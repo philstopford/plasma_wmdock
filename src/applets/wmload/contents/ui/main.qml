@@ -55,9 +55,7 @@ Item {
             property color  col:   "#cc8800"
 
             // Clamp: bars go up to 2× core-count for visual drama
-            readonly property double pct: Math.min(1.0, load / (cores * 2))
-
-            Layout.fillWidth: true
+            readonly property double pct: Math.min(1.0, load / (Math.max(1, cores) * 2))
 
             Rectangle {
                 anchors { fill: parent }

@@ -7,6 +7,7 @@
 #include "batterymonitor.h"
 #include "audiomanager.h"
 #include "weatherprovider.h"
+#include "processlauncher.h"
 #ifdef WITH_XEMBED
 #include "xembedhost.h"
 #endif
@@ -39,6 +40,11 @@ void WMDockPlugin::registerTypes(const char *uri)
         });
 
     qmlRegisterType<WeatherProvider>(uri, 1, 0, "WeatherProvider");
+
+    qmlRegisterSingletonType<ProcessLauncher>(uri, 1, 0, "ProcessLauncher",
+        [](QQmlEngine *, QJSEngine *) -> QObject * {
+            return new ProcessLauncher();
+        });
 
 #ifdef WITH_XEMBED
     qmlRegisterType<XEmbedHost>(uri, 1, 0, "XEmbedHost");

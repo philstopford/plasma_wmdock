@@ -4,18 +4,21 @@
 
 #ifdef WITH_XEMBED
 
+#include <QAbstractNativeEventFilter>
 #include <QQuickItem>
-#include <QWindow>
+#include <QString>
 #include <xcb/xcb.h>
 
 /**
  * @brief A QQuickItem that XEMBED-hosts a legacy WindowMaker dockapp.
  *
- * Creates an off-screen X11 window acting as the XEMBED container
- * and sets it as the child of the QQuickWindow's native handle.
+ * Creates an X11 window acting as the XEMBED container and reparents
+ * dockapp windows into it.  Native XCB events are received via
+ * QAbstractNativeEventFilter (the correct Qt6 mechanism).
+ *
  * Only available when compiled with WITH_XEMBED=1 on X11 sessions.
  */
-class XEmbedHost : public QQuickItem
+class XEmbedHost : public QQuickItem, public QAbstractNativeEventFilter
 {
     Q_OBJECT
     Q_PROPERTY(QString command   READ command   WRITE setCommand  NOTIFY commandChanged)
@@ -35,23 +38,24 @@ public:
     Q_INVOKABLE void launch();
     Q_INVOKABLE void detach();
 
+    // QAbstractNativeEventFilter
+    bool nativeEventFilter(const QByteArray &eventType,
+                           void             *message,
+                           qintptr          *result) override;
+
 Q_SIGNALS:
     void commandChanged();
     void clientChanged();
-
-protected:
-    bool event(QEvent *e) override;
 
 private:
     void createEmbedWindow();
     void destroyEmbedWindow();
     void handleXcbEvent(xcb_generic_event_t *event);
 
-    QString  m_command;
+    QString          m_command;
     xcb_connection_t *m_conn      = nullptr;
     xcb_window_t      m_embedWin  = 0;
     quint32           m_clientWId = 0;
-    qint64            m_pid       = 0;
 };
 
 #endif // WITH_XEMBED

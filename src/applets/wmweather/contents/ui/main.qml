@@ -125,12 +125,12 @@ Item {
         Text {
             text: "💨" + wp.windSpeed.toFixed(0) + "km/h"
             color: "#5588bb"
-            font { pixelSize: parent.height * 0.09; family: "monospace" }
+            font { pixelSize: root.height * 0.09; family: "monospace" }
         }
         Text {
             text: "💧" + wp.humidity.toFixed(0) + "%"
             color: "#448888"
-            font { pixelSize: parent.height * 0.09; family: "monospace" }
+            font { pixelSize: root.height * 0.09; family: "monospace" }
         }
     }
 

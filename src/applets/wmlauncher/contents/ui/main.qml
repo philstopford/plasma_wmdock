@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick.Controls as QQC2
 import org.kde.plasma.plasmoid
 import org.kde.kirigami as Kirigami
+import org.kde.plasma.private.wmdock 1.0
 
 /**
  * WMLauncher – Application launcher button.
@@ -102,29 +103,13 @@ Item {
         onPressed:  root.pressed = true
         onReleased: root.pressed = false
         onTapped: {
-            Qt.openUrlExternally("exec://" + root.launchCommand)
-            // Use QProcess-style launch via system() shim:
-            launchTimer.start()
+            root.pressed = false
+            launchApp()
         }
     }
 
-    // Short press animation before launch
-    Timer {
-        id: launchTimer
-        interval: 80
-        onTriggered: {
-            root.pressed = false
-            // Launch via KIO / D-Bus service launcher
-            const parts  = root.launchCommand.trim().split(/\s+/)
-            const prog   = parts[0]
-            const args   = parts.slice(1)
-            Qt.createQmlObject(
-                'import QtQuick; import QtQuick.Controls 2.0;' +
-                'Component.onCompleted: { Qt.exit(0); }',
-                root)
-            // Fallback: open as URL which KIO will route to exec handler
-            Qt.openUrlExternally("exec:" + root.launchCommand)
-        }
+    function launchApp() {
+        ProcessLauncher.launch(root.launchCommand)
     }
 
     // Tooltip showing command
