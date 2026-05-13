@@ -1,0 +1,12 @@
+{
+    "KPlugin": {
+        "Category": "System Information",
+        "Description": "Memory and swap usage styled after wmmemmon",
+        "Icon": "media-flash",
+        "Id": "org.kde.plasma.wmmem",
+        "License": "GPL-2.0-or-later",
+        "Name": "WMMemMon"
+    },
+    "X-Plasma-API-Minimum-Version": "2.0",
+    "KPackageStructure": "Plasma/Applet"
+}

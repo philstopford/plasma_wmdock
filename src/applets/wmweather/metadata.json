@@ -1,0 +1,12 @@
+{
+    "KPlugin": {
+        "Category": "Weather",
+        "Description": "Current weather conditions from Open-Meteo (no API key required)",
+        "Icon": "weather-clear",
+        "Id": "org.kde.plasma.wmweather",
+        "License": "GPL-2.0-or-later",
+        "Name": "WMWeather"
+    },
+    "X-Plasma-API-Minimum-Version": "2.0",
+    "KPackageStructure": "Plasma/Applet"
+}

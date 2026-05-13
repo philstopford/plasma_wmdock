@@ -1,0 +1,20 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "Plasma WM Dock Contributors",
+                "Email": ""
+            }
+        ],
+        "Category": "Utilities",
+        "Description": "A WindowMaker-style dock panel hosting multiple 64×64 system applets",
+        "Icon": "preferences-system-windows",
+        "Id": "org.kde.plasma.wmdock",
+        "License": "GPL-2.0-or-later",
+        "Name": "WM Dock",
+        "Version": "1.0",
+        "Website": "https://github.com/philstopford/plasma_wmdock"
+    },
+    "X-Plasma-API-Minimum-Version": "2.0",
+    "KPackageStructure": "Plasma/Applet"
+}

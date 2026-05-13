@@ -1,0 +1,12 @@
+{
+    "KPlugin": {
+        "Category": "Date and Time",
+        "Description": "Analog and digital clock in classic WindowMaker dockapp style",
+        "Icon": "clock",
+        "Id": "org.kde.plasma.wmclock",
+        "License": "GPL-2.0-or-later",
+        "Name": "WMClock"
+    },
+    "X-Plasma-API-Minimum-Version": "2.0",
+    "KPackageStructure": "Plasma/Applet"
+}
