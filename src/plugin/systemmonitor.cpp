@@ -40,25 +40,24 @@ void SystemMonitor::update()
 // CPU
 // ---------------------------------------------------------------------------
 
-static SystemMonitor::CpuStat parseCpuLine(const QString &line)
-{
-    SystemMonitor::CpuStat s;
-    // Skip the "cpuN" token
-    const QStringList parts = line.split(QLatin1Char(' '), Qt::SkipEmptyParts);
-    if (parts.size() < 5) return s;
-    s.user    = parts[1].toLongLong();
-    s.nice    = parts[2].toLongLong();
-    s.system  = parts[3].toLongLong();
-    s.idle    = parts[4].toLongLong();
-    if (parts.size() > 5) s.iowait  = parts[5].toLongLong();
-    if (parts.size() > 6) s.irq     = parts[6].toLongLong();
-    if (parts.size() > 7) s.softirq = parts[7].toLongLong();
-    if (parts.size() > 8) s.steal   = parts[8].toLongLong();
-    return s;
-}
-
 void SystemMonitor::readCpu()
 {
+    const auto parseCpuLine = [](const QString &line) {
+        CpuStat s;
+        // Skip the "cpuN" token
+        const QStringList parts = line.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+        if (parts.size() < 5) return s;
+        s.user    = parts[1].toLongLong();
+        s.nice    = parts[2].toLongLong();
+        s.system  = parts[3].toLongLong();
+        s.idle    = parts[4].toLongLong();
+        if (parts.size() > 5) s.iowait  = parts[5].toLongLong();
+        if (parts.size() > 6) s.irq     = parts[6].toLongLong();
+        if (parts.size() > 7) s.softirq = parts[7].toLongLong();
+        if (parts.size() > 8) s.steal   = parts[8].toLongLong();
+        return s;
+    };
+
     QFile f(QStringLiteral("/proc/stat"));
     if (!f.open(QIODevice::ReadOnly | QIODevice::Text))
         return;
