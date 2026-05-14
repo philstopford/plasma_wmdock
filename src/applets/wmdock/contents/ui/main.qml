@@ -205,11 +205,11 @@ PlasmoidItem {
         footer: QQC2.DialogButtonBox {
             QQC2.Button {
                 text: i18n("Add")
-                DialogButtonBox.buttonRole: QQC2.DialogButtonBox.AcceptRole
+                QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.AcceptRole
             }
             QQC2.Button {
                 text: i18n("Cancel")
-                DialogButtonBox.buttonRole: QQC2.DialogButtonBox.RejectRole
+                QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.RejectRole
             }
         }
 

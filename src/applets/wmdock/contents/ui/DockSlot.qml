@@ -111,16 +111,16 @@ Item {
     // -----------------------------------------------------------------------
     function resolveSource(id) {
         const map = {
-            "org.kde.plasma.wmclock":    Qt.resolvedUrl("../../../wmclock/contents/ui/main.qml"),
-            "org.kde.plasma.wmcpu":      Qt.resolvedUrl("../../../wmcpu/contents/ui/main.qml"),
-            "org.kde.plasma.wmmem":      Qt.resolvedUrl("../../../wmmem/contents/ui/main.qml"),
-            "org.kde.plasma.wmbattery":  Qt.resolvedUrl("../../../wmbattery/contents/ui/main.qml"),
-            "org.kde.plasma.wmnet":      Qt.resolvedUrl("../../../wmnet/contents/ui/main.qml"),
-            "org.kde.plasma.wmmixer":    Qt.resolvedUrl("../../../wmmixer/contents/ui/main.qml"),
-            "org.kde.plasma.wmload":     Qt.resolvedUrl("../../../wmload/contents/ui/main.qml"),
-            "org.kde.plasma.wmcal":      Qt.resolvedUrl("../../../wmcal/contents/ui/main.qml"),
-            "org.kde.plasma.wmlauncher": Qt.resolvedUrl("../../../wmlauncher/contents/ui/main.qml"),
-            "org.kde.plasma.wmweather":  Qt.resolvedUrl("../../../wmweather/contents/ui/main.qml"),
+            "org.kde.plasma.wmclock":    Qt.resolvedUrl("../../../wmclock/contents/ui/Display.qml"),
+            "org.kde.plasma.wmcpu":      Qt.resolvedUrl("../../../wmcpu/contents/ui/Display.qml"),
+            "org.kde.plasma.wmmem":      Qt.resolvedUrl("../../../wmmem/contents/ui/Display.qml"),
+            "org.kde.plasma.wmbattery":  Qt.resolvedUrl("../../../wmbattery/contents/ui/Display.qml"),
+            "org.kde.plasma.wmnet":      Qt.resolvedUrl("../../../wmnet/contents/ui/Display.qml"),
+            "org.kde.plasma.wmmixer":    Qt.resolvedUrl("../../../wmmixer/contents/ui/Display.qml"),
+            "org.kde.plasma.wmload":     Qt.resolvedUrl("../../../wmload/contents/ui/Display.qml"),
+            "org.kde.plasma.wmcal":      Qt.resolvedUrl("../../../wmcal/contents/ui/Display.qml"),
+            "org.kde.plasma.wmlauncher": Qt.resolvedUrl("../../../wmlauncher/contents/ui/Display.qml"),
+            "org.kde.plasma.wmweather":  Qt.resolvedUrl("../../../wmweather/contents/ui/Display.qml"),
         }
         return map[id] || ""
     }
