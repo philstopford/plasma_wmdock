@@ -8,7 +8,7 @@
 #include <QGuiApplication>
 #include <QProcess>
 #include <xcb/xcb.h>
-#include <private/qx11info_x11_p.h>   // QX11Info (Qt6 private)
+#include <private/qtx11extras_p.h>    // QX11Info (Qt6 private)
 
 // XEMBED client message sub-types
 static const uint32_t XEMBED_EMBEDDED_NOTIFY = 0;
