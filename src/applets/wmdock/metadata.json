@@ -15,6 +15,6 @@
         "Version": "1.0",
         "Website": "https://github.com/philstopford/plasma_wmdock"
     },
-    "X-Plasma-API-Minimum-Version": "2.0",
+    "X-Plasma-API-Minimum-Version": "6.0",
     "KPackageStructure": "Plasma/Applet"
 }
