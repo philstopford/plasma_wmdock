@@ -1,5 +1,6 @@
 set(PLUGIN_SOURCES
     wmdockplugin.cpp
+    processlauncher.h
     systemmonitor.cpp
     networkmonitor.cpp
     batterymonitor.cpp
