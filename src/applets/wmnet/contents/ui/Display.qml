@@ -27,11 +27,10 @@ Item {
     // Apply saved interface preference once the component is ready
     Component.onCompleted: {
         const cfg = Plasmoid.configuration.iface
-        console.log("[wmnet] Display loaded; configured iface='" + cfg
-                    + "' detected iface='" + NetworkMonitor.iface + "'")
+        console.log(`[wmnet] Display loaded; configured iface='${cfg}' detected iface='${NetworkMonitor.iface}'`)
         if (cfg && cfg.length > 0) {
             NetworkMonitor.setIface(cfg)
-            console.log("[wmnet] applied configured iface: " + cfg)
+            console.log(`[wmnet] applied configured iface: ${cfg}`)
         }
         graph.requestPaint()
     }
@@ -41,8 +40,7 @@ Item {
         function onStatsChanged() {
             const rx = NetworkMonitor.rxBytesPerSec
             const tx = NetworkMonitor.txBytesPerSec
-            console.log("[wmnet] statsChanged: iface=" + NetworkMonitor.iface
-                        + " rx=" + rx.toFixed(0) + "B/s tx=" + tx.toFixed(0) + "B/s")
+            console.log(`[wmnet] statsChanged: iface=${NetworkMonitor.iface} rx=${rx.toFixed(0)}B/s tx=${tx.toFixed(0)}B/s`)
 
             let rh = [...root.rxHistory, rx]
             let th = [...root.txHistory, tx]

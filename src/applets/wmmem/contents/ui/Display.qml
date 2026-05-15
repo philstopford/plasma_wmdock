@@ -20,16 +20,13 @@ Item {
     id: root
 
     Component.onCompleted: {
-        console.log("[wmmem] Display loaded; memUsage=" + SystemMonitor.memUsage.toFixed(1)
-                    + "% memTotal=" + SystemMonitor.memTotal
-                    + " swapUsage=" + SystemMonitor.swapUsage.toFixed(1) + "%")
+        console.log(`[wmmem] Display loaded; memUsage=${SystemMonitor.memUsage.toFixed(1)}% memTotal=${SystemMonitor.memTotal} swapUsage=${SystemMonitor.swapUsage.toFixed(1)}%`)
     }
 
     Connections {
         target: SystemMonitor
         function onMemoryChanged() {
-            console.log("[wmmem] memoryChanged: RAM=" + SystemMonitor.memUsage.toFixed(1)
-                        + "% SWAP=" + SystemMonitor.swapUsage.toFixed(1) + "%")
+            console.log(`[wmmem] memoryChanged: RAM=${SystemMonitor.memUsage.toFixed(1)}% SWAP=${SystemMonitor.swapUsage.toFixed(1)}%`)
         }
     }
 
