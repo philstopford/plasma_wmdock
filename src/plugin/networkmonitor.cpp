@@ -114,7 +114,7 @@ void NetworkMonitor::update()
     m_rxTotal = rxNow;
     m_txTotal = txNow;
 
-    if (dtSec > 0 && m_rxPrev != 0) {
+    if (dtSec > 0) {
         m_rxRate = double(rxNow - m_rxPrev) / dtSec;
         m_txRate = double(txNow - m_txPrev) / dtSec;
     } else {

@@ -3,21 +3,21 @@
 #pragma once
 
 #include <QObject>
-#include <QDBusInterface>
+#include <QTimer>
 
 /**
- * @brief Audio volume management via PulseAudio / PipeWire D-Bus.
+ * @brief Audio volume management via pactl (PulseAudio / PipeWire-pulse).
  *
- * Wraps the org.PulseAudio.Core1 D-Bus API (which is also exported
- * by PipeWire-pulse).  Falls back to a no-op stub when neither
- * daemon is available.
+ * Polls the default sink's volume and mute state using pactl every two
+ * seconds.  Falls back to an unavailable state when pactl is not present
+ * or no default sink exists.
  */
 class AudioManager : public QObject
 {
     Q_OBJECT
 
-    Q_PROPERTY(int     volume       READ volume       WRITE setVolume   NOTIFY volumeChanged)
-    Q_PROPERTY(bool    muted        READ muted        WRITE setMuted    NOTIFY mutedChanged)
+    Q_PROPERTY(int     volume       READ volume       NOTIFY volumeChanged)
+    Q_PROPERTY(bool    muted        READ muted        NOTIFY mutedChanged)
     Q_PROPERTY(bool    available    READ available    NOTIFY availableChanged)
 
 public:
@@ -37,16 +37,12 @@ Q_SIGNALS:
     void availableChanged();
 
 private Q_SLOTS:
-    void onVolumeChanged(const QDBusVariant &v);
-    void onMuteChanged(const QDBusVariant &v);
+    void poll();
 
 private:
-    bool connectToPulse();
-    void refreshSinkInfo();
-
-    QDBusInterface *m_core  = nullptr;
-    QDBusInterface *m_sink  = nullptr;
-    bool   m_available      = false;
-    int    m_volume         = 0;
-    bool   m_muted          = false;
+    QTimer m_timer;
+    QRegularExpression m_volRe;
+    bool   m_available = false;
+    int    m_volume    = 0;
+    bool   m_muted     = false;
 };

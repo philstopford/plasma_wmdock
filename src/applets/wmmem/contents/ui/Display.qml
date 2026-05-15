@@ -11,6 +11,11 @@ import org.kde.plasma.private.wmdock 1.0
 Item {
     id: root
 
+    // Relay SystemMonitor values at root scope so Qt6 inline-component
+    // property bindings re-evaluate correctly when the notify signal fires.
+    readonly property double ramPct:  SystemMonitor.memUsage
+    readonly property double swapPct: SystemMonitor.swapUsage
+
     // -----------------------------------------------------------------------
     // Background
     // -----------------------------------------------------------------------
@@ -109,7 +114,7 @@ Item {
         anchors.top: parent.top
         anchors.topMargin: parent.height * 0.18
         label:    "RAM"
-        pct:      SystemMonitor.memUsage
+        pct:      root.ramPct
         barColor: "#0088ff"
     }
 
@@ -121,7 +126,7 @@ Item {
         anchors.top: ramRow.bottom
         anchors.topMargin: 3
         label:    "SWP"
-        pct:      SystemMonitor.swapUsage
+        pct:      root.swapPct
         barColor: "#ff8800"
     }
 

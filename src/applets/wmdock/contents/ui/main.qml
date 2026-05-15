@@ -198,7 +198,7 @@ PlasmoidItem {
                     onClicked: appletPickerList.currentIndex = index
                 }
 
-                ScrollBar.vertical: QQC2.ScrollBar {}
+                QQC2.ScrollBar.vertical: QQC2.ScrollBar {}
             }
         }
 

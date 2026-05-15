@@ -99,13 +99,10 @@ Item {
     // Interaction
     // -----------------------------------------------------------------------
     TapHandler {
+        id: tapHandler
         acceptedButtons: Qt.LeftButton
-        onPressed:  root.pressed = true
-        onReleased: root.pressed = false
-        onTapped: {
-            root.pressed = false
-            launchApp()
-        }
+        onPressedChanged: root.pressed = tapHandler.pressed
+        onTapped: launchApp()
     }
 
     function launchApp() {

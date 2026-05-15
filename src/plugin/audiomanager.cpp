@@ -3,120 +3,92 @@
 
 #include "audiomanager.h"
 
-#include <QDBusConnection>
-#include <QDBusInterface>
-#include <QDBusReply>
-#include <QDBusMetaType>
-#include <QVariant>
-#include <cmath>
-
-// PulseAudio volume constant: PA_VOLUME_NORM = 65536
-static const quint32 PA_VOLUME_NORM = 65536;
+#include <QProcess>
+#include <QRegularExpression>
 
 AudioManager::AudioManager(QObject *parent)
     : QObject(parent)
+    , m_volRe(QStringLiteral(R"(/ {0,2}(\d+)%)"))
 {
-    qDBusRegisterMetaType<QList<quint32>>();
-    connectToPulse();
+    connect(&m_timer, &QTimer::timeout, this, &AudioManager::poll);
+    m_timer.setInterval(2000);
+    m_timer.start();
+    poll(); // initial read
 }
 
-bool AudioManager::connectToPulse()
+void AudioManager::poll()
 {
-    // PulseAudio / PipeWire-pulse server address is found via
-    // the PULSE_DBUS_SERVER env var or the session D-Bus lookup
-    auto sessionBus = QDBusConnection::sessionBus();
+    // Query volume for the default sink
+    QProcess vp;
+    vp.start(QStringLiteral("pactl"),
+             QStringList{QStringLiteral("get-sink-volume"),
+                         QStringLiteral("@DEFAULT_SINK@")});
+    if (!vp.waitForFinished(500) || vp.exitCode() != 0) {
+        if (m_available) {
+            m_available = false;
+            Q_EMIT availableChanged();
+        }
+        return;
+    }
 
-    QDBusInterface lookup(QStringLiteral("org.PulseAudio1"),
-                          QStringLiteral("/org/pulseaudio/server_lookup1"),
-                          QStringLiteral("org.PulseAudio.ServerLookup1"),
-                          sessionBus);
-    if (!lookup.isValid()) return false;
+    if (!m_available) {
+        m_available = true;
+        Q_EMIT availableChanged();
+    }
 
-    const QString address = lookup.property("Address").toString();
-    if (address.isEmpty()) return false;
-
-    auto paBus = QDBusConnection::connectToBus(address, QStringLiteral("pulse"));
-
-    m_core = new QDBusInterface(QStringLiteral("org.PulseAudio.Core1"),
-                                QStringLiteral("/org/pulseaudio/core1"),
-                                QStringLiteral("org.PulseAudio.Core1"),
-                                paBus, this);
-    if (!m_core->isValid()) return false;
-
-    // Get the first sink
-    QDBusReply<QList<QDBusObjectPath>> sinks = m_core->call(QStringLiteral("GetSinks"));
-    if (!sinks.isValid() || sinks.value().isEmpty()) return false;
-
-    const QString sinkPath = sinks.value().first().path();
-    m_sink = new QDBusInterface(QStringLiteral("org.PulseAudio.Core1"),
-                                sinkPath,
-                                QStringLiteral("org.PulseAudio.Core1.Device"),
-                                paBus, this);
-
-    // Connect property change signals
-    paBus.connect(QString(), sinkPath,
-                  QStringLiteral("org.PulseAudio.Core1.Device"),
-                  QStringLiteral("VolumeUpdated"),
-                  this, SLOT(onVolumeChanged(QDBusVariant)));
-    paBus.connect(QString(), sinkPath,
-                  QStringLiteral("org.PulseAudio.Core1.Device"),
-                  QStringLiteral("MuteUpdated"),
-                  this, SLOT(onMuteChanged(QDBusVariant)));
-
-    m_available = true;
-    Q_EMIT availableChanged();
-    refreshSinkInfo();
-    return true;
-}
-
-void AudioManager::refreshSinkInfo()
-{
-    if (!m_sink) return;
-
-    // Volume is a list of per-channel quint32 values
-    const QVariant volVar = m_sink->property("Volume");
-    QList<quint32> channels = volVar.value<QList<quint32>>();
-    if (!channels.isEmpty()) {
-        const quint32 avg = *std::max_element(channels.begin(), channels.end());
-        const int pct = qBound(0, int(std::round(double(avg) / PA_VOLUME_NORM * 100.0)), 150);
-        if (pct != m_volume) {
-            m_volume = pct;
+    // Parse the first percentage from output:
+    // "Volume: front-left: 52428 /  80% / -5.94 dB,  front-right: …"
+    const QString volOut = QString::fromLocal8Bit(vp.readAllStandardOutput());
+    const QRegularExpressionMatch m = m_volRe.match(volOut);
+    if (m.hasMatch()) {
+        const int vol = qBound(0, m.captured(1).toInt(), 150);
+        if (vol != m_volume) {
+            m_volume = vol;
             Q_EMIT volumeChanged();
         }
     }
 
-    const bool muted = m_sink->property("Mute").toBool();
+    // Query mute state
+    QProcess mp;
+    mp.start(QStringLiteral("pactl"),
+             QStringList{QStringLiteral("get-sink-mute"),
+                         QStringLiteral("@DEFAULT_SINK@")});
+    if (mp.waitForFinished(500) && mp.exitCode() == 0) {
+        const QString muteOut = QString::fromLocal8Bit(mp.readAllStandardOutput());
+        const bool muted = muteOut.contains(QStringLiteral("Mute: yes"));
+        if (muted != m_muted) {
+            m_muted = muted;
+            Q_EMIT mutedChanged();
+        }
+    }
+}
+
+void AudioManager::setVolume(int percent)
+{
+    percent = qBound(0, percent, 150);
+    QProcess::startDetached(QStringLiteral("pactl"),
+        QStringList{QStringLiteral("set-sink-volume"),
+                    QStringLiteral("@DEFAULT_SINK@"),
+                    QString::number(percent) + QLatin1Char('%')});
+    if (percent != m_volume) {
+        m_volume = percent;
+        Q_EMIT volumeChanged();
+    }
+}
+
+void AudioManager::setMuted(bool muted)
+{
+    QProcess::startDetached(QStringLiteral("pactl"),
+        QStringList{QStringLiteral("set-sink-mute"),
+                    QStringLiteral("@DEFAULT_SINK@"),
+                    muted ? QStringLiteral("1") : QStringLiteral("0")});
     if (muted != m_muted) {
         m_muted = muted;
         Q_EMIT mutedChanged();
     }
 }
 
-void AudioManager::setVolume(int percent)
-{
-    if (!m_sink) return;
-    percent = qBound(0, percent, 150);
-    const quint32 vol = quint32(double(percent) / 100.0 * PA_VOLUME_NORM);
-    m_sink->setProperty("Volume", QVariant::fromValue(QList<quint32>{vol, vol}));
-}
-
-void AudioManager::setMuted(bool muted)
-{
-    if (!m_sink) return;
-    m_sink->setProperty("Mute", muted);
-}
-
 void AudioManager::toggleMute()
 {
     setMuted(!m_muted);
-}
-
-void AudioManager::onVolumeChanged(const QDBusVariant & /*v*/)
-{
-    refreshSinkInfo();
-}
-
-void AudioManager::onMuteChanged(const QDBusVariant & /*v*/)
-{
-    refreshSinkInfo();
 }
