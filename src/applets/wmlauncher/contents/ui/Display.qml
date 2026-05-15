@@ -19,7 +19,7 @@ Item {
 
     // Persisted configuration
     property string launchCommand:  Plasmoid.configuration.command  || "konsole"
-    property string launchIcon:     Plasmoid.configuration.icon     || "application-x-executable"
+    property string launchIcon:     Plasmoid.configuration.icon     || "utilities-terminal"
     property string launchLabel:    Plasmoid.configuration.label    || "Launch"
     property bool   showLabel:      Plasmoid.configuration.showLabel !== false
 

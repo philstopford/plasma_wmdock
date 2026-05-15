@@ -141,13 +141,19 @@ Item {
     TapHandler {
         onDoubleTapped: wp.refresh()
     }
+
+    // Compute tooltip text as a property to avoid binding-loop on QQC2.ToolTip.text
+    readonly property string _tipText: {
+        const loc = "\nLat: " + wp.latitude.toFixed(2) +
+                    " Lon: " + wp.longitude.toFixed(2) +
+                    "\nDouble-click to refresh"
+        return wp.error.length > 0 ? wp.error + loc : wp.description + loc
+    }
+
     QQC2.ToolTip {
         visible: hoverH.hovered
-        text:    (wp.error.length > 0 ? wp.error : wp.description) +
-                 "\nLat: " + wp.latitude.toFixed(2) +
-                 " Lon: " + wp.longitude.toFixed(2) +
-                 "\nDouble-click to refresh"
-        delay: 700
+        text:    root._tipText
+        delay:   700
     }
     HoverHandler { id: hoverH }
 }
