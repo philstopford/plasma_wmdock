@@ -33,8 +33,6 @@ PlasmoidItem {
     // Fill full representation immediately (no compact icon)
     preferredRepresentation: fullRepresentation
 
-    Plasmoid.constraintHints: PlasmaCore.Types.CanFillArea
-
     // -----------------------------------------------------------------------
     // Sizing
     // -----------------------------------------------------------------------
@@ -171,34 +169,35 @@ PlasmoidItem {
                 Layout.fillWidth: true
             }
 
-            ListView {
-                id: appletPickerList
+            QQC2.ScrollView {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
-                currentIndex: 0
 
-                model: ListModel {
-                    ListElement { label: "WMClock – Analog/digital clock";    appletId: "org.kde.plasma.wmclock"   }
-                    ListElement { label: "WMCPUMon – CPU usage graph";        appletId: "org.kde.plasma.wmcpu"     }
-                    ListElement { label: "WMMemMon – Memory usage";           appletId: "org.kde.plasma.wmmem"     }
-                    ListElement { label: "WMBattery – Battery status";        appletId: "org.kde.plasma.wmbattery" }
-                    ListElement { label: "WMNet – Network traffic";           appletId: "org.kde.plasma.wmnet"     }
-                    ListElement { label: "WMMixer – Volume control";          appletId: "org.kde.plasma.wmmixer"   }
-                    ListElement { label: "WMLoad – Load average";             appletId: "org.kde.plasma.wmload"    }
-                    ListElement { label: "WMCalendar – Date/calendar";        appletId: "org.kde.plasma.wmcal"     }
-                    ListElement { label: "WMLauncher – App launcher button";  appletId: "org.kde.plasma.wmlauncher"}
-                    ListElement { label: "WMWeather – Weather conditions";    appletId: "org.kde.plasma.wmweather" }
+                ListView {
+                    id: appletPickerList
+                    currentIndex: 0
+
+                    model: ListModel {
+                        ListElement { label: "WMClock – Analog/digital clock";    appletId: "org.kde.plasma.wmclock"   }
+                        ListElement { label: "WMCPUMon – CPU usage graph";        appletId: "org.kde.plasma.wmcpu"     }
+                        ListElement { label: "WMMemMon – Memory usage";           appletId: "org.kde.plasma.wmmem"     }
+                        ListElement { label: "WMBattery – Battery status";        appletId: "org.kde.plasma.wmbattery" }
+                        ListElement { label: "WMNet – Network traffic";           appletId: "org.kde.plasma.wmnet"     }
+                        ListElement { label: "WMMixer – Volume control";          appletId: "org.kde.plasma.wmmixer"   }
+                        ListElement { label: "WMLoad – Load average";             appletId: "org.kde.plasma.wmload"    }
+                        ListElement { label: "WMCalendar – Date/calendar";        appletId: "org.kde.plasma.wmcal"     }
+                        ListElement { label: "WMLauncher – App launcher button";  appletId: "org.kde.plasma.wmlauncher"}
+                        ListElement { label: "WMWeather – Weather conditions";    appletId: "org.kde.plasma.wmweather" }
+                    }
+
+                    delegate: QQC2.ItemDelegate {
+                        width: ListView.view.width
+                        text: model.label
+                        highlighted: ListView.isCurrentItem
+                        onClicked: appletPickerList.currentIndex = index
+                    }
                 }
-
-                delegate: QQC2.ItemDelegate {
-                    width: ListView.view.width
-                    text: model.label
-                    highlighted: ListView.isCurrentItem
-                    onClicked: appletPickerList.currentIndex = index
-                }
-
-                QQC2.ScrollBar.vertical: QQC2.ScrollBar {}
             }
         }
 

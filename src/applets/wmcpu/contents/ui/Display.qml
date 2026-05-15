@@ -20,6 +20,11 @@ Item {
     // Core usage (array of 0–100 values)
     property var coreUsage: SystemMonitor.cpuCoreUsage
 
+    Component.onCompleted: {
+        graph.requestPaint()
+        coreBar.requestPaint()
+    }
+
     Connections {
         target: SystemMonitor
         function onCpuUsageChanged() {

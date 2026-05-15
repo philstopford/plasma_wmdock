@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 import QtQuick
 import QtQuick.Controls as QQC2
+import org.kde.plasma.plasmoid
 import org.kde.plasma.private.wmdock 1.0
 import org.kde.kirigami as Kirigami
 
