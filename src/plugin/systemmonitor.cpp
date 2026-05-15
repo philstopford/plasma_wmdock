@@ -6,6 +6,7 @@
 #include <QFile>
 #include <QTextStream>
 #include <QDateTime>
+#include <QDebug>
 
 SystemMonitor::SystemMonitor(QObject *parent)
     : QObject(parent)
@@ -13,6 +14,7 @@ SystemMonitor::SystemMonitor(QObject *parent)
     connect(&m_timer, &QTimer::timeout, this, &SystemMonitor::update);
     m_timer.setInterval(1000);
     m_timer.start();
+    qDebug() << "[wmdock/SystemMonitor] created, timer started";
     update(); // initial read to populate m_prevStats
 }
 
@@ -94,6 +96,7 @@ void SystemMonitor::readCpu()
 
     m_cpuCoreUsage = coreList;
     m_prevStats    = current;
+    qDebug() << "[wmdock/SystemMonitor] cpuUsage=" << m_cpuUsage << "% cores=" << coreList.size();
     Q_EMIT cpuUsageChanged();
 }
 
@@ -136,6 +139,7 @@ void SystemMonitor::readMemory()
     m_swapUsed = m_swapTotal - swapFree;
     m_swapUsage = (m_swapTotal > 0) ? (double(m_swapUsed) / double(m_swapTotal)) * 100.0 : 0.0;
 
+    qDebug() << "[wmdock/SystemMonitor] memUsage=" << m_memUsage << "% swapUsage=" << m_swapUsage << "%";
     Q_EMIT memoryChanged();
 }
 
