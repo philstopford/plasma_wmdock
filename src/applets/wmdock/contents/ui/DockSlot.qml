@@ -53,7 +53,7 @@ Item {
 
         onStatusChanged: {
             if (status === Loader.Error) {
-                console.warn("WMDock: failed to load applet", appletId, errorString())
+                console.warn("WMDock: failed to load applet", appletId, appletLoader.errorString)
             }
         }
     }
@@ -111,16 +111,16 @@ Item {
     // -----------------------------------------------------------------------
     function resolveSource(id) {
         const map = {
-            "org.kde.plasma.wmclock":    Qt.resolvedUrl("../../../wmclock/contents/ui/Display.qml"),
-            "org.kde.plasma.wmcpu":      Qt.resolvedUrl("../../../wmcpu/contents/ui/Display.qml"),
-            "org.kde.plasma.wmmem":      Qt.resolvedUrl("../../../wmmem/contents/ui/Display.qml"),
-            "org.kde.plasma.wmbattery":  Qt.resolvedUrl("../../../wmbattery/contents/ui/Display.qml"),
-            "org.kde.plasma.wmnet":      Qt.resolvedUrl("../../../wmnet/contents/ui/Display.qml"),
-            "org.kde.plasma.wmmixer":    Qt.resolvedUrl("../../../wmmixer/contents/ui/Display.qml"),
-            "org.kde.plasma.wmload":     Qt.resolvedUrl("../../../wmload/contents/ui/Display.qml"),
-            "org.kde.plasma.wmcal":      Qt.resolvedUrl("../../../wmcal/contents/ui/Display.qml"),
-            "org.kde.plasma.wmlauncher": Qt.resolvedUrl("../../../wmlauncher/contents/ui/Display.qml"),
-            "org.kde.plasma.wmweather":  Qt.resolvedUrl("../../../wmweather/contents/ui/Display.qml"),
+            "org.kde.plasma.wmclock":    Qt.resolvedUrl("../../../org.kde.plasma.wmclock/contents/ui/Display.qml"),
+            "org.kde.plasma.wmcpu":      Qt.resolvedUrl("../../../org.kde.plasma.wmcpu/contents/ui/Display.qml"),
+            "org.kde.plasma.wmmem":      Qt.resolvedUrl("../../../org.kde.plasma.wmmem/contents/ui/Display.qml"),
+            "org.kde.plasma.wmbattery":  Qt.resolvedUrl("../../../org.kde.plasma.wmbattery/contents/ui/Display.qml"),
+            "org.kde.plasma.wmnet":      Qt.resolvedUrl("../../../org.kde.plasma.wmnet/contents/ui/Display.qml"),
+            "org.kde.plasma.wmmixer":    Qt.resolvedUrl("../../../org.kde.plasma.wmmixer/contents/ui/Display.qml"),
+            "org.kde.plasma.wmload":     Qt.resolvedUrl("../../../org.kde.plasma.wmload/contents/ui/Display.qml"),
+            "org.kde.plasma.wmcal":      Qt.resolvedUrl("../../../org.kde.plasma.wmcal/contents/ui/Display.qml"),
+            "org.kde.plasma.wmlauncher": Qt.resolvedUrl("../../../org.kde.plasma.wmlauncher/contents/ui/Display.qml"),
+            "org.kde.plasma.wmweather":  Qt.resolvedUrl("../../../org.kde.plasma.wmweather/contents/ui/Display.qml"),
         }
         return map[id] || ""
     }

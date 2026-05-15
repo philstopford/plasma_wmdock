@@ -7,14 +7,13 @@ import org.kde.plasma.private.wmdock 1.0
  *
  * Displays two horizontal bar graphs (RAM and Swap) with percentage
  * readouts, styled after the classic wmmemmon dockapp.
+ *
+ * Intentionally avoids QML inline components so that Qt6 property
+ * change notifications from the C++ singleton propagate reliably to
+ * every binding in this file.
  */
 Item {
     id: root
-
-    // Relay SystemMonitor values at root scope so Qt6 inline-component
-    // property bindings re-evaluate correctly when the notify signal fires.
-    readonly property double ramPct:  SystemMonitor.memUsage
-    readonly property double swapPct: SystemMonitor.swapUsage
 
     // -----------------------------------------------------------------------
     // Background
@@ -28,16 +27,10 @@ Item {
     }
 
     // -----------------------------------------------------------------------
-    // Layout helpers
-    // -----------------------------------------------------------------------
-    readonly property real innerW: width  - 6
-    readonly property real innerH: height - 6
-    readonly property real rowH:   (innerH - 30) / 2    // bar height
-
-    // -----------------------------------------------------------------------
     // Title
     // -----------------------------------------------------------------------
     Text {
+        id: titleText
         anchors { top: parent.top; horizontalCenter: parent.horizontalCenter; topMargin: 2 }
         text: "MEM"
         color: "#00aaff"
@@ -45,61 +38,52 @@ Item {
     }
 
     // -----------------------------------------------------------------------
-    // Helper: single stat row (label + bar + percentage)
+    // RAM row
     // -----------------------------------------------------------------------
-    component MemRow : Item {
-        id: row
-        property string label:   "RAM"
-        property double pct:     0
-        property color  barColor: "#0088ff"
+    Item {
+        id: ramRow
+        anchors {
+            top:        titleText.bottom
+            topMargin:  parent.height * 0.04
+            left:       parent.left
+            right:      parent.right
+            leftMargin: 3; rightMargin: 3
+        }
+        height: parent.height * 0.24
 
-        height: root.height * 0.26
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.leftMargin: 3
-        anchors.rightMargin: 3
-
-        // Label
         Text {
-            id: rowLabel
+            id: ramLabel
             anchors { left: parent.left; verticalCenter: parent.verticalCenter }
-            text: row.label
+            text: "RAM"
             color: "#888"
             font { pixelSize: parent.height * 0.55; family: "monospace" }
             width: parent.width * 0.22
         }
-
-        // Bar background
         Rectangle {
-            id: barBg
+            id: ramBarBg
             anchors {
-                left: rowLabel.right
-                right: pctText.left
+                left: ramLabel.right; right: ramPctText.left
                 verticalCenter: parent.verticalCenter
                 leftMargin: 2; rightMargin: 2
             }
             height: parent.height * 0.55
             color: "#0a1a0a"
             radius: 1
-
-            // Fill
             Rectangle {
-                width:  Math.max(0, Math.min(1, row.pct / 100)) * parent.width
+                width:  Math.max(0, Math.min(1, SystemMonitor.memUsage / 100)) * parent.width
                 height: parent.height
-                color:  row.pct > 90 ? "#ff3300"
-                      : row.pct > 70 ? "#aa8800"
-                      : row.barColor
+                color:  SystemMonitor.memUsage > 90 ? "#ff3300"
+                      : SystemMonitor.memUsage > 70 ? "#aa8800"
+                      : "#0088ff"
                 radius: parent.radius
                 Behavior on width { NumberAnimation { duration: 200 } }
             }
         }
-
-        // Percentage
         Text {
-            id: pctText
+            id: ramPctText
             anchors { right: parent.right; verticalCenter: parent.verticalCenter }
-            text: row.pct.toFixed(0) + "%"
-            color: row.barColor
+            text: SystemMonitor.memUsage.toFixed(0) + "%"
+            color: "#0088ff"
             font { pixelSize: parent.height * 0.52; family: "monospace" }
             width: parent.width * 0.27
             horizontalAlignment: Text.AlignRight
@@ -107,31 +91,60 @@ Item {
     }
 
     // -----------------------------------------------------------------------
-    // RAM row
-    // -----------------------------------------------------------------------
-    MemRow {
-        id: ramRow
-        anchors.top: parent.top
-        anchors.topMargin: parent.height * 0.18
-        label:    "RAM"
-        pct:      root.ramPct
-        barColor: "#0088ff"
-    }
-
-    // -----------------------------------------------------------------------
     // Swap row
     // -----------------------------------------------------------------------
-    MemRow {
+    Item {
         id: swapRow
-        anchors.top: ramRow.bottom
-        anchors.topMargin: 3
-        label:    "SWP"
-        pct:      root.swapPct
-        barColor: "#ff8800"
+        anchors {
+            top:        ramRow.bottom
+            topMargin:  3
+            left:       parent.left
+            right:      parent.right
+            leftMargin: 3; rightMargin: 3
+        }
+        height: parent.height * 0.24
+
+        Text {
+            id: swapLabel
+            anchors { left: parent.left; verticalCenter: parent.verticalCenter }
+            text: "SWP"
+            color: "#888"
+            font { pixelSize: parent.height * 0.55; family: "monospace" }
+            width: parent.width * 0.22
+        }
+        Rectangle {
+            id: swapBarBg
+            anchors {
+                left: swapLabel.right; right: swapPctText.left
+                verticalCenter: parent.verticalCenter
+                leftMargin: 2; rightMargin: 2
+            }
+            height: parent.height * 0.55
+            color: "#0a1a0a"
+            radius: 1
+            Rectangle {
+                width:  Math.max(0, Math.min(1, SystemMonitor.swapUsage / 100)) * parent.width
+                height: parent.height
+                color:  SystemMonitor.swapUsage > 90 ? "#ff3300"
+                      : SystemMonitor.swapUsage > 70 ? "#aa8800"
+                      : "#ff8800"
+                radius: parent.radius
+                Behavior on width { NumberAnimation { duration: 200 } }
+            }
+        }
+        Text {
+            id: swapPctText
+            anchors { right: parent.right; verticalCenter: parent.verticalCenter }
+            text: SystemMonitor.swapUsage.toFixed(0) + "%"
+            color: "#ff8800"
+            font { pixelSize: parent.height * 0.52; family: "monospace" }
+            width: parent.width * 0.27
+            horizontalAlignment: Text.AlignRight
+        }
     }
 
     // -----------------------------------------------------------------------
-    // Numeric values
+    // Numeric values (used / total)
     // -----------------------------------------------------------------------
     function fmtBytes(b) {
         if (b >= 1073741824) return (b / 1073741824).toFixed(1) + "G"
