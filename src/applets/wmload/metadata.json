@@ -1,0 +1,12 @@
+{
+    "KPlugin": {
+        "Category": "System Information",
+        "Description": "System load-average display styled after wmloadavg",
+        "Icon": "utilities-system-monitor",
+        "Id": "org.kde.plasma.wmload",
+        "License": "GPL-2.0-or-later",
+        "Name": "WMLoad"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "KPackageStructure": "Plasma/Applet"
+}

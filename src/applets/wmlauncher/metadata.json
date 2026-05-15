@@ -1,0 +1,12 @@
+{
+    "KPlugin": {
+        "Category": "Application Launchers",
+        "Description": "Configurable application launcher button styled after wmlauncher",
+        "Icon": "application-x-executable",
+        "Id": "org.kde.plasma.wmlauncher",
+        "License": "GPL-2.0-or-later",
+        "Name": "WMLauncher"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "KPackageStructure": "Plasma/Applet"
+}

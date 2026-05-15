@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+      http://www.kde.org/standards/kcfg/1.0/kcfg.xsd" >
+  <kcfgfile name=""/>
+
+  <group name="General">
+    <entry name="slotSize" type="Int">
+      <default>64</default>
+    </entry>
+    <entry name="slotSpacing" type="Int">
+      <default>2</default>
+    </entry>
+    <entry name="appletList" type="StringList">
+      <default>org.kde.plasma.wmclock,org.kde.plasma.wmcpu,org.kde.plasma.wmmem,org.kde.plasma.wmnet,org.kde.plasma.wmbattery,org.kde.plasma.wmmixer,org.kde.plasma.wmload,org.kde.plasma.wmcal</default>
+    </entry>
+    <entry name="showBackground" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="backgroundOpacity" type="Double">
+      <default>0.85</default>
+    </entry>
+  </group>
+</kcfg>

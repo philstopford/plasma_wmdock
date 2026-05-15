@@ -1,0 +1,12 @@
+{
+    "KPlugin": {
+        "Category": "System Information",
+        "Description": "CPU usage graph styled after wmcpuload",
+        "Icon": "cpu",
+        "Id": "org.kde.plasma.wmcpu",
+        "License": "GPL-2.0-or-later",
+        "Name": "WMCPUMon"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "KPackageStructure": "Plasma/Applet"
+}

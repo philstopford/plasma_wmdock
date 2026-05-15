@@ -1,0 +1,12 @@
+{
+    "KPlugin": {
+        "Category": "System Information",
+        "Description": "Battery status indicator styled after wmbattery",
+        "Icon": "battery",
+        "Id": "org.kde.plasma.wmbattery",
+        "License": "GPL-2.0-or-later",
+        "Name": "WMBattery"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "KPackageStructure": "Plasma/Applet"
+}

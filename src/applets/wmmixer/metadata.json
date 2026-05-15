@@ -1,0 +1,12 @@
+{
+    "KPlugin": {
+        "Category": "Multimedia",
+        "Description": "Audio volume control styled after wmmixer",
+        "Icon": "audio-volume-high",
+        "Id": "org.kde.plasma.wmmixer",
+        "License": "GPL-2.0-or-later",
+        "Name": "WMMixer"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "KPackageStructure": "Plasma/Applet"
+}

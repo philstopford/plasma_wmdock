@@ -1,0 +1,12 @@
+{
+    "KPlugin": {
+        "Category": "Date and Time",
+        "Description": "Calendar and date display styled after wmcalendar",
+        "Icon": "view-calendar",
+        "Id": "org.kde.plasma.wmcal",
+        "License": "GPL-2.0-or-later",
+        "Name": "WMCalendar"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "KPackageStructure": "Plasma/Applet"
+}

@@ -1,0 +1,12 @@
+{
+    "KPlugin": {
+        "Category": "System Information",
+        "Description": "Network traffic monitor styled after wmnet",
+        "Icon": "network-wired",
+        "Id": "org.kde.plasma.wmnet",
+        "License": "GPL-2.0-or-later",
+        "Name": "WMNet"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "KPackageStructure": "Plasma/Applet"
+}
