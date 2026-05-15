@@ -3,6 +3,7 @@
 #pragma once
 
 #include <QObject>
+#include <QRegularExpression>
 #include <QTimer>
 
 /**
