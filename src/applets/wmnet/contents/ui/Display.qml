@@ -31,11 +31,20 @@ Item {
     property real txMax: 1.0
 
     // Resolved interface: prefer explicit config, fall back to first non-loopback
+    // physical-looking interface (skips common virtual/container prefixes).
     readonly property string iface: {
         const cfg = Plasmoid.configuration.iface
         if (cfg && cfg.length > 0) return cfg
-        // Auto-detect: use first non-loopback from NetworkMonitor
+        // Auto-detect: skip loopback and well-known virtual interface prefixes
+        const virtualPrefixes = ["lo", "docker", "veth", "br-", "virbr", "dummy", "tun", "tap"]
         const list = NetworkMonitor.interfaces
+        // First pass: prefer a likely physical interface
+        for (let i = 0; i < list.length; ++i) {
+            const name = list[i]
+            if (!virtualPrefixes.some(function(p) { return name.startsWith(p) }))
+                return name
+        }
+        // Second pass: at least skip pure loopback
         for (let i = 0; i < list.length; ++i) {
             if (!list[i].startsWith("lo")) return list[i]
         }

@@ -66,6 +66,8 @@ Item {
             coreBar.requestPaint()
         }
         xhr.onerror = function () {
+            console.warn("wmcpu: failed to read /sys/devices/system/cpu/present (status "
+                         + xhr.status + "); falling back to 4 cores")
             root.coreCount = 4
             coreModel.sensors = ["cpu/cpu0/usage","cpu/cpu1/usage",
                                   "cpu/cpu2/usage","cpu/cpu3/usage"]
@@ -138,7 +140,7 @@ Item {
             const barH = height
 
             for (let i = 0; i < vals.length; ++i) {
-                const pct = Math.min(1, Math.max(0, vals[i] / 100))
+                const pct = Math.min(100, Math.max(0, vals[i])) / 100
                 const bh  = Math.round(pct * barH)
                 const hue = pct > 0.75 ? "#ff4400" : pct > 0.5 ? "#aacc00" : "#00cc00"
                 ctx.fillStyle = "#001100"
