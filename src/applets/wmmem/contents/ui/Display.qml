@@ -1,19 +1,43 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 import QtQuick
-import org.kde.plasma.private.wmdock 1.0
+import org.kde.ksystemstats 1.0
 
 /**
  * WMMemMon – Memory and swap usage applet.
  *
+ * Uses KDE's org.kde.ksystemstats QML API (same backend as KDE's own
+ * "Memory Usage" widget).  The ksystemstats memory plugin reports totals
+ * and used amounts in KiB (matching /proc/meminfo units), so fmtKiB() is
+ * used for byte display instead of a raw-byte formatter.
+ *
  * Displays two horizontal bar graphs (RAM and Swap) with percentage
  * readouts, styled after the classic wmmemmon dockapp.
- *
- * Intentionally avoids QML inline components so that Qt6 property
- * change notifications from the C++ singleton propagate reliably to
- * every binding in this file.
  */
 Item {
     id: root
+
+    // -----------------------------------------------------------------------
+    // ksystemstats sensors
+    // -----------------------------------------------------------------------
+    Sensor { id: memUsedPctSensor;  sensorId: "memory/physical/usedPercent"; enabled: true }
+    Sensor { id: memUsedSensor;     sensorId: "memory/physical/used";        enabled: true }
+    Sensor { id: memTotalSensor;    sensorId: "memory/physical/total";       enabled: true }
+    Sensor { id: swapUsedPctSensor; sensorId: "memory/swap/usedPercent";     enabled: true }
+    Sensor { id: swapUsedSensor;    sensorId: "memory/swap/used";            enabled: true }
+    Sensor { id: swapTotalSensor;   sensorId: "memory/swap/total";           enabled: true }
+
+    // Convenience aliases with safe fallback to 0 before first data arrives
+    readonly property real memPct:   memUsedPctSensor.value  != null ? memUsedPctSensor.value  : 0
+    readonly property real swapPct:  swapUsedPctSensor.value != null ? swapUsedPctSensor.value : 0
+    readonly property real memUsed:  memUsedSensor.value     != null ? memUsedSensor.value     : 0
+    readonly property real memTotal: memTotalSensor.value    != null ? memTotalSensor.value    : 0
+
+    // KiB → human-readable string (ksystemstats memory values are in KiB)
+    function fmtKiB(kib) {
+        if (kib >= 1048576) return (kib / 1048576).toFixed(1) + "G"
+        if (kib >= 1024)    return (kib / 1024).toFixed(0)    + "M"
+        return kib.toFixed(0) + "K"
+    }
 
     // -----------------------------------------------------------------------
     // Background
@@ -70,10 +94,10 @@ Item {
             color: "#0a1a0a"
             radius: 1
             Rectangle {
-                width:  Math.max(0, Math.min(1, SystemMonitor.memUsage / 100)) * parent.width
+                width:  Math.max(0, Math.min(1, root.memPct / 100)) * parent.width
                 height: parent.height
-                color:  SystemMonitor.memUsage > 90 ? "#ff3300"
-                      : SystemMonitor.memUsage > 70 ? "#aa8800"
+                color:  root.memPct > 90 ? "#ff3300"
+                      : root.memPct > 70 ? "#aa8800"
                       : "#0088ff"
                 radius: parent.radius
                 Behavior on width { NumberAnimation { duration: 200 } }
@@ -82,7 +106,7 @@ Item {
         Text {
             id: ramPctText
             anchors { right: parent.right; verticalCenter: parent.verticalCenter }
-            text: SystemMonitor.memUsage.toFixed(0) + "%"
+            text: root.memPct.toFixed(0) + "%"
             color: "#0088ff"
             font { pixelSize: parent.height * 0.52; family: "monospace" }
             width: parent.width * 0.27
@@ -123,10 +147,10 @@ Item {
             color: "#0a1a0a"
             radius: 1
             Rectangle {
-                width:  Math.max(0, Math.min(1, SystemMonitor.swapUsage / 100)) * parent.width
+                width:  Math.max(0, Math.min(1, root.swapPct / 100)) * parent.width
                 height: parent.height
-                color:  SystemMonitor.swapUsage > 90 ? "#ff3300"
-                      : SystemMonitor.swapUsage > 70 ? "#aa8800"
+                color:  root.swapPct > 90 ? "#ff3300"
+                      : root.swapPct > 70 ? "#aa8800"
                       : "#ff8800"
                 radius: parent.radius
                 Behavior on width { NumberAnimation { duration: 200 } }
@@ -135,7 +159,7 @@ Item {
         Text {
             id: swapPctText
             anchors { right: parent.right; verticalCenter: parent.verticalCenter }
-            text: SystemMonitor.swapUsage.toFixed(0) + "%"
+            text: root.swapPct.toFixed(0) + "%"
             color: "#ff8800"
             font { pixelSize: parent.height * 0.52; family: "monospace" }
             width: parent.width * 0.27
@@ -144,21 +168,15 @@ Item {
     }
 
     // -----------------------------------------------------------------------
-    // Numeric values (used / total)
+    // Numeric values (used / total) in KiB-aware format
     // -----------------------------------------------------------------------
-    function fmtBytes(b) {
-        if (b >= 1073741824) return (b / 1073741824).toFixed(1) + "G"
-        if (b >= 1048576)    return (b / 1048576).toFixed(0)    + "M"
-        return (b / 1024).toFixed(0) + "K"
-    }
-
     Text {
         anchors {
             horizontalCenter: parent.horizontalCenter
             bottom: parent.bottom
             bottomMargin: 2
         }
-        text: fmtBytes(SystemMonitor.memUsed) + "/" + fmtBytes(SystemMonitor.memTotal)
+        text: fmtKiB(root.memUsed) + "/" + fmtKiB(root.memTotal)
         color: "#006699"
         font { pixelSize: parent.height * 0.11; family: "monospace" }
     }

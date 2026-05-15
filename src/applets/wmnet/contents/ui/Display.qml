@@ -1,9 +1,19 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 import QtQuick
+import org.kde.plasma.plasmoid
+import org.kde.ksystemstats 1.0
 import org.kde.plasma.private.wmdock 1.0
 
 /**
  * WMNet – Network traffic monitor.
+ *
+ * Uses KDE's org.kde.ksystemstats QML API for rate data so values update
+ * reliably in all Plasma 6 configurations.  NetworkMonitor (from the custom
+ * C++ plugin) is retained only to supply the list of available interfaces
+ * for the configuration dialog.
+ *
+ * The monitored interface is read from Plasmoid.configuration.iface; when
+ * empty the first non-loopback interface reported by NetworkMonitor is used.
  *
  * Scrolling dual-channel graph: RX (green) stacked on TX (blue).
  * Auto-scales to the peak rate seen since startup.
@@ -16,17 +26,52 @@ Item {
     property var rxHistory: []
     property var txHistory: []
 
-    Connections {
-        target: NetworkMonitor
-        function onStatsChanged() {
-            const rx = NetworkMonitor.rxBytesPerSec
-            const tx = NetworkMonitor.txBytesPerSec
+    // Peak rates for auto-scaling graph
+    property real rxMax: 1.0
+    property real txMax: 1.0
 
+    // Resolved interface: prefer explicit config, fall back to first non-loopback
+    readonly property string iface: {
+        const cfg = Plasmoid.configuration.iface
+        if (cfg && cfg.length > 0) return cfg
+        // Auto-detect: use first non-loopback from NetworkMonitor
+        const list = NetworkMonitor.interfaces
+        for (let i = 0; i < list.length; ++i) {
+            if (!list[i].startsWith("lo")) return list[i]
+        }
+        return ""
+    }
+
+    // -----------------------------------------------------------------------
+    // ksystemstats sensors — sensor IDs rebuild when iface changes
+    // -----------------------------------------------------------------------
+    Sensor {
+        id: rxSensor
+        sensorId: root.iface.length > 0
+                  ? "network/interfaces/" + root.iface + "/download/value"
+                  : ""
+        enabled:  root.iface.length > 0
+        onValueChanged: {
+            const rx = value || 0
+            if (rx > root.rxMax) root.rxMax = rx
             let rh = [...root.rxHistory, rx]
-            let th = [...root.txHistory, tx]
             if (rh.length > root.histLen) rh = rh.slice(rh.length - root.histLen)
-            if (th.length > root.histLen) th = th.slice(th.length - root.histLen)
             root.rxHistory = rh
+            graph.requestPaint()
+        }
+    }
+
+    Sensor {
+        id: txSensor
+        sensorId: root.iface.length > 0
+                  ? "network/interfaces/" + root.iface + "/upload/value"
+                  : ""
+        enabled:  root.iface.length > 0
+        onValueChanged: {
+            const tx = value || 0
+            if (tx > root.txMax) root.txMax = tx
+            let th = [...root.txHistory, tx]
+            if (th.length > root.histLen) th = th.slice(th.length - root.histLen)
             root.txHistory = th
             graph.requestPaint()
         }
@@ -51,7 +96,7 @@ Item {
     Text {
         id: titleText
         anchors { top: parent.top; horizontalCenter: parent.horizontalCenter; topMargin: 1 }
-        text: "NET " + NetworkMonitor.iface
+        text: "NET " + (root.iface || "—")
         color: "#00aaff"
         font { pixelSize: parent.height * 0.11; family: "monospace"; bold: true }
         elide: Text.ElideRight
@@ -82,8 +127,8 @@ Item {
 
             const rxH  = root.rxHistory
             const txH  = root.txHistory
-            const maxR = Math.max(1, NetworkMonitor.rxMaxRate)
-            const maxT = Math.max(1, NetworkMonitor.txMaxRate)
+            const maxR = Math.max(1, root.rxMax)
+            const maxT = Math.max(1, root.txMax)
             const bw   = w / root.histLen
 
             // Grid
@@ -131,12 +176,12 @@ Item {
         spacing: 3
 
         Text {
-            text: "↓" + fmtRate(NetworkMonitor.rxBytesPerSec)
+            text: "↓" + fmtRate(rxSensor.value || 0)
             color: "#00aa44"
             font { pixelSize: parent.parent.height * 0.10; family: "monospace" }
         }
         Text {
-            text: "↑" + fmtRate(NetworkMonitor.txBytesPerSec)
+            text: "↑" + fmtRate(txSensor.value || 0)
             color: "#4488ff"
             font { pixelSize: parent.parent.height * 0.10; family: "monospace" }
         }
