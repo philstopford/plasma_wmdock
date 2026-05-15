@@ -152,7 +152,7 @@ Item {
 
     QQC2.ToolTip {
         visible: hoverH.hovered
-        text:    root._tipText
+        text:    _tipText
         delay:   700
     }
     HoverHandler { id: hoverH }
