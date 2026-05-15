@@ -28,8 +28,10 @@ Item {
     Component.onCompleted: {
         console.log("[wmcpu] Display loaded; cpuCoreCount=" + SystemMonitor.cpuCoreCount
                     + " cpuUsage=" + SystemMonitor.cpuUsage.toFixed(1))
-        graph.requestPaint()
-        coreBar.requestPaint()
+        Qt.callLater(function() {
+            graph.requestPaint()
+            coreBar.requestPaint()
+        })
     }
 
     Connections {

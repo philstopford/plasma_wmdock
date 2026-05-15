@@ -4,8 +4,6 @@
 #include "systemmonitor.h"
 
 #include <QFile>
-#include <QTextStream>
-#include <QDateTime>
 #include <QDebug>
 
 SystemMonitor::SystemMonitor(QObject *parent)
@@ -44,31 +42,35 @@ void SystemMonitor::update()
 
 void SystemMonitor::readCpu()
 {
-    const auto parseCpuLine = [](const QString &line) {
+    const auto parseCpuLine = [](const QByteArray &line) {
         CpuStat s;
-        // Skip the "cpuN" token
-        const QStringList parts = line.split(QLatin1Char(' '), Qt::SkipEmptyParts);
-        if (parts.size() < 5) return s;
-        s.user    = parts[1].toLongLong();
-        s.nice    = parts[2].toLongLong();
-        s.system  = parts[3].toLongLong();
-        s.idle    = parts[4].toLongLong();
-        if (parts.size() > 5) s.iowait  = parts[5].toLongLong();
-        if (parts.size() > 6) s.irq     = parts[6].toLongLong();
-        if (parts.size() > 7) s.softirq = parts[7].toLongLong();
-        if (parts.size() > 8) s.steal   = parts[8].toLongLong();
+        // Skip the "cpuN" token; fields are space-separated
+        const QList<QByteArray> parts = line.split(' ');
+        // Filter empty parts (multiple spaces between fields)
+        QList<QByteArray> fields;
+        for (const QByteArray &p : parts)
+            if (!p.isEmpty()) fields.append(p);
+        if (fields.size() < 5) return s;
+        s.user    = fields[1].toLongLong();
+        s.nice    = fields[2].toLongLong();
+        s.system  = fields[3].toLongLong();
+        s.idle    = fields[4].toLongLong();
+        if (fields.size() > 5) s.iowait  = fields[5].toLongLong();
+        if (fields.size() > 6) s.irq     = fields[6].toLongLong();
+        if (fields.size() > 7) s.softirq = fields[7].toLongLong();
+        if (fields.size() > 8) s.steal   = fields[8].toLongLong();
         return s;
     };
 
     QFile f(QStringLiteral("/proc/stat"));
-    if (!f.open(QIODevice::ReadOnly | QIODevice::Text))
+    if (!f.open(QIODevice::ReadOnly))
         return;
 
     QVector<CpuStat> current;
-    QTextStream in(&f);
-    while (!in.atEnd()) {
-        const QString line = in.readLine();
-        if (!line.startsWith(QLatin1String("cpu"))) continue;
+    const QByteArray data = f.readAll();
+    for (const QByteArray &rawLine : data.split('\n')) {
+        const QByteArray line = rawLine.trimmed();
+        if (!line.startsWith("cpu")) continue;
         current.append(parseCpuLine(line));
     }
 
@@ -107,31 +109,32 @@ void SystemMonitor::readCpu()
 void SystemMonitor::readMemory()
 {
     QFile f(QStringLiteral("/proc/meminfo"));
-    if (!f.open(QIODevice::ReadOnly | QIODevice::Text))
+    if (!f.open(QIODevice::ReadOnly))
         return;
 
+    const QByteArray data = f.readAll();
     qint64 available = 0;
     qint64 swapFree  = 0;
     m_memCached      = 0;
     m_memBuffers     = 0;
 
-    QTextStream in(&f);
-    while (!in.atEnd()) {
-        const QString line = in.readLine();
-        const int colon = line.indexOf(QLatin1Char(':'));
+    for (const QByteArray &rawLine : data.split('\n')) {
+        const QByteArray line = rawLine.trimmed();
+        const int colon = line.indexOf(':');
         if (colon < 0) continue;
 
-        const QString key   = line.left(colon).trimmed();
-        const qint64  value = line.mid(colon + 1).trimmed().split(QLatin1Char(' '), Qt::SkipEmptyParts).value(0).toLongLong();
-        // /proc/meminfo values are in kB
+        const QByteArray key    = line.left(colon);
+        // value is in kB; first token after the colon
+        const QByteArray valStr = line.mid(colon + 1).trimmed().split(' ').value(0);
+        const qint64     kbVal  = valStr.toLongLong();
 
-        if      (key == QLatin1String("MemTotal"))     m_memTotal  = value * 1024;
-        else if (key == QLatin1String("MemFree"))      m_memFree   = value * 1024;
-        else if (key == QLatin1String("MemAvailable")) available    = value * 1024;
-        else if (key == QLatin1String("Buffers"))      m_memBuffers = value * 1024;
-        else if (key == QLatin1String("Cached"))       m_memCached  = value * 1024;
-        else if (key == QLatin1String("SwapTotal"))    m_swapTotal  = value * 1024;
-        else if (key == QLatin1String("SwapFree"))     swapFree     = value * 1024;
+        if      (key == "MemTotal")     m_memTotal  = kbVal * 1024;
+        else if (key == "MemFree")      m_memFree   = kbVal * 1024;
+        else if (key == "MemAvailable") available    = kbVal * 1024;
+        else if (key == "Buffers")      m_memBuffers = kbVal * 1024;
+        else if (key == "Cached")       m_memCached  = kbVal * 1024;
+        else if (key == "SwapTotal")    m_swapTotal  = kbVal * 1024;
+        else if (key == "SwapFree")     swapFree     = kbVal * 1024;
     }
 
     m_memUsed  = m_memTotal - available;

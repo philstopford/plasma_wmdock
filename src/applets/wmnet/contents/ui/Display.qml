@@ -32,7 +32,7 @@ Item {
             NetworkMonitor.setIface(cfg)
             console.log(`[wmnet] applied configured iface: ${cfg}`)
         }
-        graph.requestPaint()
+        Qt.callLater(function() { graph.requestPaint() })
     }
 
     Connections {

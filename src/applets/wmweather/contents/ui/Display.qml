@@ -142,18 +142,27 @@ Item {
         onDoubleTapped: wp.refresh()
     }
 
-    // Compute tooltip text as a property to avoid binding-loop on QQC2.ToolTip.text
-    readonly property string _tipText: {
-        const loc = "\nLat: " + wp.latitude.toFixed(2) +
-                    " Lon: " + wp.longitude.toFixed(2) +
-                    "\nDouble-click to refresh"
-        return wp.error.length > 0 ? wp.error + loc : wp.description + loc
-    }
-
+    // Compute tooltip text imperatively to avoid QML binding-loop detection.
     QQC2.ToolTip {
+        id: mainTip
         visible: hoverH.hovered
-        text:    _tipText
         delay:   700
+
+        function updateText() {
+            const loc = "\nLat: " + wp.latitude.toFixed(2) +
+                        " Lon: " + wp.longitude.toFixed(2) +
+                        "\nDouble-click to refresh"
+            text = wp.error.length > 0 ? wp.error + loc : wp.description + loc
+        }
+
+        Component.onCompleted: updateText()
+
+        Connections {
+            target: wp
+            function onWeatherUpdated() { mainTip.updateText() }
+            function onErrorChanged()   { mainTip.updateText() }
+            function onLocationChanged(){ mainTip.updateText() }
+        }
     }
     HoverHandler { id: hoverH }
 }

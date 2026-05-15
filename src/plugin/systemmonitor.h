@@ -20,7 +20,7 @@ class SystemMonitor : public QObject
     // ---- CPU ----------------------------------------------------------------
     Q_PROPERTY(double   cpuUsage     READ cpuUsage     NOTIFY cpuUsageChanged)
     Q_PROPERTY(QVariantList cpuCoreUsage READ cpuCoreUsage NOTIFY cpuUsageChanged)
-    Q_PROPERTY(int      cpuCoreCount READ cpuCoreCount CONSTANT)
+    Q_PROPERTY(int      cpuCoreCount READ cpuCoreCount NOTIFY cpuUsageChanged)
 
     // ---- Memory -------------------------------------------------------------
     Q_PROPERTY(double   memUsage     READ memUsage     NOTIFY memoryChanged)
