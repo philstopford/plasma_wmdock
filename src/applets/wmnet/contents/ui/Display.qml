@@ -53,6 +53,26 @@ Item {
     }
 
     // -----------------------------------------------------------------------
+    // Mouse-wheel cycling through available interfaces
+    // -----------------------------------------------------------------------
+    WheelHandler {
+        target: root
+        onWheel: function(event) {
+            const ifaces = NetworkMonitor.interfaces
+            if (ifaces.length < 2) return
+            const cur = ifaces.indexOf(NetworkMonitor.iface)
+            const next = (cur + (event.angleDelta.y < 0 ? 1 : -1) + ifaces.length) % ifaces.length
+            const newIface = ifaces[next]
+            NetworkMonitor.setIface(newIface)
+            // Persist the choice in the configuration (silently ignored when embedded
+            // in WMDock where Plasmoid.configuration doesn't have an 'iface' key)
+            try { Plasmoid.configuration.iface = newIface } catch(e) {
+                console.log("[wmnet] WheelHandler: iface not persisted (embedded context):", e)
+            }
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // Background
     // -----------------------------------------------------------------------
     Rectangle {

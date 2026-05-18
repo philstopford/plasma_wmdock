@@ -22,10 +22,23 @@ Kirigami.FormLayout {
         placeholderText: "konsole"
     }
 
-    QQC2.TextField {
-        id: iconField
+    // Icon row: text field + live preview
+    RowLayout {
         Kirigami.FormData.label: i18n("Icon name:")
-        placeholderText: "utilities-terminal"
+        spacing: Kirigami.Units.smallSpacing
+
+        QQC2.TextField {
+            id: iconField
+            Layout.fillWidth: true
+            placeholderText: "utilities-terminal"
+        }
+
+        Kirigami.Icon {
+            source: iconField.text || "utilities-terminal"
+            width:  Kirigami.Units.iconSizes.medium
+            height: Kirigami.Units.iconSizes.medium
+            isMask: false
+        }
     }
 
     QQC2.TextField {

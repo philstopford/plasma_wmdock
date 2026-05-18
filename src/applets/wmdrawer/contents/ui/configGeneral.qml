@@ -147,10 +147,20 @@ Kirigami.ScrollablePage {
                 Kirigami.FormData.label: i18n("Command:")
                 placeholderText: "konsole"
             }
-            QQC2.TextField {
-                id: editIcon
+            RowLayout {
                 Kirigami.FormData.label: i18n("Icon name:")
-                placeholderText: "utilities-terminal"
+                spacing: Kirigami.Units.smallSpacing
+                QQC2.TextField {
+                    id: editIcon
+                    Layout.fillWidth: true
+                    placeholderText: "utilities-terminal"
+                }
+                Kirigami.Icon {
+                    source: editIcon.text || "application-x-executable"
+                    width:  Kirigami.Units.iconSizes.medium
+                    height: Kirigami.Units.iconSizes.medium
+                    isMask: false
+                }
             }
             QQC2.TextField {
                 id: editLabel

@@ -110,6 +110,7 @@ Item {
     // -----------------------------------------------------------------------
     TapHandler {
         acceptedButtons: Qt.RightButton
+        grabPermissions: PointerHandler.CanTakeOverFromAnything
         onTapped: slotMenu.popup()
     }
 
@@ -185,10 +186,21 @@ Item {
                 Kirigami.FormData.label: i18n("Command:")
                 placeholderText: "konsole"
             }
-            QQC2.TextField {
-                id: iconField
+            // Icon field with live preview
+            RowLayout {
                 Kirigami.FormData.label: i18n("Icon name:")
-                placeholderText: "utilities-terminal"
+                spacing: Kirigami.Units.smallSpacing
+                QQC2.TextField {
+                    id: iconField
+                    Layout.fillWidth: true
+                    placeholderText: "utilities-terminal"
+                }
+                Kirigami.Icon {
+                    source: iconField.text || "utilities-terminal"
+                    width:  Kirigami.Units.iconSizes.medium
+                    height: Kirigami.Units.iconSizes.medium
+                    isMask: false
+                }
             }
             QQC2.TextField {
                 id: labelField
@@ -382,10 +394,20 @@ Item {
                 Kirigami.FormData.label: i18n("Command:")
                 placeholderText: "konsole"
             }
-            QQC2.TextField {
-                id: editIconField
+            RowLayout {
                 Kirigami.FormData.label: i18n("Icon name:")
-                placeholderText: "utilities-terminal"
+                spacing: Kirigami.Units.smallSpacing
+                QQC2.TextField {
+                    id: editIconField
+                    Layout.fillWidth: true
+                    placeholderText: "utilities-terminal"
+                }
+                Kirigami.Icon {
+                    source: editIconField.text || "application-x-executable"
+                    width:  Kirigami.Units.iconSizes.medium
+                    height: Kirigami.Units.iconSizes.medium
+                    isMask: false
+                }
             }
             QQC2.TextField {
                 id: editLabelField

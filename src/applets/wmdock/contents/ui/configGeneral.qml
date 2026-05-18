@@ -132,6 +132,7 @@ KCM.SimpleKCM {
                     { text: i18n("WMLoad – Load average"),    value: "org.kde.plasma.wmload"     },
                     { text: i18n("WMCalendar – Calendar"),    value: "org.kde.plasma.wmcal"      },
                     { text: i18n("WMLauncher – Launcher"),    value: "org.kde.plasma.wmlauncher" },
+                    { text: i18n("WMDrawer – App drawer"),    value: "org.kde.plasma.wmdrawer"   },
                     { text: i18n("WMWeather – Weather"),      value: "org.kde.plasma.wmweather"  },
                 ]
                 textRole: "text"
