@@ -63,11 +63,10 @@ void NetworkMonitor::scanInterfaces()
 
     const QByteArray data = f.readAll();
     QStringList list;
-    bool firstLine = true, secondLine = true;
+    int lineNum = 0;
     for (const QByteArray &rawLine : data.split('\n')) {
         // Skip the two header lines
-        if (firstLine)  { firstLine  = false; continue; }
-        if (secondLine) { secondLine = false; continue; }
+        if (lineNum++ < 2) continue;
         const QByteArray line = rawLine.trimmed();
         const int colon = line.indexOf(':');
         if (colon > 0)

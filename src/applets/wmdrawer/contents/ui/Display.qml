@@ -156,8 +156,9 @@ Item {
         function openDrawer() {
             // Position above (or below) the dock button
             var pt = root.mapToItem(QQC2.Overlay.overlay, 0, 0)
-            var popW = Math.max(160, Math.ceil(Math.sqrt(Math.max(1, root.launchers.length))) * 62 + 24)
-            var rowCount = Math.max(1, Math.ceil(root.launchers.length / Math.max(1, Math.ceil(Math.sqrt(Math.max(1, root.launchers.length))))))
+            var colCount = Math.max(1, Math.ceil(Math.sqrt(Math.max(1, root.launchers.length))))
+            var rowCount = Math.max(1, Math.ceil(root.launchers.length / colCount))
+            var popW = Math.max(160, colCount * 62 + 24)
             var popH = 44 + rowCount * 62 + 16
 
             width  = popW
