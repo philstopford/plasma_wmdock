@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 import QtQuick
 import QtQuick.Controls as QQC2
+import QtQuick.Layouts
 import org.kde.plasma.components 3.0 as PlasmaComponents
 import org.kde.kirigami as Kirigami
 
@@ -17,10 +18,12 @@ Item {
     property string appletId:   ""
     property int    slotIndex:  0
     property int    totalCount: 1
+    property string slotConfig: ""   // JSON config for this slot
 
     signal removeRequested()
     signal moveLeft()
     signal moveRight()
+    signal slotConfigSaved(int index, string config)
 
     // -----------------------------------------------------------------------
     // Outer slot border  (classic raised/inset WM look)
@@ -55,8 +58,32 @@ Item {
             if (status === Loader.Error) {
                 console.warn("WMDock: failed to load applet", appletId, appletLoader.errorString)
             }
+            if (status === Loader.Ready) {
+                applySlotConfig()
+            }
         }
     }
+
+    // Apply slotConfig to the loaded item whenever config or item changes
+    function applySlotConfig() {
+        if (!appletLoader.item) return
+        if (!slotConfig) return
+        try {
+            var cfg = JSON.parse(slotConfig)
+            // Pass to item via named properties (if the item exposes them)
+            if (cfg.command    !== undefined) appletLoader.item.externalCommand   = cfg.command
+            if (cfg.icon       !== undefined) appletLoader.item.externalIcon      = cfg.icon
+            if (cfg.label      !== undefined) appletLoader.item.externalLabel     = cfg.label
+            if (cfg.showLabel  !== undefined) appletLoader.item.externalShowLabel = cfg.showLabel
+            if (cfg.drawerIcon !== undefined) appletLoader.item.externalDrawerIcon  = cfg.drawerIcon
+            if (cfg.drawerLabel!== undefined) appletLoader.item.externalDrawerLabel = cfg.drawerLabel
+            if (cfg.launchers  !== undefined) appletLoader.item.externalLaunchers  = cfg.launchers
+        } catch(e) {
+            console.warn("WMDock: failed to parse slotConfig for", appletId, e)
+        }
+    }
+
+    onSlotConfigChanged: applySlotConfig()
 
     // -----------------------------------------------------------------------
     // Busy indicator while loading
@@ -101,8 +128,295 @@ Item {
         }
         QQC2.MenuSeparator {}
         QQC2.MenuItem {
+            text: i18n("Configure Applet…")
+            visible: appletId === "org.kde.plasma.wmlauncher" ||
+                     appletId === "org.kde.plasma.wmdrawer"
+            height: visible ? implicitHeight : 0
+            onTriggered: {
+                if (appletId === "org.kde.plasma.wmlauncher") {
+                    launcherConfigDialog.openForSlot()
+                } else if (appletId === "org.kde.plasma.wmdrawer") {
+                    drawerConfigDialog.openForSlot()
+                }
+            }
+        }
+        QQC2.MenuSeparator {
+            visible: appletId === "org.kde.plasma.wmlauncher" ||
+                     appletId === "org.kde.plasma.wmdrawer"
+            height: visible ? implicitHeight : 0
+        }
+        QQC2.MenuItem {
             text: i18n("Remove")
             onTriggered: slot.removeRequested()
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Launcher configure dialog
+    // -----------------------------------------------------------------------
+    QQC2.Dialog {
+        id: launcherConfigDialog
+        title: i18n("Configure Launcher")
+        modal: true
+        parent: QQC2.Overlay.overlay
+        anchors.centerIn: parent
+        width: 340
+
+        function openForSlot() {
+            // Pre-fill from current slotConfig
+            try {
+                var cfg = slotConfig ? JSON.parse(slotConfig) : {}
+                cmdField.text       = cfg.command   || "konsole"
+                iconField.text      = cfg.icon      || "utilities-terminal"
+                labelField.text     = cfg.label     || "Launch"
+                showLabelBox.checked = cfg.showLabel !== false
+            } catch(e) {
+                cmdField.text       = "konsole"
+                iconField.text      = "utilities-terminal"
+                labelField.text     = "Launch"
+                showLabelBox.checked = true
+            }
+            open()
+        }
+
+        contentItem: Kirigami.FormLayout {
+            QQC2.TextField {
+                id: cmdField
+                Kirigami.FormData.label: i18n("Command:")
+                placeholderText: "konsole"
+            }
+            QQC2.TextField {
+                id: iconField
+                Kirigami.FormData.label: i18n("Icon name:")
+                placeholderText: "utilities-terminal"
+            }
+            QQC2.TextField {
+                id: labelField
+                Kirigami.FormData.label: i18n("Label:")
+                placeholderText: "Launch"
+            }
+            QQC2.CheckBox {
+                id: showLabelBox
+                Kirigami.FormData.label: i18n("Show label:")
+                checked: true
+            }
+        }
+
+        footer: QQC2.DialogButtonBox {
+            QQC2.Button {
+                text: i18n("OK")
+                QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.AcceptRole
+            }
+            QQC2.Button {
+                text: i18n("Cancel")
+                QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.RejectRole
+            }
+        }
+
+        onAccepted: {
+            var cfg = {
+                command:   cmdField.text   || "konsole",
+                icon:      iconField.text  || "utilities-terminal",
+                label:     labelField.text || "Launch",
+                showLabel: showLabelBox.checked
+            }
+            slot.slotConfigSaved(slotIndex, JSON.stringify(cfg))
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Drawer configure dialog
+    // -----------------------------------------------------------------------
+    QQC2.Dialog {
+        id: drawerConfigDialog
+        title: i18n("Configure Drawer")
+        modal: true
+        parent: QQC2.Overlay.overlay
+        anchors.centerIn: parent
+        width: 400
+        height: 480
+
+        property var editingLaunchers: []
+
+        function openForSlot() {
+            try {
+                var cfg = slotConfig ? JSON.parse(slotConfig) : {}
+                drawerIconField.text  = cfg.drawerIcon  || "folder"
+                drawerLabelField.text = cfg.drawerLabel || "Apps"
+                editingLaunchers = cfg.launchers ? JSON.parse(JSON.stringify(cfg.launchers)) : []
+            } catch(e) {
+                drawerIconField.text  = "folder"
+                drawerLabelField.text = "Apps"
+                editingLaunchers = []
+            }
+            launcherListModel.reload()
+            open()
+        }
+
+        contentItem: ColumnLayout {
+            spacing: Kirigami.Units.smallSpacing
+
+            Kirigami.FormLayout {
+                Layout.fillWidth: true
+                QQC2.TextField {
+                    id: drawerIconField
+                    Kirigami.FormData.label: i18n("Drawer icon:")
+                    placeholderText: "folder"
+                }
+                QQC2.TextField {
+                    id: drawerLabelField
+                    Kirigami.FormData.label: i18n("Drawer label:")
+                    placeholderText: "Apps"
+                }
+            }
+
+            PlasmaComponents.Label { text: i18n("Launchers:") }
+
+            QQC2.ScrollView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+
+                ListView {
+                    id: launcherListView
+                    model: ListModel { id: launcherListModel }
+
+                    function reload() {
+                        launcherListModel.clear()
+                        for (var i = 0; i < drawerConfigDialog.editingLaunchers.length; i++) {
+                            var item = drawerConfigDialog.editingLaunchers[i]
+                            launcherListModel.append({
+                                cmd:   item.command || "",
+                                ico:   item.icon    || "",
+                                lbl:   item.label   || ""
+                            })
+                        }
+                    }
+
+                    delegate: RowLayout {
+                        width: ListView.view.width
+                        spacing: Kirigami.Units.smallSpacing
+
+                        Kirigami.Icon {
+                            source: model.ico || "application-x-executable"
+                            width:  Kirigami.Units.iconSizes.small
+                            height: Kirigami.Units.iconSizes.small
+                        }
+                        PlasmaComponents.Label {
+                            text: model.lbl || model.cmd
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                        }
+                        QQC2.ToolButton {
+                            icon.name: "document-edit"
+                            onClicked: launcherEditDialog.openFor(index)
+                        }
+                        QQC2.ToolButton {
+                            icon.name: "list-remove"
+                            onClicked: {
+                                drawerConfigDialog.editingLaunchers.splice(index, 1)
+                                launcherListView.reload()
+                            }
+                        }
+                    }
+                }
+            }
+
+            QQC2.Button {
+                text: i18n("Add Launcher…")
+                Layout.alignment: Qt.AlignLeft
+                onClicked: launcherEditDialog.openFor(-1)
+            }
+        }
+
+        footer: QQC2.DialogButtonBox {
+            QQC2.Button {
+                text: i18n("OK")
+                QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.AcceptRole
+            }
+            QQC2.Button {
+                text: i18n("Cancel")
+                QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.RejectRole
+            }
+        }
+
+        onAccepted: {
+            var cfg = {
+                drawerIcon:   drawerIconField.text  || "folder",
+                drawerLabel:  drawerLabelField.text || "Apps",
+                launchers:    editingLaunchers
+            }
+            slot.slotConfigSaved(slotIndex, JSON.stringify(cfg))
+        }
+    }
+
+    // Sub-dialog: edit a single launcher entry in the drawer
+    QQC2.Dialog {
+        id: launcherEditDialog
+        title: i18n("Edit Launcher")
+        modal: true
+        parent: QQC2.Overlay.overlay
+        anchors.centerIn: parent
+        width: 320
+
+        property int editIndex: -1
+
+        function openFor(idx) {
+            editIndex = idx
+            if (idx >= 0 && idx < drawerConfigDialog.editingLaunchers.length) {
+                var item = drawerConfigDialog.editingLaunchers[idx]
+                editCmdField.text   = item.command || ""
+                editIconField.text  = item.icon    || ""
+                editLabelField.text = item.label   || ""
+            } else {
+                editCmdField.text   = ""
+                editIconField.text  = ""
+                editLabelField.text = ""
+            }
+            open()
+        }
+
+        contentItem: Kirigami.FormLayout {
+            QQC2.TextField {
+                id: editCmdField
+                Kirigami.FormData.label: i18n("Command:")
+                placeholderText: "konsole"
+            }
+            QQC2.TextField {
+                id: editIconField
+                Kirigami.FormData.label: i18n("Icon name:")
+                placeholderText: "utilities-terminal"
+            }
+            QQC2.TextField {
+                id: editLabelField
+                Kirigami.FormData.label: i18n("Label:")
+                placeholderText: "Terminal"
+            }
+        }
+
+        footer: QQC2.DialogButtonBox {
+            QQC2.Button {
+                text: i18n("OK")
+                QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.AcceptRole
+            }
+            QQC2.Button {
+                text: i18n("Cancel")
+                QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.RejectRole
+            }
+        }
+
+        onAccepted: {
+            var entry = {
+                command: editCmdField.text  || "konsole",
+                icon:    editIconField.text || "application-x-executable",
+                label:   editLabelField.text || editCmdField.text || "Launch"
+            }
+            if (editIndex >= 0 && editIndex < drawerConfigDialog.editingLaunchers.length) {
+                drawerConfigDialog.editingLaunchers[editIndex] = entry
+            } else {
+                drawerConfigDialog.editingLaunchers.push(entry)
+            }
+            launcherListView.reload()
         }
     }
 
@@ -121,6 +435,7 @@ Item {
             "org.kde.plasma.wmcal":      Qt.resolvedUrl("../../../org.kde.plasma.wmcal/contents/ui/Display.qml"),
             "org.kde.plasma.wmlauncher": Qt.resolvedUrl("../../../org.kde.plasma.wmlauncher/contents/ui/Display.qml"),
             "org.kde.plasma.wmweather":  Qt.resolvedUrl("../../../org.kde.plasma.wmweather/contents/ui/Display.qml"),
+            "org.kde.plasma.wmdrawer":   Qt.resolvedUrl("../../../org.kde.plasma.wmdrawer/contents/ui/Display.qml"),
         }
         return map[id] || ""
     }

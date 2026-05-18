@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+      http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+  <kcfgfile name=""/>
+  <group name="General">
+    <entry name="drawerIcon" type="String">
+      <label>Icon shown for the drawer button</label>
+      <default>folder</default>
+    </entry>
+    <entry name="drawerLabel" type="String">
+      <label>Label shown below the drawer button</label>
+      <default>Apps</default>
+    </entry>
+    <entry name="launchersJson" type="String">
+      <label>JSON array of launcher entries (command, icon, label)</label>
+      <default>[]</default>
+    </entry>
+  </group>
+</kcfg>
