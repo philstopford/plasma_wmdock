@@ -6,7 +6,7 @@ import org.kde.kirigami as Kirigami
 Item {
     id: page
 
-    property int cfg_lowBatteryThreshold: 20
+    property int cfg_lowBatteryThreshold: 0
 
     onCfg_lowBatteryThresholdChanged: thresholdSpinBox.value = cfg_lowBatteryThreshold
 

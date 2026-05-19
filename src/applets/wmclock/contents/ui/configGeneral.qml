@@ -6,9 +6,9 @@ import org.kde.kirigami as Kirigami
 Item {
     id: page
 
-    property bool cfg_use24Hour:   true
-    property bool cfg_showSeconds: true
-    property bool cfg_showDate:    true
+    property bool cfg_use24Hour:   false
+    property bool cfg_showSeconds: false
+    property bool cfg_showDate:    false
 
     onCfg_use24HourChanged:   use24HourCheck.checked   = cfg_use24Hour
     onCfg_showSecondsChanged: showSecondsCheck.checked = cfg_showSeconds

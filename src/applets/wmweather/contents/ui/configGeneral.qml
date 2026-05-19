@@ -7,12 +7,12 @@ import org.kde.kirigami as Kirigami
 Item {
     id: page
 
-    property real   cfg_latitude:  51.5
-    property real   cfg_longitude: -0.12
-    property string cfg_tempUnit:  "celsius"
+    property real   cfg_latitude:  0
+    property real   cfg_longitude: 0
+    property string cfg_tempUnit:  ""
 
-    onCfg_latitudeChanged:  latField.value  = cfg_latitude
-    onCfg_longitudeChanged: lonField.value  = cfg_longitude
+    onCfg_latitudeChanged:  latField.value  = Math.round(cfg_latitude  * 1000)
+    onCfg_longitudeChanged: lonField.value  = Math.round(cfg_longitude * 1000)
     onCfg_tempUnitChanged: {
         for (let i = 0; i < unitCombo.count; ++i) {
             if (unitCombo.model[i].value === cfg_tempUnit) {
@@ -33,7 +33,6 @@ Item {
             from:    -90000
             to:       90000
             stepSize: 100
-            value: Math.round(cfg_latitude * 1000)
             onValueChanged: page.cfg_latitude = value / 1000.0
             textFromValue: function(v) { return (v / 1000.0).toFixed(3) }
             valueFromText: function(t) { return Math.round(parseFloat(t) * 1000) }
@@ -45,7 +44,6 @@ Item {
             from:    -180000
             to:       180000
             stepSize: 100
-            value: Math.round(cfg_longitude * 1000)
             onValueChanged: page.cfg_longitude = value / 1000.0
             textFromValue: function(v) { return (v / 1000.0).toFixed(3) }
             valueFromText: function(t) { return Math.round(parseFloat(t) * 1000) }

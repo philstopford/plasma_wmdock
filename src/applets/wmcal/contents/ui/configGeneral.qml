@@ -6,9 +6,7 @@ import org.kde.kirigami as Kirigami
 Item {
     id: page
 
-    property bool cfg_weekStartsMonday: false
-
-    onCfg_weekStartsMondayChanged: mondayCheck.checked = cfg_weekStartsMonday
+    property bool cfg_weekStartsMonday: false    onCfg_weekStartsMondayChanged: mondayCheck.checked = cfg_weekStartsMonday
 
     Kirigami.FormLayout {
         anchors.left:  parent.left

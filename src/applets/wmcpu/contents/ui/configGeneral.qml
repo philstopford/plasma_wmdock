@@ -6,7 +6,7 @@ import org.kde.kirigami as Kirigami
 Item {
     id: page
 
-    property int cfg_histLen: 50
+    property int cfg_histLen: 0
 
     onCfg_histLenChanged: histLenSpinBox.value = cfg_histLen
 
