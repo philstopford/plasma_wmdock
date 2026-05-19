@@ -34,6 +34,11 @@ Item {
     readonly property real markR1: faceR * 0.82
     readonly property real markR2: faceR * 0.92
 
+    // Repaint when config changes
+    onUse24HourChanged:   faceCanvas.requestPaint()
+    onShowSecondsChanged: faceCanvas.requestPaint()
+    onShowDateChanged:    faceCanvas.requestPaint()
+
     // -----------------------------------------------------------------------
     // Background
     // -----------------------------------------------------------------------
@@ -57,11 +62,6 @@ Item {
             repeat:   true
             onTriggered: faceCanvas.requestPaint()
         }
-
-        // Repaint immediately when any config setting changes
-        onUse24HourChanged:   requestPaint()
-        onShowSecondsChanged: requestPaint()
-        onShowDateChanged:    requestPaint()
 
         onPaint: {
             const ctx = getContext("2d")
@@ -175,7 +175,7 @@ Item {
             ctx.fillStyle = "#444"
             ctx.fill()
 
-            // ---- Digital time (HH:MM or hh:MM am/pm) -------------------------
+            // ---- Digital time (HH:MM or hh:MM AM/PM) -------------------------
             const pad     = n => String(n).padStart(2, "0")
             const hours   = root.use24Hour ? t.getHours() : (t.getHours() % 12 || 12)
             const timeStr = pad(hours) + ":" + pad(t.getMinutes())

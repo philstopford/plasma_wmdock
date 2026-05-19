@@ -33,8 +33,6 @@ Item {
             from:    -90000
             to:       90000
             stepSize: 100
-            // Store as integer × 1000 to avoid fractional stepSize
-            property real realValue: value / 1000.0
             value: Math.round(cfg_latitude * 1000)
             onValueChanged: page.cfg_latitude = value / 1000.0
             textFromValue: function(v) { return (v / 1000.0).toFixed(3) }
