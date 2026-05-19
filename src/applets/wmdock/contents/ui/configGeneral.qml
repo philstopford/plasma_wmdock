@@ -8,15 +8,29 @@ import org.kde.kirigami as Kirigami
 /**
  * Configuration page for the WM Dock main applet.
  * Allows the user to add, remove and reorder applet slots.
+ *
+ * Root must be Item (not Kirigami.ScrollablePage) so Plasma can embed it in
+ * its own config dialog.  Explicit cfg_* properties are used instead of
+ * property aliases because Plasma's setInitialProperties() runs before
+ * children are constructed, causing aliases to resolve to nothing.
  */
-Kirigami.ScrollablePage {
-    property alias cfg_slotSize:          slotSizeSpinBox.value
-    property alias cfg_slotSpacing:       spacingSpinBox.value
-    property alias cfg_showBackground:    showBgCheck.checked
-    property alias cfg_backgroundOpacity: opacitySlider.value
-    property var   cfg_appletList:        []
+Item {
+    id: page
+
+    property int    cfg_slotSize:          64
+    property int    cfg_slotSpacing:       2
+    property bool   cfg_showBackground:    true
+    property real   cfg_backgroundOpacity: 0.85
+    property var    cfg_appletList:        []
+
+    onCfg_slotSizeChanged:          slotSizeSpinBox.value   = cfg_slotSize
+    onCfg_slotSpacingChanged:       spacingSpinBox.value    = cfg_slotSpacing
+    onCfg_showBackgroundChanged:    showBgCheck.checked     = cfg_showBackground
+    onCfg_backgroundOpacityChanged: opacitySlider.value     = cfg_backgroundOpacity
 
     ColumnLayout {
+        anchors.left:  parent.left
+        anchors.right: parent.right
         spacing: Kirigami.Units.largeSpacing
 
         // ---- Slot size -------------------------------------------------------
@@ -27,17 +41,20 @@ Kirigami.ScrollablePage {
                 id: slotSizeSpinBox
                 Kirigami.FormData.label: i18n("Slot size (px):")
                 from: 32; to: 128; stepSize: 8
+                onValueChanged: page.cfg_slotSize = value
             }
 
             QQC2.SpinBox {
                 id: spacingSpinBox
                 Kirigami.FormData.label: i18n("Slot spacing (px):")
                 from: 0; to: 16; stepSize: 1
+                onValueChanged: page.cfg_slotSpacing = value
             }
 
             QQC2.CheckBox {
                 id: showBgCheck
                 Kirigami.FormData.label: i18n("Show background:")
+                onCheckedChanged: page.cfg_showBackground = checked
             }
 
             QQC2.Slider {
@@ -45,6 +62,7 @@ Kirigami.ScrollablePage {
                 Kirigami.FormData.label: i18n("Background opacity:")
                 from: 0.1; to: 1.0; stepSize: 0.05
                 enabled: showBgCheck.checked
+                onValueChanged: page.cfg_backgroundOpacity = value
             }
         }
 

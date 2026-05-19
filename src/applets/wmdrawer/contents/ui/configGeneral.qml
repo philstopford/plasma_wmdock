@@ -14,8 +14,10 @@ import org.kde.plasma.components 3.0 as PlasmaComponents
  *
  * Explicit cfg_* properties are used instead of property aliases so that
  * Plasma's setInitialProperties() succeeds before children are constructed.
+ * The root must be Item (not Kirigami.ScrollablePage) so Plasma can embed
+ * it in its own config dialog without "not placed in graphics scene" errors.
  */
-Kirigami.ScrollablePage {
+Item {
     id: configPage
 
     property string cfg_drawerIcon:    ""
@@ -44,6 +46,8 @@ Kirigami.ScrollablePage {
     }
 
     ColumnLayout {
+        anchors.left:  parent.left
+        anchors.right: parent.right
         spacing: Kirigami.Units.largeSpacing
 
         Kirigami.FormLayout {

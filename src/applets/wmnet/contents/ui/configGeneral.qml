@@ -10,7 +10,7 @@ import org.kde.plasma.private.wmdock 1.0
  * to monitor.  The interface list is populated from NetworkMonitor which
  * reads /proc/net/dev via the custom C++ plugin.
  */
-Kirigami.FormLayout {
+Item {
     id: page
 
     // Writable cfg_ property that Plasma reads/writes.
@@ -29,24 +29,29 @@ Kirigami.FormLayout {
         ifaceCombo.currentIndex = 0  // fallback to "Auto"
     }
 
-    QQC2.ComboBox {
-        id: ifaceCombo
-        Kirigami.FormData.label: i18n("Network interface:")
+    Kirigami.FormLayout {
+        anchors.left:  parent.left
+        anchors.right: parent.right
 
-        // Build model: "Auto" entry + discovered interfaces
-        model: {
-            const items = [{ text: i18n("Auto (first non-loopback)"), value: "" }]
-            const ifaces = NetworkMonitor.interfaces
-            for (let i = 0; i < ifaces.length; ++i) {
-                items.push({ text: ifaces[i], value: ifaces[i] })
+        QQC2.ComboBox {
+            id: ifaceCombo
+            Kirigami.FormData.label: i18n("Network interface:")
+
+            // Build model: "Auto" entry + discovered interfaces
+            model: {
+                const items = [{ text: i18n("Auto (first non-loopback)"), value: "" }]
+                const ifaces = NetworkMonitor.interfaces
+                for (let i = 0; i < ifaces.length; ++i) {
+                    items.push({ text: ifaces[i], value: ifaces[i] })
+                }
+                return items
             }
-            return items
+
+            textRole:  "text"
+            valueRole: "value"
+
+            // User-driven change → update cfg_iface so Plasma can save it
+            onActivated: page.cfg_iface = currentValue
         }
-
-        textRole:  "text"
-        valueRole: "value"
-
-        // User-driven change → update cfg_iface so Plasma can save it
-        onActivated: page.cfg_iface = currentValue
     }
 }

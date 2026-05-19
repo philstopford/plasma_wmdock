@@ -13,7 +13,7 @@ import org.kde.kirigami as Kirigami
  * before children are fully constructed, which can cause alias
  * resolution to fail silently and the tab to disappear.
  */
-Kirigami.FormLayout {
+Item {
     id: page
 
     property string cfg_command:   ""
@@ -26,43 +26,48 @@ Kirigami.FormLayout {
     onCfg_labelChanged:     labelField.text        = cfg_label
     onCfg_showLabelChanged: showLabelCheck.checked = cfg_showLabel
 
-    QQC2.TextField {
-        id: commandField
-        Kirigami.FormData.label: i18n("Command:")
-        placeholderText: "konsole"
-        onTextChanged: page.cfg_command = text
-    }
-
-    // Icon row: text field + live preview
-    RowLayout {
-        Kirigami.FormData.label: i18n("Icon name:")
-        spacing: Kirigami.Units.smallSpacing
+    Kirigami.FormLayout {
+        anchors.left:  parent.left
+        anchors.right: parent.right
 
         QQC2.TextField {
-            id: iconField
-            Layout.fillWidth: true
-            placeholderText: "utilities-terminal"
-            onTextChanged: page.cfg_icon = text
+            id: commandField
+            Kirigami.FormData.label: i18n("Command:")
+            placeholderText: "konsole"
+            onTextChanged: page.cfg_command = text
         }
 
-        Kirigami.Icon {
-            source: iconField.text || "utilities-terminal"
-            width:  Kirigami.Units.iconSizes.medium
-            height: Kirigami.Units.iconSizes.medium
-            isMask: false
+        // Icon row: text field + live preview
+        RowLayout {
+            Kirigami.FormData.label: i18n("Icon name:")
+            spacing: Kirigami.Units.smallSpacing
+
+            QQC2.TextField {
+                id: iconField
+                Layout.fillWidth: true
+                placeholderText: "utilities-terminal"
+                onTextChanged: page.cfg_icon = text
+            }
+
+            Kirigami.Icon {
+                source: iconField.text || "utilities-terminal"
+                width:  Kirigami.Units.iconSizes.medium
+                height: Kirigami.Units.iconSizes.medium
+                isMask: false
+            }
         }
-    }
 
-    QQC2.TextField {
-        id: labelField
-        Kirigami.FormData.label: i18n("Label:")
-        placeholderText: "Launch"
-        onTextChanged: page.cfg_label = text
-    }
+        QQC2.TextField {
+            id: labelField
+            Kirigami.FormData.label: i18n("Label:")
+            placeholderText: "Launch"
+            onTextChanged: page.cfg_label = text
+        }
 
-    QQC2.CheckBox {
-        id: showLabelCheck
-        Kirigami.FormData.label: i18n("Show label:")
-        onCheckedChanged: page.cfg_showLabel = checked
+        QQC2.CheckBox {
+            id: showLabelCheck
+            Kirigami.FormData.label: i18n("Show label:")
+            onCheckedChanged: page.cfg_showLabel = checked
+        }
     }
 }
