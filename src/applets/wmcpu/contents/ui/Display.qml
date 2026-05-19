@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 import QtQuick
+import org.kde.plasma.plasmoid
 import org.kde.plasma.private.wmdock 1.0
 
 /**
@@ -19,7 +20,7 @@ Item {
     id: root
 
     // Rolling history (filled left→right, newest on right)
-    property int histLen: 50
+    property int histLen: Plasmoid.configuration.histLen ?? 50
     property var history: []
 
     // Core usage (array of 0–100 values)

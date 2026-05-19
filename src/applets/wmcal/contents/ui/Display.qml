@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 import QtQuick
+import org.kde.plasma.plasmoid
 
 /**
  * WMCalendar – Date and mini-calendar applet.
@@ -14,6 +15,8 @@ import QtQuick
 Item {
     id: root
 
+    readonly property bool weekStartsMonday: Plasmoid.configuration.weekStartsMonday ?? false
+
     property var _now: new Date()
 
     Timer {
@@ -23,25 +26,31 @@ Item {
         onTriggered: root._now = new Date()
     }
 
+    onWeekStartsMondayChanged: root._now = new Date()  // force cells rebuild
+
     // Derived date fields
     readonly property int  todayYear:  _now.getFullYear()
     readonly property int  todayMonth: _now.getMonth()       // 0-based
     readonly property int  todayDay:   _now.getDate()
     readonly property int  todayWDay:  _now.getDay()         // 0=Sun
 
-    readonly property var  dayNames:   ["Su","Mo","Tu","We","Th","Fr","Sa"]
+    readonly property var  dayNames:   weekStartsMonday
+                                        ? ["Mo","Tu","We","Th","Fr","Sa","Su"]
+                                        : ["Su","Mo","Tu","We","Th","Fr","Sa"]
     readonly property var  dayNamesFull: ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]
     readonly property var  monthNames: ["Jan","Feb","Mar","Apr","May","Jun",
                                         "Jul","Aug","Sep","Oct","Nov","Dec"]
 
-    // Build array of day cells for current month (with leading blanks)
+    // Build array of day cells for current month (with leading blanks).
+    // When weekStartsMonday is true, Sunday (getDay()=0) maps to column 6.
     readonly property var  cells: buildCells()
 
     function buildCells() {
-        const firstDay = new Date(todayYear, todayMonth, 1).getDay()
+        let firstDay = new Date(todayYear, todayMonth, 1).getDay()  // 0=Sun
+        if (weekStartsMonday) firstDay = (firstDay + 6) % 7         // 0=Mon
         const daysInMonth = new Date(todayYear, todayMonth + 1, 0).getDate()
         let arr = []
-        for (let i = 0; i < firstDay; i++)    arr.push(-1)   // blank
+        for (let i = 0; i < firstDay; i++)    arr.push(-1)
         for (let d = 1; d <= daysInMonth; d++) arr.push(d)
         return arr
     }
@@ -79,7 +88,11 @@ Item {
             Text {
                 width: root.width / 7
                 text: modelData
-                color: (index === 0 || index === 6) ? "#884400" : "#445566"
+                color: {
+                    if (root.weekStartsMonday)
+                        return (index >= 5) ? "#884400" : "#445566"
+                    return (index === 0 || index === 6) ? "#884400" : "#445566"
+                }
                 font { pixelSize: root.height * 0.09; family: "monospace" }
                 horizontalAlignment: Text.AlignHCenter
             }
@@ -123,8 +136,11 @@ Item {
                     anchors.centerIn: parent
                     text: modelData > 0 ? modelData : ""
                     color: isToday ? "#ffffff"
-                         : (index % 7 === 0 || index % 7 === 6) ? "#884400"
-                         : "#aaaaaa"
+                         : {
+                             const col = index % 7
+                             const isWeekend = root.weekStartsMonday ? col >= 5 : (col === 0 || col === 6)
+                             return isWeekend ? "#884400" : "#aaaaaa"
+                         }
                     font { pixelSize: root.height * 0.09; family: "monospace";
                            bold: isToday }
                 }
