@@ -30,7 +30,7 @@ Kirigami.ScrollablePage {
         } catch(e) {
             editingLaunchers = []
         }
-        launcherModel.reload()
+        launcherListView.reload()
     }
 
     function saveToJson() {

@@ -4,13 +4,12 @@ import QtQuick.Layouts
 import QtQuick.Controls as QQC2
 import org.kde.plasma.components 3.0 as PlasmaComponents
 import org.kde.kirigami as Kirigami
-import org.kde.kcmutils as KCM
 
 /**
  * Configuration page for the WM Dock main applet.
  * Allows the user to add, remove and reorder applet slots.
  */
-KCM.SimpleKCM {
+Kirigami.ScrollablePage {
     property alias cfg_slotSize:          slotSizeSpinBox.value
     property alias cfg_slotSpacing:       spacingSpinBox.value
     property alias cfg_showBackground:    showBgCheck.checked

@@ -273,7 +273,7 @@ Item {
                 drawerLabelField.text = "Apps"
                 editingLaunchers = []
             }
-            launcherListModel.reload()
+            launcherListView.reload()
             open()
         }
 
