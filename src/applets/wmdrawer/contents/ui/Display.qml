@@ -175,18 +175,26 @@ Item {
             var btnScreenPos = root.mapToGlobal(root.width / 2, 0)
             var sx = btnScreenPos.x - popW / 2
 
+            // Use the Screen attached property of the root item so that
+            // multi-monitor setups (including panels on secondary displays)
+            // are handled correctly.
+            var scr = root.Screen
+            var screenLeft   = scr.virtualX
+            var screenTop    = scr.virtualY
+            var screenRight  = scr.virtualX + scr.width
+            var screenBottom = scr.virtualY + scr.height
+
             // Prefer opening above the button; fall back to below.
+            // Compare against screenTop (not 0) to work on non-primary monitors.
             var sy
-            if (btnScreenPos.y - popH - 4 >= 0) {
+            if (btnScreenPos.y - popH - 4 >= screenTop) {
                 sy = btnScreenPos.y - popH - 4
             } else {
                 sy = root.mapToGlobal(0, root.height).y + 4
             }
 
-            // Clamp horizontally to avoid going off-screen edge.
-            var screen = Qt.application.screens[0]
-            sx = Math.max(screen.virtualX,
-                 Math.min(sx, screen.virtualX + screen.width - popW))
+            // Clamp horizontally to the current screen to avoid spanning monitors.
+            sx = Math.max(screenLeft, Math.min(sx, screenRight - popW))
             x = sx
             y = sy
             visible = true
