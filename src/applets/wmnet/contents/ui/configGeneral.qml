@@ -17,18 +17,6 @@ Item {
     // (We can't alias ComboBox.currentValue directly because it is readonly.)
     property string cfg_iface: ""
 
-    // Keep the ComboBox selection in sync whenever Plasma restores the
-    // saved value (fires before and after Component.onCompleted).
-    onCfg_ifaceChanged: {
-        for (let i = 0; i < ifaceCombo.count; ++i) {
-            if (ifaceCombo.model[i].value === cfg_iface) {
-                ifaceCombo.currentIndex = i
-                return
-            }
-        }
-        ifaceCombo.currentIndex = 0  // fallback to "Auto"
-    }
-
     Kirigami.FormLayout {
         anchors.left:  parent.left
         anchors.right: parent.right
@@ -49,6 +37,17 @@ Item {
 
             textRole:  "text"
             valueRole: "value"
+
+            // Set initial selection after both model and cfg_iface are available
+            Component.onCompleted: {
+                for (let i = 0; i < count; ++i) {
+                    if (model[i].value === page.cfg_iface) {
+                        currentIndex = i
+                        return
+                    }
+                }
+                currentIndex = 0  // fallback to "Auto"
+            }
 
             // User-driven change → update cfg_iface so Plasma can save it
             onActivated: page.cfg_iface = currentValue

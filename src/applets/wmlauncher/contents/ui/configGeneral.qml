@@ -21,11 +21,6 @@ Item {
     property string cfg_label:     ""
     property bool   cfg_showLabel: true
 
-    onCfg_commandChanged:   commandField.text      = cfg_command
-    onCfg_iconChanged:      iconField.text         = cfg_icon
-    onCfg_labelChanged:     labelField.text        = cfg_label
-    onCfg_showLabelChanged: showLabelCheck.checked = cfg_showLabel
-
     Kirigami.FormLayout {
         anchors.left:  parent.left
         anchors.right: parent.right
@@ -34,6 +29,7 @@ Item {
             id: commandField
             Kirigami.FormData.label: i18n("Command:")
             placeholderText: "konsole"
+            text: page.cfg_command
             onTextChanged: page.cfg_command = text
         }
 
@@ -46,6 +42,7 @@ Item {
                 id: iconField
                 Layout.fillWidth: true
                 placeholderText: "utilities-terminal"
+                text: page.cfg_icon
                 onTextChanged: page.cfg_icon = text
             }
 
@@ -61,12 +58,14 @@ Item {
             id: labelField
             Kirigami.FormData.label: i18n("Label:")
             placeholderText: "Launch"
+            text: page.cfg_label
             onTextChanged: page.cfg_label = text
         }
 
         QQC2.CheckBox {
             id: showLabelCheck
             Kirigami.FormData.label: i18n("Show label:")
+            checked: page.cfg_showLabel
             onCheckedChanged: page.cfg_showLabel = checked
         }
     }

@@ -8,8 +8,6 @@ Item {
 
     property int cfg_lowBatteryThreshold: 0
 
-    onCfg_lowBatteryThresholdChanged: thresholdSpinBox.value = cfg_lowBatteryThreshold
-
     Kirigami.FormLayout {
         anchors.left:  parent.left
         anchors.right: parent.right
@@ -20,6 +18,7 @@ Item {
             from: 1
             to:   50
             stepSize: 1
+            value: page.cfg_lowBatteryThreshold
             onValueChanged: page.cfg_lowBatteryThreshold = value
         }
     }

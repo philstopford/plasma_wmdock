@@ -8,8 +8,6 @@ Item {
 
     property int cfg_histLen: 0
 
-    onCfg_histLenChanged: histLenSpinBox.value = cfg_histLen
-
     Kirigami.FormLayout {
         anchors.left:  parent.left
         anchors.right: parent.right
@@ -20,6 +18,7 @@ Item {
             from: 10
             to:   200
             stepSize: 10
+            value: page.cfg_histLen
             onValueChanged: page.cfg_histLen = value
         }
     }

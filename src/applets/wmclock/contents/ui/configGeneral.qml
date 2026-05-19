@@ -10,10 +10,6 @@ Item {
     property bool cfg_showSeconds: false
     property bool cfg_showDate:    false
 
-    onCfg_use24HourChanged:   use24HourCheck.checked   = cfg_use24Hour
-    onCfg_showSecondsChanged: showSecondsCheck.checked = cfg_showSeconds
-    onCfg_showDateChanged:    showDateCheck.checked     = cfg_showDate
-
     Kirigami.FormLayout {
         anchors.left:  parent.left
         anchors.right: parent.right
@@ -21,18 +17,21 @@ Item {
         QQC2.CheckBox {
             id: use24HourCheck
             Kirigami.FormData.label: i18n("24-hour digital display:")
+            checked: page.cfg_use24Hour
             onCheckedChanged: page.cfg_use24Hour = checked
         }
 
         QQC2.CheckBox {
             id: showSecondsCheck
             Kirigami.FormData.label: i18n("Show seconds hand:")
+            checked: page.cfg_showSeconds
             onCheckedChanged: page.cfg_showSeconds = checked
         }
 
         QQC2.CheckBox {
             id: showDateCheck
             Kirigami.FormData.label: i18n("Show date line:")
+            checked: page.cfg_showDate
             onCheckedChanged: page.cfg_showDate = checked
         }
     }

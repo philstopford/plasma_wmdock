@@ -3,7 +3,6 @@ import QtQuick
 import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
-import org.kde.plasma.components 3.0 as PlasmaComponents
 
 /**
  * WMDrawer standalone configuration page.
@@ -23,9 +22,6 @@ Item {
     property string cfg_drawerIcon:    ""
     property string cfg_drawerLabel:   ""
     property string cfg_launchersJson: "[]"
-
-    onCfg_drawerIconChanged:  drawerIconField.text  = cfg_drawerIcon
-    onCfg_drawerLabelChanged: drawerLabelField.text = cfg_drawerLabel
 
     // Internal editable list populated from cfg_launchersJson
     property var editingLaunchers: []
@@ -57,17 +53,19 @@ Item {
                 id: drawerIconField
                 Kirigami.FormData.label: i18n("Drawer icon:")
                 placeholderText: "folder"
+                text: configPage.cfg_drawerIcon
                 onTextChanged: configPage.cfg_drawerIcon = text
             }
             QQC2.TextField {
                 id: drawerLabelField
                 Kirigami.FormData.label: i18n("Drawer label:")
                 placeholderText: "Apps"
+                text: configPage.cfg_drawerLabel
                 onTextChanged: configPage.cfg_drawerLabel = text
             }
         }
 
-        PlasmaComponents.Label {
+        QQC2.Label {
             text: i18n("Launchers:")
             font.bold: true
         }
@@ -100,7 +98,7 @@ Item {
                     width:  Kirigami.Units.iconSizes.small
                     height: Kirigami.Units.iconSizes.small
                 }
-                PlasmaComponents.Label {
+                QQC2.Label {
                     text: model.lbl || model.cmd
                     Layout.fillWidth: true
                     elide: Text.ElideRight
@@ -132,8 +130,6 @@ Item {
         id: entryEditDialog
         title: i18n("Edit Launcher")
         modal: true
-        parent: QQC2.Overlay.overlay
-        anchors.centerIn: parent
         width: 320
 
         property int editIndex: -1

@@ -7,7 +7,6 @@ Item {
     id: page
 
     property bool cfg_weekStartsMonday: false
-    onCfg_weekStartsMondayChanged: mondayCheck.checked = cfg_weekStartsMonday
 
     Kirigami.FormLayout {
         anchors.left:  parent.left
@@ -16,6 +15,7 @@ Item {
         QQC2.CheckBox {
             id: mondayCheck
             Kirigami.FormData.label: i18n("Week starts on Monday:")
+            checked: page.cfg_weekStartsMonday
             onCheckedChanged: page.cfg_weekStartsMonday = checked
         }
     }

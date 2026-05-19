@@ -2,7 +2,6 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
-import org.kde.plasma.components 3.0 as PlasmaComponents
 import org.kde.kirigami as Kirigami
 
 /**
@@ -23,11 +22,6 @@ Item {
     property real   cfg_backgroundOpacity: 0.85
     property var    cfg_appletList:        []
 
-    onCfg_slotSizeChanged:          slotSizeSpinBox.value   = cfg_slotSize
-    onCfg_slotSpacingChanged:       spacingSpinBox.value    = cfg_slotSpacing
-    onCfg_showBackgroundChanged:    showBgCheck.checked     = cfg_showBackground
-    onCfg_backgroundOpacityChanged: opacitySlider.value     = cfg_backgroundOpacity
-
     ColumnLayout {
         anchors.left:  parent.left
         anchors.right: parent.right
@@ -41,6 +35,7 @@ Item {
                 id: slotSizeSpinBox
                 Kirigami.FormData.label: i18n("Slot size (px):")
                 from: 32; to: 128; stepSize: 8
+                value: page.cfg_slotSize
                 onValueChanged: page.cfg_slotSize = value
             }
 
@@ -48,12 +43,14 @@ Item {
                 id: spacingSpinBox
                 Kirigami.FormData.label: i18n("Slot spacing (px):")
                 from: 0; to: 16; stepSize: 1
+                value: page.cfg_slotSpacing
                 onValueChanged: page.cfg_slotSpacing = value
             }
 
             QQC2.CheckBox {
                 id: showBgCheck
                 Kirigami.FormData.label: i18n("Show background:")
+                checked: page.cfg_showBackground
                 onCheckedChanged: page.cfg_showBackground = checked
             }
 
@@ -62,6 +59,7 @@ Item {
                 Kirigami.FormData.label: i18n("Background opacity:")
                 from: 0.1; to: 1.0; stepSize: 0.05
                 enabled: showBgCheck.checked
+                value: page.cfg_backgroundOpacity
                 onValueChanged: page.cfg_backgroundOpacity = value
             }
         }
@@ -69,7 +67,7 @@ Item {
         Kirigami.Separator { Layout.fillWidth: true }
 
         // ---- Applet list management -----------------------------------------
-        PlasmaComponents.Label {
+        QQC2.Label {
             text: i18n("Active applets (drag to reorder):")
             font.bold: true
         }
@@ -95,7 +93,7 @@ Item {
                         Layout.preferredHeight: Kirigami.Units.iconSizes.small
                     }
 
-                    PlasmaComponents.Label {
+                    QQC2.Label {
                         text: modelData.replace("org.kde.plasma.", "").replace(/^wm/, "WM")
                         Layout.fillWidth: true
                     }
