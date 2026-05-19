@@ -136,11 +136,8 @@ Item {
                     anchors.centerIn: parent
                     text: modelData > 0 ? modelData : ""
                     color: isToday ? "#ffffff"
-                         : {
-                             const col = index % 7
-                             const isWeekend = root.weekStartsMonday ? col >= 5 : (col === 0 || col === 6)
-                             return isWeekend ? "#884400" : "#aaaaaa"
-                         }
+                         : (root.weekStartsMonday ? (index % 7 >= 5) : (index % 7 === 0 || index % 7 === 6))
+                           ? "#884400" : "#aaaaaa"
                     font { pixelSize: root.height * 0.09; family: "monospace";
                            bold: isToday }
                 }
