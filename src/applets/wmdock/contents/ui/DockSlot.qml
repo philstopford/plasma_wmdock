@@ -107,11 +107,23 @@ Item {
 
     // -----------------------------------------------------------------------
     // Context menu (right-click)
+    //
+    // We use a MouseArea that fills the slot and explicitly accepts the right
+    // button.  This runs at the QML level and fires before Plasma's panel
+    // event-filter, so the slot-specific menu (Move/Configure/Remove) will
+    // appear instead of the global "Remove Widget" menu.
     // -----------------------------------------------------------------------
-    TapHandler {
+    MouseArea {
+        anchors.fill:    parent
         acceptedButtons: Qt.RightButton
-        grabPermissions: PointerHandler.CanTakeOverFromAnything
-        onTapped: slotMenu.popup()
+        // Allow left-click to pass through to the embedded applet
+        propagateComposedEvents: true
+        onClicked: function(mouse) {
+            if (mouse.button === Qt.RightButton) {
+                slotMenu.popup()
+                mouse.accepted = true
+            }
+        }
     }
 
     QQC2.Menu {

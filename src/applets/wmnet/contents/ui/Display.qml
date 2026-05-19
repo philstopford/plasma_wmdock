@@ -53,22 +53,29 @@ Item {
     }
 
     // -----------------------------------------------------------------------
-    // Mouse-wheel cycling through available interfaces
+    // Mouse-wheel cycling through available interfaces.
+    // MouseArea (acceptedButtons: Qt.NoButton) only handles wheel events,
+    // so left-click on the widget still works normally.
     // -----------------------------------------------------------------------
-    WheelHandler {
-        target: root
-        onWheel: function(event) {
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.NoButton  // wheel-only; don't steal click events
+        onWheel: function(wheelEvent) {
             const ifaces = NetworkMonitor.interfaces
-            if (ifaces.length < 2) return
+            if (ifaces.length < 2) {
+                wheelEvent.accepted = false
+                return
+            }
             const cur = ifaces.indexOf(NetworkMonitor.iface)
-            const next = (cur + (event.angleDelta.y < 0 ? 1 : -1) + ifaces.length) % ifaces.length
+            const next = (cur + (wheelEvent.angleDelta.y < 0 ? 1 : -1) + ifaces.length) % ifaces.length
             const newIface = ifaces[next]
             NetworkMonitor.setIface(newIface)
-            // Persist the choice in the configuration (silently ignored when embedded
-            // in WMDock where Plasmoid.configuration doesn't have an 'iface' key)
+            // Persist the choice when running standalone.  Silently ignored
+            // when embedded in WMDock where Plasmoid.configuration has no 'iface'.
             try { Plasmoid.configuration.iface = newIface } catch(e) {
-                console.log("[wmnet] WheelHandler: iface not persisted (embedded context):", e)
+                console.log("[wmnet] wheel: iface not persisted (embedded context):", e)
             }
+            wheelEvent.accepted = true
         }
     }
 

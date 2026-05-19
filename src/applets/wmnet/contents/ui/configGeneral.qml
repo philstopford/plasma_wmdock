@@ -13,8 +13,21 @@ import org.kde.plasma.private.wmdock 1.0
 Kirigami.FormLayout {
     id: page
 
-    // Standard cfg_ alias wired to Plasmoid.configuration.iface
-    property alias cfg_iface: ifaceCombo.currentValue
+    // Writable cfg_ property that Plasma reads/writes.
+    // (We can't alias ComboBox.currentValue directly because it is readonly.)
+    property string cfg_iface: ""
+
+    // Keep the ComboBox selection in sync whenever Plasma restores the
+    // saved value (fires before and after Component.onCompleted).
+    onCfg_ifaceChanged: {
+        for (let i = 0; i < ifaceCombo.count; ++i) {
+            if (ifaceCombo.model[i].value === cfg_iface) {
+                ifaceCombo.currentIndex = i
+                return
+            }
+        }
+        ifaceCombo.currentIndex = 0  // fallback to "Auto"
+    }
 
     QQC2.ComboBox {
         id: ifaceCombo
@@ -33,16 +46,7 @@ Kirigami.FormLayout {
         textRole:  "text"
         valueRole: "value"
 
-        // Select the entry that matches the saved configuration
-        Component.onCompleted: {
-            const saved = cfg_iface
-            for (let i = 0; i < model.length; ++i) {
-                if (model[i].value === saved) {
-                    currentIndex = i
-                    return
-                }
-            }
-            currentIndex = 0  // fallback to "Auto"
-        }
+        // User-driven change → update cfg_iface so Plasma can save it
+        onActivated: page.cfg_iface = currentValue
     }
 }
