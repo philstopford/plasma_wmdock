@@ -2,6 +2,7 @@
 import QtQuick
 import QtQuick.Controls as QQC2
 import QtQuick.Layouts
+import QtQuick.Window
 import org.kde.plasma.plasmoid
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.private.wmdock 1.0
@@ -142,40 +143,62 @@ Item {
     HoverHandler { id: hoverHandler }
 
     // -----------------------------------------------------------------------
-    // Drawer popup
+    // Drawer popup – uses a top-level Qt.Popup Window so it can appear
+    // above/below the panel regardless of the panel window's bounds.
+    // QQC2.Popup is confined to its parent Window's overlay item (the panel),
+    // which causes truncation when opening on a thin horizontal panel.
     // -----------------------------------------------------------------------
-    QQC2.Popup {
+    Window {
         id: drawerPopup
 
-        parent: QQC2.Overlay.overlay
-        modal: false
-        closePolicy: QQC2.Popup.CloseOnEscape | QQC2.Popup.CloseOnPressOutsideParent
+        // Qt.Popup closes automatically when clicking outside (on X11 and Wayland).
+        flags: Qt.Popup | Qt.FramelessWindowHint
+        color: "transparent"
+        visible: false
 
-        padding: 8
-
+        // Compute layout and position relative to the button in screen coordinates.
         function openDrawer() {
-            // Position above (or below) the dock button
-            var pt = root.mapToItem(QQC2.Overlay.overlay, 0, 0)
             var colCount = Math.max(1, Math.ceil(Math.sqrt(Math.max(1, root.launchers.length))))
             var rowCount = Math.max(1, Math.ceil(root.launchers.length / colCount))
-            var popW = Math.max(160, colCount * 62 + 24)
-            var popH = 44 + rowCount * 62 + 16
+            var popW = Math.max(180, colCount * 62 + 32)
+            // Overhead: 8 (padding) + ~24 (header row) + 4 (spacing) + 1 (divider) + 4 (spacing) + 8 (padding) = 49
+            // Flow: each row is 56px high; between rows 6px spacing.
+            var flowH = root.launchers.length > 0
+                        ? rowCount * 56 + Math.max(0, rowCount - 1) * 6
+                        : 42  // empty-state text
+            var popH = 49 + flowH
 
             width  = popW
             height = popH
 
-            // Prefer opening above
-            if (pt.y - popH - 4 >= 0) {
-                x = pt.x + root.width / 2 - popW / 2
-                y = pt.y - popH - 4
+            // Map button centre to screen (global) coordinates for true popup placement.
+            var btnScreenPos = root.mapToGlobal(root.width / 2, 0)
+            var sx = btnScreenPos.x - popW / 2
+
+            // Prefer opening above the button; fall back to below.
+            var sy
+            if (btnScreenPos.y - popH - 4 >= 0) {
+                sy = btnScreenPos.y - popH - 4
             } else {
-                x = pt.x + root.width / 2 - popW / 2
-                y = pt.y + root.height + 4
+                sy = root.mapToGlobal(0, root.height).y + 4
             }
-            open()
+
+            // Clamp horizontally to avoid going off-screen edge.
+            var screen = Qt.application.screens[0]
+            sx = Math.max(screen.virtualX,
+                 Math.min(sx, screen.virtualX + screen.width - popW))
+            x = sx
+            y = sy
+            visible = true
         }
 
-        background: Rectangle {
+        function close() {
+            visible = false
+        }
+
+        // Background
+        Rectangle {
+            anchors.fill: parent
             color:   "#1c1c1c"
             border.color: "#555"
             border.width: 1
@@ -192,7 +215,9 @@ Item {
             }
         }
 
-        contentItem: ColumnLayout {
+        // Content
+        ColumnLayout {
+            anchors { fill: parent; margins: 8 }
             spacing: 4
 
             // Header bar
@@ -304,7 +329,7 @@ Item {
                     color:   "#888888"
                     font.pixelSize: 11
                     wrapMode: Text.WordWrap
-                    width:   200
+                    width:   launcherFlow.width
                 }
             }
         }

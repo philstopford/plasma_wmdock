@@ -11,13 +11,19 @@ import org.kde.plasma.components 3.0 as PlasmaComponents
  * Used when the applet is placed directly on a panel/desktop rather
  * than embedded inside WMDock.  Provides fields for the drawer icon,
  * label and the list of launchers stored as a JSON string.
+ *
+ * Explicit cfg_* properties are used instead of property aliases so that
+ * Plasma's setInitialProperties() succeeds before children are constructed.
  */
 Kirigami.ScrollablePage {
     id: configPage
 
-    property alias cfg_drawerIcon:    drawerIconField.text
-    property alias cfg_drawerLabel:   drawerLabelField.text
+    property string cfg_drawerIcon:    ""
+    property string cfg_drawerLabel:   ""
     property string cfg_launchersJson: "[]"
+
+    onCfg_drawerIconChanged:  drawerIconField.text  = cfg_drawerIcon
+    onCfg_drawerLabelChanged: drawerLabelField.text = cfg_drawerLabel
 
     // Internal editable list populated from cfg_launchersJson
     property var editingLaunchers: []
@@ -47,11 +53,13 @@ Kirigami.ScrollablePage {
                 id: drawerIconField
                 Kirigami.FormData.label: i18n("Drawer icon:")
                 placeholderText: "folder"
+                onTextChanged: configPage.cfg_drawerIcon = text
             }
             QQC2.TextField {
                 id: drawerLabelField
                 Kirigami.FormData.label: i18n("Drawer label:")
                 placeholderText: "Apps"
+                onTextChanged: configPage.cfg_drawerLabel = text
             }
         }
 
