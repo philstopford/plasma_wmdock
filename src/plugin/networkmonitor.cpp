@@ -20,9 +20,6 @@ NetworkMonitor::NetworkMonitor(QObject *parent)
         }
     }
 
-    qDebug() << "[wmdock/NetworkMonitor] created; interfaces=" << m_interfaces
-             << "selected iface=" << m_iface;
-
     connect(&m_timer, &QTimer::timeout, this, &NetworkMonitor::update);
     m_timer.setInterval(1000);
     m_timer.start();
@@ -138,7 +135,5 @@ void NetworkMonitor::update()
     m_rxPrev = rxNow;
     m_txPrev = txNow;
 
-    qDebug() << "[wmdock/NetworkMonitor] statsChanged: iface=" << m_iface
-             << "rx=" << m_rxRate << "B/s tx=" << m_txRate << "B/s";
     Q_EMIT statsChanged();
 }
