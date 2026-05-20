@@ -4,7 +4,6 @@
 #include "systemmonitor.h"
 
 #include <QFile>
-#include <QDebug>
 
 SystemMonitor::SystemMonitor(QObject *parent)
     : QObject(parent)

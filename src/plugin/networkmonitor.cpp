@@ -5,7 +5,6 @@
 
 #include <QFile>
 #include <QDateTime>
-#include <QDebug>
 
 NetworkMonitor::NetworkMonitor(QObject *parent)
     : QObject(parent)
