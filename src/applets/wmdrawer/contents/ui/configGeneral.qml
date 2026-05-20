@@ -139,6 +139,7 @@ Item {
             height: 180
             clip: true
             model: configPage.parsedLaunchers
+            QQC2.ScrollBar.vertical: QQC2.ScrollBar {}
 
             delegate: Item {
                 width: ListView.view.width
@@ -174,16 +175,15 @@ Item {
         }
 
         // Command
-        Row {
+        RowLayout {
             width: parent.width
             spacing: Kirigami.Units.smallSpacing
             QQC2.Label {
                 text: i18n("Command:")
-                anchors.verticalCenter: parent.verticalCenter
-                width: 90
+                Layout.minimumWidth: implicitWidth
             }
             Rectangle {
-                width: parent.width - 90 - Kirigami.Units.smallSpacing
+                Layout.fillWidth: true
                 height: Kirigami.Units.gridUnit * 2
                 color:        Kirigami.Theme.backgroundColor
                 border.color: editCmdInput.activeFocus ? Kirigami.Theme.highlightColor
@@ -210,16 +210,15 @@ Item {
         }
 
         // Icon name
-        Row {
+        RowLayout {
             width: parent.width
             spacing: Kirigami.Units.smallSpacing
             QQC2.Label {
                 text: i18n("Icon name:")
-                anchors.verticalCenter: parent.verticalCenter
-                width: 90
+                Layout.minimumWidth: implicitWidth
             }
             Rectangle {
-                width: parent.width - 90 - Kirigami.Units.smallSpacing
+                Layout.fillWidth: true
                 height: Kirigami.Units.gridUnit * 2
                 color:        Kirigami.Theme.backgroundColor
                 border.color: editIconInput.activeFocus ? Kirigami.Theme.highlightColor
@@ -246,16 +245,15 @@ Item {
         }
 
         // Label
-        Row {
+        RowLayout {
             width: parent.width
             spacing: Kirigami.Units.smallSpacing
             QQC2.Label {
                 text: i18n("Label:")
-                anchors.verticalCenter: parent.verticalCenter
-                width: 90
+                Layout.minimumWidth: implicitWidth
             }
             Rectangle {
-                width: parent.width - 90 - Kirigami.Units.smallSpacing
+                Layout.fillWidth: true
                 height: Kirigami.Units.gridUnit * 2
                 color:        Kirigami.Theme.backgroundColor
                 border.color: editLabelInput.activeFocus ? Kirigami.Theme.highlightColor
