@@ -4,18 +4,23 @@ import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 
+// Root must be plain Item so Plasma can embed it in its own config dialog.
+// Kirigami.FormLayout inside a ColumnLayout does not propagate implicitHeight
+// reliably when its children are Rectangle+TextInput items; we use RowLayout
+// rows instead to ensure ColumnLayout.implicitHeight is computed correctly.
 Item {
     id: configPage
-    implicitHeight: mainLayout.implicitHeight
 
     property string cfg_drawerIcon:    ""
     property string cfg_drawerLabel:   ""
-    property string cfg_launchersJson: "[]"
+    property string cfg_launchersJson: ""
 
     property int editIndex: -1
 
     property var parsedLaunchers: {
-        try { return JSON.parse(cfg_launchersJson) } catch(e) { return [] }
+        var raw = cfg_launchersJson
+        if (!raw || raw.length === 0) return []
+        try { return JSON.parse(raw) } catch(e) { return [] }
     }
 
     function commitLauncher(idx, cmd, ico, lbl) {
@@ -41,23 +46,26 @@ Item {
     }
 
     // -----------------------------------------------------------------------
-    // Layout
+    // Layout — anchors.left/right only (no anchors.top) matches the working
+    // wmdock pattern; height is unrestricted so ColumnLayout renders freely.
     // -----------------------------------------------------------------------
     ColumnLayout {
-        id: mainLayout
-        anchors.top:   parent.top
         anchors.left:  parent.left
         anchors.right: parent.right
         spacing: Kirigami.Units.largeSpacing
 
-        Kirigami.FormLayout {
+        // ---- Drawer icon (RowLayout instead of FormLayout for reliable height)
+        RowLayout {
             Layout.fillWidth: true
-
-            // Drawer icon – plain Rectangle+TextInput avoids QQC2.TextField
-            // which silently drops the config tab in Plasma 6's config context.
+            spacing: Kirigami.Units.smallSpacing
+            QQC2.Label {
+                text: i18n("Drawer icon:")
+                Layout.minimumWidth: implicitWidth
+            }
+            // Plain Rectangle+TextInput avoids QQC2.TextField which silently
+            // drops the config tab in Plasma 6's config-dialog context.
             Rectangle {
-                Kirigami.FormData.label: i18n("Drawer icon:")
-                implicitWidth:  200
+                Layout.fillWidth: true
                 implicitHeight: Kirigami.Units.gridUnit * 2
                 color:        Kirigami.Theme.backgroundColor
                 border.color: drawerIconInput.activeFocus ? Kirigami.Theme.highlightColor
@@ -83,11 +91,18 @@ Item {
                     onTextChanged: configPage.cfg_drawerIcon = text
                 }
             }
+        }
 
-            // Drawer label
+        // ---- Drawer label
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: Kirigami.Units.smallSpacing
+            QQC2.Label {
+                text: i18n("Drawer label:")
+                Layout.minimumWidth: implicitWidth
+            }
             Rectangle {
-                Kirigami.FormData.label: i18n("Drawer label:")
-                implicitWidth:  200
+                Layout.fillWidth: true
                 implicitHeight: Kirigami.Units.gridUnit * 2
                 color:        Kirigami.Theme.backgroundColor
                 border.color: drawerLabelInput.activeFocus ? Kirigami.Theme.highlightColor
@@ -114,6 +129,8 @@ Item {
                 }
             }
         }
+
+        Kirigami.Separator { Layout.fillWidth: true }
 
         QQC2.Label {
             text: i18n("Launchers:")
@@ -156,13 +173,16 @@ Item {
             font.bold: true
         }
 
-        Kirigami.FormLayout {
+        // ---- Command
+        RowLayout {
             Layout.fillWidth: true
-
-            // Command (edit form)
+            spacing: Kirigami.Units.smallSpacing
+            QQC2.Label {
+                text: i18n("Command:")
+                Layout.minimumWidth: implicitWidth
+            }
             Rectangle {
-                Kirigami.FormData.label: i18n("Command:")
-                implicitWidth:  200
+                Layout.fillWidth: true
                 implicitHeight: Kirigami.Units.gridUnit * 2
                 color:        Kirigami.Theme.backgroundColor
                 border.color: editCmdInput.activeFocus ? Kirigami.Theme.highlightColor
@@ -186,11 +206,18 @@ Item {
                     verticalAlignment: TextInput.AlignVCenter
                 }
             }
+        }
 
-            // Icon name (edit form)
+        // ---- Icon name
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: Kirigami.Units.smallSpacing
+            QQC2.Label {
+                text: i18n("Icon name:")
+                Layout.minimumWidth: implicitWidth
+            }
             Rectangle {
-                Kirigami.FormData.label: i18n("Icon name:")
-                implicitWidth:  200
+                Layout.fillWidth: true
                 implicitHeight: Kirigami.Units.gridUnit * 2
                 color:        Kirigami.Theme.backgroundColor
                 border.color: editIconInput.activeFocus ? Kirigami.Theme.highlightColor
@@ -214,11 +241,18 @@ Item {
                     verticalAlignment: TextInput.AlignVCenter
                 }
             }
+        }
 
-            // Label (edit form)
+        // ---- Label
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: Kirigami.Units.smallSpacing
+            QQC2.Label {
+                text: i18n("Label:")
+                Layout.minimumWidth: implicitWidth
+            }
             Rectangle {
-                Kirigami.FormData.label: i18n("Label:")
-                implicitWidth:  200
+                Layout.fillWidth: true
                 implicitHeight: Kirigami.Units.gridUnit * 2
                 color:        Kirigami.Theme.backgroundColor
                 border.color: editLabelInput.activeFocus ? Kirigami.Theme.highlightColor
@@ -244,6 +278,7 @@ Item {
             }
         }
 
+        // ---- Action buttons
         RowLayout {
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
