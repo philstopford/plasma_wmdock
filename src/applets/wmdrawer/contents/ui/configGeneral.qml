@@ -11,12 +11,8 @@ Item {
     property string cfg_drawerLabel:   ""
     property string cfg_launchersJson: "[]"
 
-    // Which list-item is being edited (-1 = adding new)
     property int editIndex: -1
 
-    // Reactive: re-parses cfg_launchersJson whenever it changes.
-    // Using a binding expression (not Component.onCompleted) keeps this in
-    // sync with Plasma's setInitialProperties() ordering.
     property var parsedLaunchers: {
         try { return JSON.parse(cfg_launchersJson) } catch(e) { return [] }
     }
@@ -38,45 +34,9 @@ Item {
     function startEdit(idx) {
         editIndex = idx
         var src = (idx >= 0 && idx < parsedLaunchers.length) ? parsedLaunchers[idx] : null
-        editCmdInput.inputText   = src ? (src.command || "") : ""
-        editIconInput.inputText  = src ? (src.icon    || "") : ""
-        editLabelInput.inputText = src ? (src.label   || "") : ""
-    }
-
-    // -----------------------------------------------------------------------
-    // Helper: styled text-input row (avoids QQC2.TextField which can cause
-    // silent config-tab failures in Plasma 6's config-dialog QML context).
-    // -----------------------------------------------------------------------
-    component LabelledInput: Rectangle {
-        id: wrapper
-        property alias inputText: ti.text
-        property string placeholder: ""
-        implicitWidth: 200
-        implicitHeight: Kirigami.Units.gridUnit * 2
-        color:  Kirigami.Theme.backgroundColor
-        border.color: ti.activeFocus
-                      ? Kirigami.Theme.highlightColor
-                      : Kirigami.Theme.disabledTextColor
-        border.width: 1
-        radius: 3
-
-        Text {
-            anchors { fill: parent; margins: 4 }
-            text: wrapper.placeholder
-            color: Kirigami.Theme.disabledTextColor
-            visible: ti.text.length === 0
-            verticalAlignment: Text.AlignVCenter
-        }
-
-        TextInput {
-            id: ti
-            anchors { fill: parent; margins: 4 }
-            color: Kirigami.Theme.textColor
-            selectedTextColor: Kirigami.Theme.highlightedTextColor
-            selectionColor:    Kirigami.Theme.highlightColor
-            selectByMouse:     true
-            verticalAlignment: TextInput.AlignVCenter
-        }
+        editCmdInput.text   = src ? (src.command || "") : ""
+        editIconInput.text  = src ? (src.icon    || "") : ""
+        editLabelInput.text = src ? (src.label   || "") : ""
     }
 
     // -----------------------------------------------------------------------
@@ -90,20 +50,65 @@ Item {
         Kirigami.FormLayout {
             Layout.fillWidth: true
 
-            LabelledInput {
-                id: drawerIconInput
+            // Drawer icon – plain Rectangle+TextInput avoids QQC2.TextField
+            // which silently drops the config tab in Plasma 6's config context.
+            Rectangle {
                 Kirigami.FormData.label: i18n("Drawer icon:")
-                placeholder: "folder"
-                Component.onCompleted: inputText = configPage.cfg_drawerIcon
-                onInputTextChanged: configPage.cfg_drawerIcon = inputText
+                implicitWidth:  200
+                implicitHeight: Kirigami.Units.gridUnit * 2
+                color:        Kirigami.Theme.backgroundColor
+                border.color: drawerIconInput.activeFocus ? Kirigami.Theme.highlightColor
+                                                          : Kirigami.Theme.disabledTextColor
+                border.width: 1
+                radius: 3
+                Text {
+                    anchors { fill: parent; margins: 4 }
+                    text:  "folder"
+                    color: Kirigami.Theme.disabledTextColor
+                    visible: drawerIconInput.text.length === 0
+                    verticalAlignment: Text.AlignVCenter
+                }
+                TextInput {
+                    id: drawerIconInput
+                    anchors { fill: parent; margins: 4 }
+                    color:             Kirigami.Theme.textColor
+                    selectedTextColor: Kirigami.Theme.highlightedTextColor
+                    selectionColor:    Kirigami.Theme.highlightColor
+                    selectByMouse:     true
+                    verticalAlignment: TextInput.AlignVCenter
+                    Component.onCompleted: text = configPage.cfg_drawerIcon
+                    onTextChanged: configPage.cfg_drawerIcon = text
+                }
             }
 
-            LabelledInput {
-                id: drawerLabelInput
+            // Drawer label
+            Rectangle {
                 Kirigami.FormData.label: i18n("Drawer label:")
-                placeholder: "Apps"
-                Component.onCompleted: inputText = configPage.cfg_drawerLabel
-                onInputTextChanged: configPage.cfg_drawerLabel = inputText
+                implicitWidth:  200
+                implicitHeight: Kirigami.Units.gridUnit * 2
+                color:        Kirigami.Theme.backgroundColor
+                border.color: drawerLabelInput.activeFocus ? Kirigami.Theme.highlightColor
+                                                           : Kirigami.Theme.disabledTextColor
+                border.width: 1
+                radius: 3
+                Text {
+                    anchors { fill: parent; margins: 4 }
+                    text:  "Apps"
+                    color: Kirigami.Theme.disabledTextColor
+                    visible: drawerLabelInput.text.length === 0
+                    verticalAlignment: Text.AlignVCenter
+                }
+                TextInput {
+                    id: drawerLabelInput
+                    anchors { fill: parent; margins: 4 }
+                    color:             Kirigami.Theme.textColor
+                    selectedTextColor: Kirigami.Theme.highlightedTextColor
+                    selectionColor:    Kirigami.Theme.highlightColor
+                    selectByMouse:     true
+                    verticalAlignment: TextInput.AlignVCenter
+                    Component.onCompleted: text = configPage.cfg_drawerLabel
+                    onTextChanged: configPage.cfg_drawerLabel = text
+                }
             }
         }
 
@@ -151,20 +156,88 @@ Item {
         Kirigami.FormLayout {
             Layout.fillWidth: true
 
-            LabelledInput {
-                id: editCmdInput
+            // Command (edit form)
+            Rectangle {
                 Kirigami.FormData.label: i18n("Command:")
-                placeholder: "konsole"
+                implicitWidth:  200
+                implicitHeight: Kirigami.Units.gridUnit * 2
+                color:        Kirigami.Theme.backgroundColor
+                border.color: editCmdInput.activeFocus ? Kirigami.Theme.highlightColor
+                                                       : Kirigami.Theme.disabledTextColor
+                border.width: 1
+                radius: 3
+                Text {
+                    anchors { fill: parent; margins: 4 }
+                    text:  "konsole"
+                    color: Kirigami.Theme.disabledTextColor
+                    visible: editCmdInput.text.length === 0
+                    verticalAlignment: Text.AlignVCenter
+                }
+                TextInput {
+                    id: editCmdInput
+                    anchors { fill: parent; margins: 4 }
+                    color:             Kirigami.Theme.textColor
+                    selectedTextColor: Kirigami.Theme.highlightedTextColor
+                    selectionColor:    Kirigami.Theme.highlightColor
+                    selectByMouse:     true
+                    verticalAlignment: TextInput.AlignVCenter
+                }
             }
-            LabelledInput {
-                id: editIconInput
+
+            // Icon name (edit form)
+            Rectangle {
                 Kirigami.FormData.label: i18n("Icon name:")
-                placeholder: "utilities-terminal"
+                implicitWidth:  200
+                implicitHeight: Kirigami.Units.gridUnit * 2
+                color:        Kirigami.Theme.backgroundColor
+                border.color: editIconInput.activeFocus ? Kirigami.Theme.highlightColor
+                                                        : Kirigami.Theme.disabledTextColor
+                border.width: 1
+                radius: 3
+                Text {
+                    anchors { fill: parent; margins: 4 }
+                    text:  "utilities-terminal"
+                    color: Kirigami.Theme.disabledTextColor
+                    visible: editIconInput.text.length === 0
+                    verticalAlignment: Text.AlignVCenter
+                }
+                TextInput {
+                    id: editIconInput
+                    anchors { fill: parent; margins: 4 }
+                    color:             Kirigami.Theme.textColor
+                    selectedTextColor: Kirigami.Theme.highlightedTextColor
+                    selectionColor:    Kirigami.Theme.highlightColor
+                    selectByMouse:     true
+                    verticalAlignment: TextInput.AlignVCenter
+                }
             }
-            LabelledInput {
-                id: editLabelInput
+
+            // Label (edit form)
+            Rectangle {
                 Kirigami.FormData.label: i18n("Label:")
-                placeholder: "Terminal"
+                implicitWidth:  200
+                implicitHeight: Kirigami.Units.gridUnit * 2
+                color:        Kirigami.Theme.backgroundColor
+                border.color: editLabelInput.activeFocus ? Kirigami.Theme.highlightColor
+                                                         : Kirigami.Theme.disabledTextColor
+                border.width: 1
+                radius: 3
+                Text {
+                    anchors { fill: parent; margins: 4 }
+                    text:  "Terminal"
+                    color: Kirigami.Theme.disabledTextColor
+                    visible: editLabelInput.text.length === 0
+                    verticalAlignment: Text.AlignVCenter
+                }
+                TextInput {
+                    id: editLabelInput
+                    anchors { fill: parent; margins: 4 }
+                    color:             Kirigami.Theme.textColor
+                    selectedTextColor: Kirigami.Theme.highlightedTextColor
+                    selectionColor:    Kirigami.Theme.highlightColor
+                    selectByMouse:     true
+                    verticalAlignment: TextInput.AlignVCenter
+                }
             }
         }
 
@@ -176,14 +249,14 @@ Item {
                 text: configPage.editIndex >= 0 ? i18n("Update") : i18n("Add")
                 icon.name: configPage.editIndex >= 0 ? "document-save" : "list-add"
                 onClicked: {
-                    var cmd = editCmdInput.inputText   || "konsole"
-                    var ico = editIconInput.inputText  || "application-x-executable"
-                    var lbl = editLabelInput.inputText || editCmdInput.inputText || "Launch"
+                    var cmd = editCmdInput.text   || "konsole"
+                    var ico = editIconInput.text  || "application-x-executable"
+                    var lbl = editLabelInput.text || editCmdInput.text || "Launch"
                     configPage.commitLauncher(configPage.editIndex, cmd, ico, lbl)
                     configPage.editIndex = -1
-                    editCmdInput.inputText   = ""
-                    editIconInput.inputText  = ""
-                    editLabelInput.inputText = ""
+                    editCmdInput.text   = ""
+                    editIconInput.text  = ""
+                    editLabelInput.text = ""
                 }
             }
 
@@ -193,9 +266,9 @@ Item {
                 visible: configPage.editIndex >= 0
                 onClicked: {
                     configPage.editIndex = -1
-                    editCmdInput.inputText   = ""
-                    editIconInput.inputText  = ""
-                    editLabelInput.inputText = ""
+                    editCmdInput.text   = ""
+                    editIconInput.text  = ""
+                    editLabelInput.text = ""
                 }
             }
         }
