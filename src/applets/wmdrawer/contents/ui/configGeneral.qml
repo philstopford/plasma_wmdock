@@ -6,6 +6,7 @@ import org.kde.kirigami as Kirigami
 
 Item {
     id: configPage
+    implicitHeight: mainLayout.implicitHeight
 
     property string cfg_drawerIcon:    ""
     property string cfg_drawerLabel:   ""
@@ -43,6 +44,8 @@ Item {
     // Layout
     // -----------------------------------------------------------------------
     ColumnLayout {
+        id: mainLayout
+        anchors.top:   parent.top
         anchors.left:  parent.left
         anchors.right: parent.right
         spacing: Kirigami.Units.largeSpacing
