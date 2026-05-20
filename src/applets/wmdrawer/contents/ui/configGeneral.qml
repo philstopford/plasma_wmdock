@@ -11,41 +11,77 @@ Item {
     property string cfg_drawerLabel:   ""
     property string cfg_launchersJson: "[]"
 
-    property var editingLaunchers: []
+    // Which list-item is being edited (-1 = adding new)
     property int editIndex: -1
 
-    Component.onCompleted: {
-        drawerIconField.text  = cfg_drawerIcon
-        drawerLabelField.text = cfg_drawerLabel
-        reloadFromJson()
+    // Reactive: re-parses cfg_launchersJson whenever it changes.
+    // Using a binding expression (not Component.onCompleted) keeps this in
+    // sync with Plasma's setInitialProperties() ordering.
+    property var parsedLaunchers: {
+        try { return JSON.parse(cfg_launchersJson) } catch(e) { return [] }
     }
 
-    function reloadFromJson() {
-        try {
-            editingLaunchers = JSON.parse(cfg_launchersJson)
-        } catch(e) {
-            editingLaunchers = []
-        }
-        launcherListView.reload()
+    function commitLauncher(idx, cmd, ico, lbl) {
+        var arr = parsedLaunchers.slice()
+        var entry = { command: cmd, icon: ico, label: lbl }
+        if (idx >= 0 && idx < arr.length) arr[idx] = entry
+        else arr.push(entry)
+        cfg_launchersJson = JSON.stringify(arr)
     }
 
-    function saveToJson() {
-        cfg_launchersJson = JSON.stringify(editingLaunchers)
+    function removeLauncher(idx) {
+        var arr = parsedLaunchers.slice()
+        arr.splice(idx, 1)
+        cfg_launchersJson = JSON.stringify(arr)
     }
 
     function startEdit(idx) {
         editIndex = idx
-        if (idx >= 0 && idx < editingLaunchers.length) {
-            editCmd.text   = editingLaunchers[idx].command || ""
-            editIcon.text  = editingLaunchers[idx].icon    || ""
-            editLabel.text = editingLaunchers[idx].label   || ""
-        } else {
-            editCmd.text   = ""
-            editIcon.text  = ""
-            editLabel.text = ""
+        var src = (idx >= 0 && idx < parsedLaunchers.length) ? parsedLaunchers[idx] : null
+        editCmdInput.inputText   = src ? (src.command || "") : ""
+        editIconInput.inputText  = src ? (src.icon    || "") : ""
+        editLabelInput.inputText = src ? (src.label   || "") : ""
+    }
+
+    // -----------------------------------------------------------------------
+    // Helper: styled text-input row (avoids QQC2.TextField which can cause
+    // silent config-tab failures in Plasma 6's config-dialog QML context).
+    // -----------------------------------------------------------------------
+    component LabelledInput: Rectangle {
+        id: wrapper
+        property alias inputText: ti.text
+        property string placeholder: ""
+        implicitWidth: 200
+        implicitHeight: Kirigami.Units.gridUnit * 2
+        color:  Kirigami.Theme.backgroundColor
+        border.color: ti.activeFocus
+                      ? Kirigami.Theme.highlightColor
+                      : Kirigami.Theme.disabledTextColor
+        border.width: 1
+        radius: 3
+
+        Text {
+            anchors { fill: parent; margins: 4 }
+            text: wrapper.placeholder
+            color: Kirigami.Theme.disabledTextColor
+            visible: ti.text.length === 0
+            verticalAlignment: Text.AlignVCenter
+        }
+
+        TextInput {
+            id: ti
+            anchors { fill: parent; margins: 4 }
+            color: Kirigami.Theme.textColor
+            selectedTextColor: Kirigami.Theme.highlightedTextColor
+            selectionColor:    Kirigami.Theme.highlightColor
+            selectByMouse:     true
+            verticalAlignment: TextInput.AlignVCenter
         }
     }
 
+    // -----------------------------------------------------------------------
+    // Layout
+    // -----------------------------------------------------------------------
     ColumnLayout {
         anchors.left:  parent.left
         anchors.right: parent.right
@@ -54,17 +90,20 @@ Item {
         Kirigami.FormLayout {
             Layout.fillWidth: true
 
-            QQC2.TextField {
-                id: drawerIconField
+            LabelledInput {
+                id: drawerIconInput
                 Kirigami.FormData.label: i18n("Drawer icon:")
-                placeholderText: "folder"
-                onTextChanged: configPage.cfg_drawerIcon = text
+                placeholder: "folder"
+                inputText: configPage.cfg_drawerIcon
+                onInputTextChanged: configPage.cfg_drawerIcon = inputText
             }
-            QQC2.TextField {
-                id: drawerLabelField
+
+            LabelledInput {
+                id: drawerLabelInput
                 Kirigami.FormData.label: i18n("Drawer label:")
-                placeholderText: "Apps"
-                onTextChanged: configPage.cfg_drawerLabel = text
+                placeholder: "Apps"
+                inputText: configPage.cfg_drawerLabel
+                onInputTextChanged: configPage.cfg_drawerLabel = inputText
             }
         }
 
@@ -76,28 +115,18 @@ Item {
         ListView {
             id: launcherListView
             Layout.fillWidth: true
-            implicitHeight: contentHeight
+            Layout.preferredHeight: 200
             clip: true
-            model: ListModel { id: launcherModel }
+            model: configPage.parsedLaunchers
 
-            function reload() {
-                launcherModel.clear()
-                for (var i = 0; i < configPage.editingLaunchers.length; i++) {
-                    var item = configPage.editingLaunchers[i]
-                    launcherModel.append({
-                        cmd: item.command || "",
-                        ico: item.icon    || "",
-                        lbl: item.label   || ""
-                    })
-                }
-            }
+            ScrollBar.vertical: QQC2.ScrollBar {}
 
             delegate: RowLayout {
                 width: ListView.view.width
                 spacing: Kirigami.Units.smallSpacing
 
                 QQC2.Label {
-                    text: model.lbl || model.cmd
+                    text: modelData.label || modelData.command
                     Layout.fillWidth: true
                     elide: Text.ElideRight
                 }
@@ -107,13 +136,7 @@ Item {
                 }
                 QQC2.ToolButton {
                     icon.name: "list-remove"
-                    onClicked: {
-                        var arr = configPage.editingLaunchers.slice()
-                        arr.splice(index, 1)
-                        configPage.editingLaunchers = arr
-                        configPage.saveToJson()
-                        launcherListView.reload()
-                    }
+                    onClicked: configPage.removeLauncher(index)
                 }
             }
         }
@@ -128,20 +151,20 @@ Item {
         Kirigami.FormLayout {
             Layout.fillWidth: true
 
-            QQC2.TextField {
-                id: editCmd
+            LabelledInput {
+                id: editCmdInput
                 Kirigami.FormData.label: i18n("Command:")
-                placeholderText: "konsole"
+                placeholder: "konsole"
             }
-            QQC2.TextField {
-                id: editIcon
+            LabelledInput {
+                id: editIconInput
                 Kirigami.FormData.label: i18n("Icon name:")
-                placeholderText: "utilities-terminal"
+                placeholder: "utilities-terminal"
             }
-            QQC2.TextField {
-                id: editLabel
+            LabelledInput {
+                id: editLabelInput
                 Kirigami.FormData.label: i18n("Label:")
-                placeholderText: "Terminal"
+                placeholder: "Terminal"
             }
         }
 
@@ -153,24 +176,14 @@ Item {
                 text: configPage.editIndex >= 0 ? i18n("Update") : i18n("Add")
                 icon.name: configPage.editIndex >= 0 ? "document-save" : "list-add"
                 onClicked: {
-                    var entry = {
-                        command: editCmd.text   || "konsole",
-                        icon:    editIcon.text  || "application-x-executable",
-                        label:   editLabel.text || editCmd.text || "Launch"
-                    }
-                    var arr = configPage.editingLaunchers.slice()
-                    if (configPage.editIndex >= 0 && configPage.editIndex < arr.length) {
-                        arr[configPage.editIndex] = entry
-                    } else {
-                        arr.push(entry)
-                    }
-                    configPage.editingLaunchers = arr
-                    configPage.saveToJson()
+                    var cmd = editCmdInput.inputText   || "konsole"
+                    var ico = editIconInput.inputText  || "application-x-executable"
+                    var lbl = editLabelInput.inputText || editCmdInput.inputText || "Launch"
+                    configPage.commitLauncher(configPage.editIndex, cmd, ico, lbl)
                     configPage.editIndex = -1
-                    editCmd.text   = ""
-                    editIcon.text  = ""
-                    editLabel.text = ""
-                    launcherListView.reload()
+                    editCmdInput.inputText   = ""
+                    editIconInput.inputText  = ""
+                    editLabelInput.inputText = ""
                 }
             }
 
@@ -180,9 +193,9 @@ Item {
                 visible: configPage.editIndex >= 0
                 onClicked: {
                     configPage.editIndex = -1
-                    editCmd.text   = ""
-                    editIcon.text  = ""
-                    editLabel.text = ""
+                    editCmdInput.inputText   = ""
+                    editIconInput.inputText  = ""
+                    editLabelInput.inputText = ""
                 }
             }
         }
