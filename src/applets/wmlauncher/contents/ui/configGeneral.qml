@@ -19,7 +19,7 @@ Item {
     property string cfg_command:   ""
     property string cfg_icon:      ""
     property string cfg_label:     ""
-    property bool   cfg_showLabel: true
+    property bool   cfg_showLabel: false
 
     Kirigami.FormLayout {
         anchors.left:  parent.left

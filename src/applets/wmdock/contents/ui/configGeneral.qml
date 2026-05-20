@@ -16,10 +16,10 @@ import org.kde.kirigami as Kirigami
 Item {
     id: page
 
-    property int    cfg_slotSize:          64
-    property int    cfg_slotSpacing:       2
-    property bool   cfg_showBackground:    true
-    property real   cfg_backgroundOpacity: 0.85
+    property int    cfg_slotSize:          0
+    property int    cfg_slotSpacing:       0
+    property bool   cfg_showBackground:    false
+    property real   cfg_backgroundOpacity: 0.0
     property var    cfg_appletList:        []
 
     ColumnLayout {
