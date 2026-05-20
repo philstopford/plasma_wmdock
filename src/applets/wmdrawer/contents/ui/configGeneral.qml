@@ -5,9 +5,8 @@ import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 
 // Root must be plain Item so Plasma can embed it in its own config dialog.
-// Kirigami.FormLayout inside a ColumnLayout does not propagate implicitHeight
-// reliably when its children are Rectangle+TextInput items; we use RowLayout
-// rows instead to ensure ColumnLayout.implicitHeight is computed correctly.
+// Use Kirigami.FormLayout anchored directly inside Item (no ColumnLayout wrapper)
+// — this matches the proven wmlauncher pattern that works in Plasma 6.
 Item {
     id: configPage
 
@@ -46,91 +45,88 @@ Item {
     }
 
     // -----------------------------------------------------------------------
-    // Layout — anchors.left/right only (no anchors.top) matches the working
-    // wmdock pattern; height is unrestricted so ColumnLayout renders freely.
+    // Proven Plasma 6 pattern: Kirigami.FormLayout with anchors.left/right
+    // anchored directly to the root Item (same as working wmlauncher).
     // -----------------------------------------------------------------------
-    ColumnLayout {
+    Kirigami.FormLayout {
+        id: topForm
         anchors.left:  parent.left
         anchors.right: parent.right
-        spacing: Kirigami.Units.largeSpacing
 
-        // ---- Drawer icon (RowLayout instead of FormLayout for reliable height)
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: Kirigami.Units.smallSpacing
-            QQC2.Label {
-                text: i18n("Drawer icon:")
-                Layout.minimumWidth: implicitWidth
+        // Plain Rectangle+TextInput avoids QQC2.TextField which silently
+        // drops the config tab in Plasma 6's config-dialog context.
+        Rectangle {
+            Kirigami.FormData.label: i18n("Drawer icon:")
+            implicitWidth:  200
+            implicitHeight: Kirigami.Units.gridUnit * 2
+            color:        Kirigami.Theme.backgroundColor
+            border.color: drawerIconInput.activeFocus ? Kirigami.Theme.highlightColor
+                                                      : Kirigami.Theme.disabledTextColor
+            border.width: 1
+            radius: 3
+            Text {
+                anchors { fill: parent; margins: 4 }
+                text:  "folder"
+                color: Kirigami.Theme.disabledTextColor
+                visible: drawerIconInput.text.length === 0
+                verticalAlignment: Text.AlignVCenter
             }
-            // Plain Rectangle+TextInput avoids QQC2.TextField which silently
-            // drops the config tab in Plasma 6's config-dialog context.
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: Kirigami.Units.gridUnit * 2
-                color:        Kirigami.Theme.backgroundColor
-                border.color: drawerIconInput.activeFocus ? Kirigami.Theme.highlightColor
-                                                          : Kirigami.Theme.disabledTextColor
-                border.width: 1
-                radius: 3
-                Text {
-                    anchors { fill: parent; margins: 4 }
-                    text:  "folder"
-                    color: Kirigami.Theme.disabledTextColor
-                    visible: drawerIconInput.text.length === 0
-                    verticalAlignment: Text.AlignVCenter
-                }
-                TextInput {
-                    id: drawerIconInput
-                    anchors { fill: parent; margins: 4 }
-                    color:             Kirigami.Theme.textColor
-                    selectedTextColor: Kirigami.Theme.highlightedTextColor
-                    selectionColor:    Kirigami.Theme.highlightColor
-                    selectByMouse:     true
-                    verticalAlignment: TextInput.AlignVCenter
-                    Component.onCompleted: text = configPage.cfg_drawerIcon
-                    onTextChanged: configPage.cfg_drawerIcon = text
-                }
+            TextInput {
+                id: drawerIconInput
+                anchors { fill: parent; margins: 4 }
+                color:             Kirigami.Theme.textColor
+                selectedTextColor: Kirigami.Theme.highlightedTextColor
+                selectionColor:    Kirigami.Theme.highlightColor
+                selectByMouse:     true
+                verticalAlignment: TextInput.AlignVCenter
+                Component.onCompleted: text = configPage.cfg_drawerIcon
+                onTextChanged: configPage.cfg_drawerIcon = text
             }
         }
 
-        // ---- Drawer label
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: Kirigami.Units.smallSpacing
-            QQC2.Label {
-                text: i18n("Drawer label:")
-                Layout.minimumWidth: implicitWidth
+        Rectangle {
+            Kirigami.FormData.label: i18n("Drawer label:")
+            implicitWidth:  200
+            implicitHeight: Kirigami.Units.gridUnit * 2
+            color:        Kirigami.Theme.backgroundColor
+            border.color: drawerLabelInput.activeFocus ? Kirigami.Theme.highlightColor
+                                                       : Kirigami.Theme.disabledTextColor
+            border.width: 1
+            radius: 3
+            Text {
+                anchors { fill: parent; margins: 4 }
+                text:  "Apps"
+                color: Kirigami.Theme.disabledTextColor
+                visible: drawerLabelInput.text.length === 0
+                verticalAlignment: Text.AlignVCenter
             }
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: Kirigami.Units.gridUnit * 2
-                color:        Kirigami.Theme.backgroundColor
-                border.color: drawerLabelInput.activeFocus ? Kirigami.Theme.highlightColor
-                                                           : Kirigami.Theme.disabledTextColor
-                border.width: 1
-                radius: 3
-                Text {
-                    anchors { fill: parent; margins: 4 }
-                    text:  "Apps"
-                    color: Kirigami.Theme.disabledTextColor
-                    visible: drawerLabelInput.text.length === 0
-                    verticalAlignment: Text.AlignVCenter
-                }
-                TextInput {
-                    id: drawerLabelInput
-                    anchors { fill: parent; margins: 4 }
-                    color:             Kirigami.Theme.textColor
-                    selectedTextColor: Kirigami.Theme.highlightedTextColor
-                    selectionColor:    Kirigami.Theme.highlightColor
-                    selectByMouse:     true
-                    verticalAlignment: TextInput.AlignVCenter
-                    Component.onCompleted: text = configPage.cfg_drawerLabel
-                    onTextChanged: configPage.cfg_drawerLabel = text
-                }
+            TextInput {
+                id: drawerLabelInput
+                anchors { fill: parent; margins: 4 }
+                color:             Kirigami.Theme.textColor
+                selectedTextColor: Kirigami.Theme.highlightedTextColor
+                selectionColor:    Kirigami.Theme.highlightColor
+                selectByMouse:     true
+                verticalAlignment: TextInput.AlignVCenter
+                Component.onCompleted: text = configPage.cfg_drawerLabel
+                onTextChanged: configPage.cfg_drawerLabel = text
             }
         }
+    }
 
-        Kirigami.Separator { Layout.fillWidth: true }
+    // -----------------------------------------------------------------------
+    // Launcher management section — anchored below the FormLayout.
+    // Uses Column (not ColumnLayout) so childrenRect.height is always valid.
+    // -----------------------------------------------------------------------
+    Column {
+        id: launcherSection
+        anchors.top:   topForm.bottom
+        anchors.left:  parent.left
+        anchors.right: parent.right
+        anchors.topMargin: Kirigami.Units.largeSpacing
+        spacing: Kirigami.Units.smallSpacing
+
+        Kirigami.Separator { width: parent.width }
 
         QQC2.Label {
             text: i18n("Launchers:")
@@ -139,51 +135,56 @@ Item {
 
         ListView {
             id: launcherListView
-            Layout.fillWidth: true
-            Layout.preferredHeight: 200
+            width: parent.width
+            height: 180
             clip: true
             model: configPage.parsedLaunchers
 
-            ScrollBar.vertical: QQC2.ScrollBar {}
-
-            delegate: RowLayout {
+            delegate: Item {
                 width: ListView.view.width
-                spacing: Kirigami.Units.smallSpacing
+                height: Kirigami.Units.gridUnit * 2
 
-                QQC2.Label {
-                    text: modelData.label || modelData.command
-                    Layout.fillWidth: true
-                    elide: Text.ElideRight
-                }
-                QQC2.ToolButton {
-                    icon.name: "document-edit"
-                    onClicked: configPage.startEdit(index)
-                }
-                QQC2.ToolButton {
-                    icon.name: "list-remove"
-                    onClicked: configPage.removeLauncher(index)
+                RowLayout {
+                    anchors.fill: parent
+                    spacing: Kirigami.Units.smallSpacing
+
+                    QQC2.Label {
+                        text: modelData.label || modelData.command
+                        Layout.fillWidth: true
+                        elide: Text.ElideRight
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    QQC2.ToolButton {
+                        icon.name: "document-edit"
+                        onClicked: configPage.startEdit(index)
+                    }
+                    QQC2.ToolButton {
+                        icon.name: "list-remove"
+                        onClicked: configPage.removeLauncher(index)
+                    }
                 }
             }
         }
 
-        Kirigami.Separator { Layout.fillWidth: true }
+        Kirigami.Separator { width: parent.width }
 
         QQC2.Label {
             text: configPage.editIndex >= 0 ? i18n("Edit Launcher:") : i18n("Add Launcher:")
             font.bold: true
         }
 
-        // ---- Command
-        RowLayout {
-            Layout.fillWidth: true
+        // Command
+        Row {
+            width: parent.width
             spacing: Kirigami.Units.smallSpacing
             QQC2.Label {
                 text: i18n("Command:")
-                Layout.minimumWidth: implicitWidth
+                anchors.verticalCenter: parent.verticalCenter
+                width: 90
             }
             Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: Kirigami.Units.gridUnit * 2
+                width: parent.width - 90 - Kirigami.Units.smallSpacing
+                height: Kirigami.Units.gridUnit * 2
                 color:        Kirigami.Theme.backgroundColor
                 border.color: editCmdInput.activeFocus ? Kirigami.Theme.highlightColor
                                                        : Kirigami.Theme.disabledTextColor
@@ -208,17 +209,18 @@ Item {
             }
         }
 
-        // ---- Icon name
-        RowLayout {
-            Layout.fillWidth: true
+        // Icon name
+        Row {
+            width: parent.width
             spacing: Kirigami.Units.smallSpacing
             QQC2.Label {
                 text: i18n("Icon name:")
-                Layout.minimumWidth: implicitWidth
+                anchors.verticalCenter: parent.verticalCenter
+                width: 90
             }
             Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: Kirigami.Units.gridUnit * 2
+                width: parent.width - 90 - Kirigami.Units.smallSpacing
+                height: Kirigami.Units.gridUnit * 2
                 color:        Kirigami.Theme.backgroundColor
                 border.color: editIconInput.activeFocus ? Kirigami.Theme.highlightColor
                                                         : Kirigami.Theme.disabledTextColor
@@ -243,17 +245,18 @@ Item {
             }
         }
 
-        // ---- Label
-        RowLayout {
-            Layout.fillWidth: true
+        // Label
+        Row {
+            width: parent.width
             spacing: Kirigami.Units.smallSpacing
             QQC2.Label {
                 text: i18n("Label:")
-                Layout.minimumWidth: implicitWidth
+                anchors.verticalCenter: parent.verticalCenter
+                width: 90
             }
             Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: Kirigami.Units.gridUnit * 2
+                width: parent.width - 90 - Kirigami.Units.smallSpacing
+                height: Kirigami.Units.gridUnit * 2
                 color:        Kirigami.Theme.backgroundColor
                 border.color: editLabelInput.activeFocus ? Kirigami.Theme.highlightColor
                                                          : Kirigami.Theme.disabledTextColor
@@ -278,11 +281,9 @@ Item {
             }
         }
 
-        // ---- Action buttons
-        RowLayout {
-            Layout.fillWidth: true
+        // Action buttons
+        Row {
             spacing: Kirigami.Units.smallSpacing
-
             QQC2.Button {
                 text: configPage.editIndex >= 0 ? i18n("Update") : i18n("Add")
                 icon.name: configPage.editIndex >= 0 ? "document-save" : "list-add"
@@ -297,7 +298,6 @@ Item {
                     editLabelInput.text = ""
                 }
             }
-
             QQC2.Button {
                 text: i18n("Cancel")
                 icon.name: "dialog-cancel"
