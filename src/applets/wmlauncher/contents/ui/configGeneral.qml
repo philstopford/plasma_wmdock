@@ -1,18 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 import QtQuick
 import QtQuick.Controls as QQC2
-import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 
-/**
- * WMLauncher configuration page.
- *
- * Exposes explicit cfg_* properties that Plasma reads/writes to the
- * applet's KConfig via the config/main.xml schema.
- * Property aliases are avoided because Plasma sets initial properties
- * before children are fully constructed, which can cause alias
- * resolution to fail silently and the tab to disappear.
- */
 Item {
     id: page
 
@@ -29,36 +19,23 @@ Item {
             id: commandField
             Kirigami.FormData.label: i18n("Command:")
             placeholderText: "konsole"
-            text: page.cfg_command
+            Component.onCompleted: text = page.cfg_command
             onTextChanged: page.cfg_command = text
         }
 
-        // Icon row: text field + live preview
-        RowLayout {
+        QQC2.TextField {
+            id: iconField
             Kirigami.FormData.label: i18n("Icon name:")
-            spacing: Kirigami.Units.smallSpacing
-
-            QQC2.TextField {
-                id: iconField
-                Layout.fillWidth: true
-                placeholderText: "utilities-terminal"
-                text: page.cfg_icon
-                onTextChanged: page.cfg_icon = text
-            }
-
-            Kirigami.Icon {
-                source: iconField.text || "utilities-terminal"
-                width:  Kirigami.Units.iconSizes.medium
-                height: Kirigami.Units.iconSizes.medium
-                isMask: false
-            }
+            placeholderText: "utilities-terminal"
+            Component.onCompleted: text = page.cfg_icon
+            onTextChanged: page.cfg_icon = text
         }
 
         QQC2.TextField {
             id: labelField
             Kirigami.FormData.label: i18n("Label:")
             placeholderText: "Launch"
-            text: page.cfg_label
+            Component.onCompleted: text = page.cfg_label
             onTextChanged: page.cfg_label = text
         }
 

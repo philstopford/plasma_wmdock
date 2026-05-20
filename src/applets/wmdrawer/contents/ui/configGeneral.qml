@@ -4,18 +4,6 @@ import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 
-/**
- * WMDrawer standalone configuration page.
- *
- * Used when the applet is placed directly on a panel/desktop rather
- * than embedded inside WMDock.  Provides fields for the drawer icon,
- * label and the list of launchers stored as a JSON string.
- *
- * Explicit cfg_* properties are used instead of property aliases so that
- * Plasma's setInitialProperties() succeeds before children are constructed.
- * The root must be Item (not Kirigami.ScrollablePage) so Plasma can embed
- * it in its own config dialog without "not placed in graphics scene" errors.
- */
 Item {
     id: configPage
 
@@ -23,10 +11,14 @@ Item {
     property string cfg_drawerLabel:   ""
     property string cfg_launchersJson: "[]"
 
-    // Internal editable list populated from cfg_launchersJson
     property var editingLaunchers: []
+    property int editIndex: -1
 
-    Component.onCompleted: reloadFromJson()
+    Component.onCompleted: {
+        drawerIconField.text  = cfg_drawerIcon
+        drawerLabelField.text = cfg_drawerLabel
+        reloadFromJson()
+    }
 
     function reloadFromJson() {
         try {
@@ -41,6 +33,19 @@ Item {
         cfg_launchersJson = JSON.stringify(editingLaunchers)
     }
 
+    function startEdit(idx) {
+        editIndex = idx
+        if (idx >= 0 && idx < editingLaunchers.length) {
+            editCmd.text   = editingLaunchers[idx].command || ""
+            editIcon.text  = editingLaunchers[idx].icon    || ""
+            editLabel.text = editingLaunchers[idx].label   || ""
+        } else {
+            editCmd.text   = ""
+            editIcon.text  = ""
+            editLabel.text = ""
+        }
+    }
+
     ColumnLayout {
         anchors.left:  parent.left
         anchors.right: parent.right
@@ -53,14 +58,12 @@ Item {
                 id: drawerIconField
                 Kirigami.FormData.label: i18n("Drawer icon:")
                 placeholderText: "folder"
-                text: configPage.cfg_drawerIcon
                 onTextChanged: configPage.cfg_drawerIcon = text
             }
             QQC2.TextField {
                 id: drawerLabelField
                 Kirigami.FormData.label: i18n("Drawer label:")
                 placeholderText: "Apps"
-                text: configPage.cfg_drawerLabel
                 onTextChanged: configPage.cfg_drawerLabel = text
             }
         }
@@ -93,11 +96,6 @@ Item {
                 width: ListView.view.width
                 spacing: Kirigami.Units.smallSpacing
 
-                Kirigami.Icon {
-                    source: model.ico || "application-x-executable"
-                    width:  Kirigami.Units.iconSizes.small
-                    height: Kirigami.Units.iconSizes.small
-                }
                 QQC2.Label {
                     text: model.lbl || model.cmd
                     Layout.fillWidth: true
@@ -105,70 +103,40 @@ Item {
                 }
                 QQC2.ToolButton {
                     icon.name: "document-edit"
-                    onClicked: entryEditDialog.openFor(index)
+                    onClicked: configPage.startEdit(index)
                 }
                 QQC2.ToolButton {
                     icon.name: "list-remove"
                     onClicked: {
-                        configPage.editingLaunchers.splice(index, 1)
-                        launcherListView.reload()
+                        var arr = configPage.editingLaunchers.slice()
+                        arr.splice(index, 1)
+                        configPage.editingLaunchers = arr
                         configPage.saveToJson()
+                        launcherListView.reload()
                     }
                 }
             }
         }
 
-        QQC2.Button {
-            text: i18n("Add Launcher…")
-            icon.name: "list-add"
-            onClicked: entryEditDialog.openFor(-1)
-        }
-    }
+        Kirigami.Separator { Layout.fillWidth: true }
 
-    // Edit/add a single launcher entry
-    QQC2.Dialog {
-        id: entryEditDialog
-        title: i18n("Edit Launcher")
-        modal: true
-        width: 320
-
-        property int editIndex: -1
-
-        function openFor(idx) {
-            editIndex = idx
-            if (idx >= 0 && idx < configPage.editingLaunchers.length) {
-                var item = configPage.editingLaunchers[idx]
-                editCmd.text   = item.command || ""
-                editIcon.text  = item.icon    || ""
-                editLabel.text = item.label   || ""
-            } else {
-                editCmd.text   = ""
-                editIcon.text  = ""
-                editLabel.text = ""
-            }
-            open()
+        QQC2.Label {
+            text: configPage.editIndex >= 0 ? i18n("Edit Launcher:") : i18n("Add Launcher:")
+            font.bold: true
         }
 
-        contentItem: Kirigami.FormLayout {
+        Kirigami.FormLayout {
+            Layout.fillWidth: true
+
             QQC2.TextField {
                 id: editCmd
                 Kirigami.FormData.label: i18n("Command:")
                 placeholderText: "konsole"
             }
-            RowLayout {
+            QQC2.TextField {
+                id: editIcon
                 Kirigami.FormData.label: i18n("Icon name:")
-                spacing: Kirigami.Units.smallSpacing
-                QQC2.TextField {
-                    id: editIcon
-                    Layout.fillWidth: true
-                    placeholderText: "utilities-terminal"
-                }
-                Kirigami.Icon {
-                    source: editIcon.text || "application-x-executable"
-                    width:  Kirigami.Units.iconSizes.medium
-                    height: Kirigami.Units.iconSizes.medium
-                    isMask: false
-                }
+                placeholderText: "utilities-terminal"
             }
             QQC2.TextField {
                 id: editLabel
@@ -177,30 +145,46 @@ Item {
             }
         }
 
-        footer: QQC2.DialogButtonBox {
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: Kirigami.Units.smallSpacing
+
             QQC2.Button {
-                text: i18n("OK")
-                QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.AcceptRole
+                text: configPage.editIndex >= 0 ? i18n("Update") : i18n("Add")
+                icon.name: configPage.editIndex >= 0 ? "document-save" : "list-add"
+                onClicked: {
+                    var entry = {
+                        command: editCmd.text   || "konsole",
+                        icon:    editIcon.text  || "application-x-executable",
+                        label:   editLabel.text || editCmd.text || "Launch"
+                    }
+                    var arr = configPage.editingLaunchers.slice()
+                    if (configPage.editIndex >= 0 && configPage.editIndex < arr.length) {
+                        arr[configPage.editIndex] = entry
+                    } else {
+                        arr.push(entry)
+                    }
+                    configPage.editingLaunchers = arr
+                    configPage.saveToJson()
+                    configPage.editIndex = -1
+                    editCmd.text   = ""
+                    editIcon.text  = ""
+                    editLabel.text = ""
+                    launcherListView.reload()
+                }
             }
+
             QQC2.Button {
                 text: i18n("Cancel")
-                QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.RejectRole
+                icon.name: "dialog-cancel"
+                visible: configPage.editIndex >= 0
+                onClicked: {
+                    configPage.editIndex = -1
+                    editCmd.text   = ""
+                    editIcon.text  = ""
+                    editLabel.text = ""
+                }
             }
-        }
-
-        onAccepted: {
-            var entry = {
-                command: editCmd.text   || "konsole",
-                icon:    editIcon.text  || "application-x-executable",
-                label:   editLabel.text || editCmd.text || "Launch"
-            }
-            if (editIndex >= 0 && editIndex < configPage.editingLaunchers.length) {
-                configPage.editingLaunchers[editIndex] = entry
-            } else {
-                configPage.editingLaunchers.push(entry)
-            }
-            launcherListView.reload()
-            configPage.saveToJson()
         }
     }
 }
