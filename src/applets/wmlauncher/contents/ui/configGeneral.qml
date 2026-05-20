@@ -52,21 +52,21 @@ Item {
         LabelledInput {
             Kirigami.FormData.label: i18n("Command:")
             placeholder: "konsole"
-            inputText: page.cfg_command
+            Component.onCompleted: inputText = page.cfg_command
             onInputTextChanged: page.cfg_command = inputText
         }
 
         LabelledInput {
             Kirigami.FormData.label: i18n("Icon name:")
             placeholder: "utilities-terminal"
-            inputText: page.cfg_icon
+            Component.onCompleted: inputText = page.cfg_icon
             onInputTextChanged: page.cfg_icon = inputText
         }
 
         LabelledInput {
             Kirigami.FormData.label: i18n("Label:")
             placeholder: "Launch"
-            inputText: page.cfg_label
+            Component.onCompleted: inputText = page.cfg_label
             onInputTextChanged: page.cfg_label = inputText
         }
 

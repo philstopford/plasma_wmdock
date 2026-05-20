@@ -94,7 +94,7 @@ Item {
                 id: drawerIconInput
                 Kirigami.FormData.label: i18n("Drawer icon:")
                 placeholder: "folder"
-                inputText: configPage.cfg_drawerIcon
+                Component.onCompleted: inputText = configPage.cfg_drawerIcon
                 onInputTextChanged: configPage.cfg_drawerIcon = inputText
             }
 
@@ -102,7 +102,7 @@ Item {
                 id: drawerLabelInput
                 Kirigami.FormData.label: i18n("Drawer label:")
                 placeholder: "Apps"
-                inputText: configPage.cfg_drawerLabel
+                Component.onCompleted: inputText = configPage.cfg_drawerLabel
                 onInputTextChanged: configPage.cfg_drawerLabel = inputText
             }
         }
