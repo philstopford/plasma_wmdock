@@ -117,12 +117,13 @@ Item {
                 // Stop at the next section header
                 if (inEntry && line.length > 0 && line[0] === "[") break
                 if (!inEntry) continue
-                if (line.startsWith("Name=") && name === "")
-                    name = line.substring(5).trim()
-                else if (line.startsWith("Exec=") && exec === "")
-                    exec = line.substring(5).trim()
-                else if (line.startsWith("Icon=") && icon === "")
-                    icon = line.substring(5).trim()
+                var eqIdx = line.indexOf("=")
+                if (eqIdx <= 0) continue
+                var key = line.substring(0, eqIdx)
+                var val = line.substring(eqIdx + 1).trim()
+                if (key === "Name" && name === "")       name = val
+                else if (key === "Exec" && exec === "") exec = val
+                else if (key === "Icon" && icon === "") icon = val
             }
             // Strip .desktop field codes (%f, %F, %u, %U, %d, %D, %n, %N,
             // %i, %c, %k, %v, %m) from the Exec value.
@@ -173,8 +174,9 @@ Item {
         var offset = 0
         for (var i = 0; i < urls.length; i++) {
             var url = urls[i].toString()
-            // Check only the last 8 chars so we don't lowercase the path.
-            if (url.slice(-8).toLowerCase() === ".desktop") {
+            // endsWith check is case-insensitive on the extension only;
+            // the original url (with original casing) is passed to the parser.
+            if (url.toLowerCase().endsWith(".desktop")) {
                 addLauncherFromDesktop(url, insertIndex < 0 ? -1 : insertIndex + offset)
                 offset++
             }
