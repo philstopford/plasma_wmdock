@@ -81,6 +81,11 @@ Item {
     // Apply slotConfig to the loaded item whenever config or item changes
     function applySlotConfig() {
         if (!appletLoader.item) return
+        // Always propagate orientation so the drawer opens in the correct direction
+        // regardless of whether slotConfig has been populated yet.
+        // 1 = LeftEdge, 2 = RightEdge → vertical dock; all others → horizontal dock.
+        appletLoader.item.externalOrientation =
+            (Plasmoid.location === 1 || Plasmoid.location === 2) ? "vertical" : "horizontal"
         if (!slotConfig) return
         try {
             var cfg = JSON.parse(slotConfig)
@@ -92,10 +97,6 @@ Item {
             if (cfg.drawerIcon !== undefined) appletLoader.item.externalDrawerIcon  = cfg.drawerIcon
             if (cfg.drawerLabel!== undefined) appletLoader.item.externalDrawerLabel = cfg.drawerLabel
             if (cfg.launchers  !== undefined) appletLoader.item.externalLaunchers  = cfg.launchers
-            // Pass the dock's orientation so the drawer can open in the correct direction.
-            // 1 = LeftEdge, 2 = RightEdge → vertical dock; all others → horizontal dock.
-            appletLoader.item.externalOrientation =
-                (Plasmoid.location === 1 || Plasmoid.location === 2) ? "vertical" : "horizontal"
         } catch(e) {
             console.warn("WMDock: failed to parse slotConfig for", appletId, e)
         }
