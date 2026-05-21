@@ -19,6 +19,6 @@ void CursorTracker::poll()
     const QPoint p = QCursor::pos();
     if (p != m_pos) {
         m_pos = p;
-        emit positionChanged();
+        Q_EMIT positionChanged();
     }
 }

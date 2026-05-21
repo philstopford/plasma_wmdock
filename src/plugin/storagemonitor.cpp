@@ -26,7 +26,7 @@ void StorageMonitor::setUpdateInterval(int ms)
     if (ms == m_timer.interval())
         return;
     m_timer.setInterval(ms);
-    emit updateIntervalChanged();
+    Q_EMIT updateIntervalChanged();
 }
 
 // ---------------------------------------------------------------------------
@@ -102,5 +102,5 @@ void StorageMonitor::update()
     }
 
     m_volumes = newVolumes;
-    emit volumesChanged();
+    Q_EMIT volumesChanged();
 }
