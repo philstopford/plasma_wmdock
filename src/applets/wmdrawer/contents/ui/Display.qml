@@ -86,99 +86,43 @@ Item {
     }
 
     // -----------------------------------------------------------------------
-    // Desktop-file drag-and-drop helpers
+    // Desktop-file drag-and-drop helper
     // -----------------------------------------------------------------------
 
-    // Asynchronously read and parse a .desktop file at fileUrl (file:// URL).
-    // Calls callback({ command, icon, label }) on success, or callback(null)
-    // if the file cannot be read or has no Exec= value.
-    //
-    // Note: only un-localised keys (Name=, Exec=, Icon=) are read; locale-
-    // specific variants such as Name[fr]= are intentionally ignored to keep
-    // the implementation simple without a dependency on KConfig.
-    function parseDesktopFile(fileUrl, callback) {
-        var xhr = new XMLHttpRequest()
-        xhr.open("GET", fileUrl)
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState !== XMLHttpRequest.DONE) return
-            // Local file:// reads return status 0; network success is 200.
-            if (xhr.status !== 0 && xhr.status !== 200) {
-                console.warn("WMDrawer: failed to read .desktop file:", fileUrl,
-                             "(status", xhr.status, ")")
-                callback(null)
-                return
-            }
-            var lines = xhr.responseText.split("\n")
-            var inEntry = false
-            var name = "", exec = "", icon = ""
-            for (var i = 0; i < lines.length; i++) {
-                var line = lines[i].trim()
-                if (line === "[Desktop Entry]") { inEntry = true; continue }
-                // Stop at the next section header
-                if (inEntry && line.length > 0 && line[0] === "[") break
-                if (!inEntry) continue
-                var eqIdx = line.indexOf("=")
-                if (eqIdx <= 0) continue
-                var key = line.substring(0, eqIdx)
-                var val = line.substring(eqIdx + 1).trim()
-                if (key === "Name" && name === "")       name = val
-                else if (key === "Exec" && exec === "") exec = val
-                else if (key === "Icon" && icon === "") icon = val
-            }
-            // Strip .desktop field codes (%f, %F, %u, %U, %d, %D, %n, %N,
-            // %i, %c, %k, %v, %m) from the Exec value.
-            exec = exec.replace(/ ?%[fFuUdDnNickvm]/g, "").trim()
-            if (!exec) {
-                console.warn("WMDrawer: no Exec= value found in .desktop file:", fileUrl)
-                callback(null)
-                return
-            }
-            callback({
-                command: exec,
-                icon:    icon || "application-x-executable",
-                label:   name || exec
-            })
-        }
-        xhr.send()
-    }
-
-    // Add a launcher built from a .desktop file URL at the given position.
-    // insertIndex == -1 (or out of range) means append at the end.
-    // If the popup is open the live launcherModel is updated immediately;
-    // otherwise the persistent configuration is updated directly.
-    function addLauncherFromDesktop(fileUrl, insertIndex) {
-        parseDesktopFile(fileUrl, function(entry) {
-            if (!entry) return
-            if (drawerPopup.drawerOpen) {
-                var pos = (insertIndex >= 0 && insertIndex <= launcherModel.count)
-                          ? insertIndex : launcherModel.count
-                launcherModel.insert(pos, entry)
-                root.saveLaunchersFromModel()
-            } else {
-                var arr = root.launchers ? root.launchers.slice() : []
-                var pos2 = (insertIndex >= 0 && insertIndex <= arr.length)
-                           ? insertIndex : arr.length
-                arr.splice(pos2, 0, entry)
-                if (root.externalLaunchers !== null) {
-                    root.launchersReordered(arr)
-                } else {
-                    Plasmoid.configuration.launchersJson = JSON.stringify(arr)
-                }
-            }
-        })
-    }
-
-    // Convenience wrapper: iterate a list of dropped URLs and add each
-    // .desktop file as a launcher starting at insertIndex.
+    // Process a list of dropped URLs: read each .desktop file via the C++
+    // DesktopFileReader singleton (which uses QFile, avoiding QML sandbox
+    // restrictions on file:// XHR) and insert the resulting launcher entries
+    // starting at insertIndex.  Pass insertIndex < 0 to append at the end.
+    // Multiple files are inserted consecutively at successive positions.
     function addLauncherFromUrls(urls, insertIndex) {
-        var offset = 0
+        // Collect all valid entries synchronously before mutating state.
+        var entries = []
         for (var i = 0; i < urls.length; i++) {
             var url = urls[i].toString()
-            // endsWith check is case-insensitive on the extension only;
-            // the original url (with original casing) is passed to the parser.
-            if (url.toLowerCase().endsWith(".desktop")) {
-                addLauncherFromDesktop(url, insertIndex < 0 ? -1 : insertIndex + offset)
-                offset++
+            if (!url.toLowerCase().endsWith(".desktop")) continue
+            var entry = DesktopFileReader.read(url)
+            if (entry && entry.command) entries.push(entry)
+        }
+        if (entries.length === 0) return
+
+        if (drawerPopup.drawerOpen) {
+            var ins = (insertIndex >= 0 && insertIndex <= launcherModel.count)
+                      ? insertIndex : launcherModel.count
+            for (var j = 0; j < entries.length; j++) {
+                launcherModel.insert(ins + j, entries[j])
+            }
+            root.saveLaunchersFromModel()
+        } else {
+            var arr = root.launchers ? root.launchers.slice() : []
+            var pos = (insertIndex >= 0 && insertIndex <= arr.length)
+                      ? insertIndex : arr.length
+            for (var k = 0; k < entries.length; k++) {
+                arr.splice(pos + k, 0, entries[k])
+            }
+            if (root.externalLaunchers !== null) {
+                root.launchersReordered(arr)
+            } else {
+                Plasmoid.configuration.launchersJson = JSON.stringify(arr)
             }
         }
     }
