@@ -1,0 +1,12 @@
+{
+    "KPlugin": {
+        "Category": "Applets",
+        "Description": "Animated eyes that follow the mouse cursor in classic WindowMaker dockapp style",
+        "Icon": "view-visible",
+        "Id": "org.kde.plasma.wmeyes",
+        "License": "GPL-2.0-or-later",
+        "Name": "WMEyes"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "KPackageStructure": "Plasma/Applet"
+}

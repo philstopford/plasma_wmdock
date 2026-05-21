@@ -1,0 +1,12 @@
+{
+    "KPlugin": {
+        "Category": "Multimedia",
+        "Description": "Audio visualizer with multiple effects in classic WindowMaker dockapp style",
+        "Icon": "audio-volume-high",
+        "Id": "org.kde.plasma.wmviz",
+        "License": "GPL-2.0-or-later",
+        "Name": "WMViz"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "KPackageStructure": "Plasma/Applet"
+}

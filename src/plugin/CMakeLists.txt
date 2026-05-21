@@ -7,6 +7,10 @@ set(PLUGIN_SOURCES
     batterymonitor.cpp
     audiomanager.cpp
     weatherprovider.cpp
+    thermalmonitor.cpp
+    storagemonitor.cpp
+    cursortracker.cpp
+    mediascanner.cpp
 )
 
 if(WITH_XEMBED)

@@ -9,6 +9,10 @@
 #include "weatherprovider.h"
 #include "desktopfilereader.h"
 #include "processlauncher.h"
+#include "thermalmonitor.h"
+#include "storagemonitor.h"
+#include "cursortracker.h"
+#include "mediascanner.h"
 #ifdef WITH_XEMBED
 #include "xembedhost.h"
 #endif
@@ -50,6 +54,26 @@ void WMDockPlugin::registerTypes(const char *uri)
     qmlRegisterSingletonType<DesktopFileReader>(uri, 1, 0, "DesktopFileReader",
         [](QQmlEngine *, QJSEngine *) -> QObject * {
             return new DesktopFileReader();
+        });
+
+    qmlRegisterSingletonType<ThermalMonitor>(uri, 1, 0, "ThermalMonitor",
+        [](QQmlEngine *, QJSEngine *) -> QObject * {
+            return new ThermalMonitor();
+        });
+
+    qmlRegisterSingletonType<StorageMonitor>(uri, 1, 0, "StorageMonitor",
+        [](QQmlEngine *, QJSEngine *) -> QObject * {
+            return new StorageMonitor();
+        });
+
+    qmlRegisterSingletonType<CursorTracker>(uri, 1, 0, "CursorTracker",
+        [](QQmlEngine *, QJSEngine *) -> QObject * {
+            return new CursorTracker();
+        });
+
+    qmlRegisterSingletonType<MediaScanner>(uri, 1, 0, "MediaScanner",
+        [](QQmlEngine *, QJSEngine *) -> QObject * {
+            return new MediaScanner();
         });
 
 #ifdef WITH_XEMBED

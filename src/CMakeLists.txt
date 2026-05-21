@@ -13,6 +13,12 @@ set(WMDOCK_APPLETS
     wmlauncher
     wmweather
     wmdrawer
+    wmviz
+    wmplay
+    wmeyes
+    wmlava
+    wmsensors
+    wmstorage
 )
 
 foreach(APPLET ${WMDOCK_APPLETS})

@@ -1,0 +1,12 @@
+{
+    "KPlugin": {
+        "Category": "Applets",
+        "Description": "Lava lamp simulation in classic WindowMaker dockapp style",
+        "Icon": "color-management",
+        "Id": "org.kde.plasma.wmlava",
+        "License": "GPL-2.0-or-later",
+        "Name": "WMLava"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "KPackageStructure": "Plasma/Applet"
+}
