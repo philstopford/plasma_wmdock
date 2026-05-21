@@ -83,9 +83,9 @@ Item {
         if (!appletLoader.item) return
         // Always propagate orientation so the drawer opens in the correct direction
         // regardless of whether slotConfig has been populated yet.
-        // 1 = LeftEdge, 2 = RightEdge → vertical dock; all others → horizontal dock.
+        // Plasma 6 location: 5 = LeftEdge, 6 = RightEdge → vertical dock; all others → horizontal dock.
         appletLoader.item.externalOrientation =
-            (Plasmoid.location === 1 || Plasmoid.location === 2) ? "vertical" : "horizontal"
+            (Plasmoid.location === 5 || Plasmoid.location === 6) ? "vertical" : "horizontal"
         if (!slotConfig) return
         try {
             var cfg = JSON.parse(slotConfig)

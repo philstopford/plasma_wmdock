@@ -51,12 +51,12 @@ Item {
 
     // True when the parent dock sits on a horizontal edge (top/bottom).
     // Falls back to Plasmoid.location when running standalone.
-    //   1 = LeftEdge, 2 = RightEdge → vertical dock
-    //   3 = TopEdge,  4 = BottomEdge, 0 = Floating → horizontal dock
+    //   Plasma 6: 5 = LeftEdge, 6 = RightEdge → vertical dock
+    //   3 = TopEdge, 4 = BottomEdge, 0 = Floating → horizontal dock
     readonly property bool isHorizontalDock: {
         if (externalOrientation === "vertical")   return false
         if (externalOrientation === "horizontal") return true
-        return Plasmoid.location !== 1 && Plasmoid.location !== 2
+        return Plasmoid.location !== 5 && Plasmoid.location !== 6
     }
 
     readonly property string openEffect: Plasmoid.configuration.openEffect || "slide"
@@ -132,7 +132,7 @@ Item {
     function _arrowText(open) {
         if (root.isHorizontalDock) return open ? "\u25B2" : "\u25BC"  // ▲ / ▼
         // Vertical dock: arrow points away from the panel edge
-        return (Plasmoid.location === 2) === open ? "\u25BA" : "\u25C4"  // ► / ◄
+        return (Plasmoid.location === 6) === open ? "\u25BA" : "\u25C4"  // ► / ◄
     }
 
     // Small open/close indicator arrow
@@ -277,7 +277,7 @@ Item {
                 _fixedX    = targetX
             } else {
                 targetY = btnPos.y
-                if (Plasmoid.location === 2) {  // RightEdge: popup to the left
+                if (Plasmoid.location === 6) {  // 6=RightEdge: popup to the left
                     targetX    = btnPos.x - popW - 4
                     _hiddenPos = btnPos.x - 4   // popup right edge at button's left
                 } else {                         // LeftEdge: popup to the right
