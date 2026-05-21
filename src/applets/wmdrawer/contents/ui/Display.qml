@@ -128,23 +128,20 @@ Item {
         isMask: false
     }
 
+    // Returns the indicator arrow for the current open/close and orientation state.
+    function _arrowText(open) {
+        if (root.isHorizontalDock) return open ? "\u25B2" : "\u25BC"  // ▲ / ▼
+        // Vertical dock: arrow points away from the panel edge
+        return (Plasmoid.location === 2) === open ? "\u25BA" : "\u25C4"  // ► / ◄
+    }
+
     // Small open/close indicator arrow
     Text {
         anchors {
             bottom: drawerIconItem.bottom
             right:  drawerIconItem.right
         }
-        text: {
-            if (drawerPopup.visible) {
-                if (!root.isHorizontalDock)
-                    return Plasmoid.location === 2 ? "\u25C4" : "\u25BA"
-                return "\u25B2"
-            } else {
-                if (!root.isHorizontalDock)
-                    return Plasmoid.location === 2 ? "\u25BA" : "\u25C4"
-                return "\u25BC"
-            }
-        }
+        text:  root._arrowText(drawerPopup.visible)
         color: "#aaaaaa"
         font.pixelSize: Math.max(8, parent.height * 0.12)
     }
@@ -270,11 +267,11 @@ Item {
             if (root.isHorizontalDock) {
                 targetX = btnPos.x
                 if (btnPos.y - popH - 4 >= scr.virtualY) {
-                    targetY      = btnPos.y - popH - 4
-                    _hiddenPos   = targetY + popH   // ≈ btnPos.y - 4 (just above button)
+                    targetY    = btnPos.y - popH - 4
+                    _hiddenPos = btnPos.y - 4  // popup bottom at button's top
                 } else {
-                    targetY      = btnPos.y + root.height + 4
-                    _hiddenPos   = targetY - popH   // ≈ btn bottom
+                    targetY    = btnPos.y + root.height + 4
+                    _hiddenPos = targetY - popH  // popup top at button's bottom
                 }
                 _targetPos = targetY
                 _fixedX    = targetX
@@ -282,10 +279,10 @@ Item {
                 targetY = btnPos.y
                 if (Plasmoid.location === 2) {  // RightEdge: popup to the left
                     targetX    = btnPos.x - popW - 4
-                    _hiddenPos = targetX + popW   // ≈ btnPos.x - 4
+                    _hiddenPos = btnPos.x - 4   // popup right edge at button's left
                 } else {                         // LeftEdge: popup to the right
                     targetX    = btnPos.x + root.width + 4
-                    _hiddenPos = targetX - popW
+                    _hiddenPos = targetX - popW  // popup left edge at button's right
                 }
                 _targetPos = targetX
                 _fixedY    = targetY
@@ -352,8 +349,8 @@ Item {
             clip:        true
             interactive: false
 
-            // Track the item currently being dragged (by model index)
-            property int dragActiveIndex: -1
+            // Track the model index of the item currently being drag-reordered.
+            property int draggedItemIndex: -1
 
             displaced: Transition {
                 NumberAnimation { properties: "x,y"; duration: 80 }
@@ -418,11 +415,11 @@ Item {
                     target: null
                     onActiveChanged: {
                         if (active) {
-                            launcherList.dragActiveIndex = index
+                            launcherList.draggedItemIndex = index
                         } else {
-                            if (launcherList.dragActiveIndex >= 0) {
+                            if (launcherList.draggedItemIndex >= 0) {
                                 root.saveLaunchersFromModel()
-                                launcherList.dragActiveIndex = -1
+                                launcherList.draggedItemIndex = -1
                             }
                         }
                     }
@@ -449,7 +446,7 @@ Item {
                     acceptedButtons: Qt.LeftButton
                     onPressedChanged: delItem.itemPressed = pressed
                     onTapped: {
-                        if (launcherList.dragActiveIndex < 0) {
+                        if (launcherList.draggedItemIndex < 0) {
                             var cmd = model.command || ""
                             if (cmd) ProcessLauncher.launch(cmd)
                         }
@@ -457,7 +454,7 @@ Item {
                 }
 
                 QQC2.ToolTip {
-                    visible: itemHover.hovered && launcherList.dragActiveIndex < 0
+                    visible: itemHover.hovered && launcherList.draggedItemIndex < 0
                     text:    model.command || ""
                     delay:   700
                 }

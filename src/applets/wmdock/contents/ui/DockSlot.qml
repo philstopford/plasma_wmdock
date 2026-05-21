@@ -70,7 +70,7 @@ Item {
                             cfg.launchers = newLaunchers
                             slot.slotConfigSaved(slotIndex, JSON.stringify(cfg))
                         } catch(e) {
-                            console.warn("WMDock: failed to save reordered launchers", e)
+                            console.warn("WMDock: failed to parse or save reordered launchers for slot", slotIndex, e)
                         }
                     })
                 }
