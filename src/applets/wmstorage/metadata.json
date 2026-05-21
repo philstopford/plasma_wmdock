@@ -1,0 +1,12 @@
+{
+    "KPlugin": {
+        "Category": "System Information",
+        "Description": "Mounted volume storage usage overview in classic WindowMaker dockapp style",
+        "Icon": "drive-harddisk",
+        "Id": "org.kde.plasma.wmstorage",
+        "License": "GPL-2.0-or-later",
+        "Name": "WMStorage"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "KPackageStructure": "Plasma/Applet"
+}

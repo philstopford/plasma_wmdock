@@ -38,6 +38,11 @@ find_package(Qt6 ${QT_MIN_VERSION} REQUIRED COMPONENTS
     Network
 )
 
+# Optional: Qt Multimedia is used by the WMPlay applet at QML runtime.
+# If not present the applet will display an import error but all other
+# applets continue to work normally.
+find_package(Qt6 OPTIONAL_COMPONENTS Multimedia)
+
 find_package(KF6 ${KF_MIN_VERSION} REQUIRED COMPONENTS
     I18n
     Config
