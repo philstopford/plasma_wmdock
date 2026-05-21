@@ -173,6 +173,15 @@ Item {
         acceptedButtons: Qt.LeftButton
         onPressedChanged: root.pressed = tapHandler.pressed
         onTapped: {
+            // Qt.Popup auto-closes the popup on any click outside of it,
+            // including a click on this very button.  By the time onTapped
+            // fires the popup is already hidden, so a naive visible-check
+            // would reopen it.  We detect this case by comparing timestamps:
+            // if the popup disappeared less than 300 ms ago the close was
+            // caused by this same gesture, so we leave it closed.
+            if (Date.now() - drawerPopup._lastCloseTime < 300) {
+                return
+            }
             if (drawerPopup.visible) {
                 drawerPopup.closeDrawer()
             } else {
@@ -204,6 +213,12 @@ Item {
         flags: Qt.Popup | Qt.FramelessWindowHint
         color: "transparent"
         visible: false
+
+        // Timestamp of the last time the popup became hidden.  Used by the
+        // TapHandler to distinguish "closed by this button click" (suppress
+        // reopen) from "closed by an unrelated outside click" (allow reopen).
+        property real _lastCloseTime: 0
+        onVisibleChanged: { if (!visible) _lastCloseTime = Date.now() }
 
         // Saved so closeDrawer() can animate back to the button.
         property real _hiddenPos: 0    // y (horiz dock) or x (vert dock)
