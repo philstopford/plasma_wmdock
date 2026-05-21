@@ -6,22 +6,20 @@
 #include <QTimer>
 #include <QVariantList>
 
-/**
- * @brief Monitors hardware temperature sensors.
- *
- * Reads temperatures from two kernel interfaces:
- *   - /sys/class/hwmon/hwmon*/temp*_input   (millidegrees Celsius)
- *   - /sys/class/thermal/thermal_zone*/temp  (millidegrees Celsius)
- *
- * Each sensor is described by a QVariantMap with keys:
- *   key        - unique identifier string (e.g. "hwmon0_temp1")
- *   name       - source device name (hwmon chip name or thermal_zone type)
- *   label      - human-readable label (temp*_label or zone type)
- *   temp       - current temperature in degrees Celsius (double)
- *   available  - bool: false when the sysfs node is unreadable
- *
- * Exposed to QML as a singleton via the wmdockplugin QML extension.
- */
+// Monitors hardware temperature sensors.
+//
+// Reads temperatures from two kernel interfaces:
+//   - /sys/class/hwmon/hwmon<N>/temp<N>_input  (millidegrees Celsius)
+//   - /sys/class/thermal/thermal_zone<N>/temp   (millidegrees Celsius)
+//
+// Each sensor is described by a QVariantMap with keys:
+//   key        - unique identifier string (e.g. "hwmon0_temp1")
+//   name       - source device name (hwmon chip name or thermal_zone type)
+//   label      - human-readable label (temp<N>_label or zone type)
+//   temp       - current temperature in degrees Celsius (double)
+//   available  - bool: false when the sysfs node is unreadable
+//
+// Exposed to QML as a singleton via the wmdockplugin QML extension.
 class ThermalMonitor : public QObject
 {
     Q_OBJECT
