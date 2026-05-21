@@ -97,7 +97,7 @@ void StorageMonitor::update()
         m[QStringLiteral("totalBytes")]  = total;
         m[QStringLiteral("availBytes")]  = avail;
         m[QStringLiteral("usedBytes")]   = used;
-        m[QStringLiteral("usedPct")]     = qRound(100.0 * used / total);
+        m[QStringLiteral("usedPct")]     = total > 0 ? qRound(100.0 * used / total) : 0;
         newVolumes.append(m);
     }
 

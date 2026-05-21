@@ -101,6 +101,9 @@ Item {
         height: parent.height * 0.14
         clip: true
 
+        // Named constant for scroll speed (ms per pixel of overflow)
+        readonly property int scrollSpeedMsPerPx: 25
+
         Text {
             id: trackLabel
             height: parent.height
@@ -119,7 +122,7 @@ Item {
                 loops:  Animation.Infinite
                 from:   0
                 to:     Math.max(0, trackLabel.implicitWidth - trackRow.width + 8)
-                duration: Math.max(2000, (trackLabel.implicitWidth - trackRow.width) * 25)
+                duration: Math.max(2000, (trackLabel.implicitWidth - trackRow.width) * trackRow.scrollSpeedMsPerPx)
                 onStopped: trackLabel.offset = 0
             }
         }

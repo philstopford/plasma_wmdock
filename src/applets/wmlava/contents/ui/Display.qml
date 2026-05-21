@@ -75,6 +75,14 @@ Item {
     }
 
     // ----- physics tick ----------------------------------------------------
+    function clampBlobToBounds(b, w, h) {
+        const margin = b.r * 0.5
+        if (b.x < margin)     { b.x = margin;     b.vx =  Math.abs(b.vx) * 0.5 }
+        if (b.x > w - margin) { b.x = w - margin; b.vx = -Math.abs(b.vx) * 0.5 }
+        if (b.y < margin)     { b.y = margin;     b.vy =  Math.abs(b.vy) * 0.5 }
+        if (b.y > h - margin) { b.y = h - margin; b.vy = -Math.abs(b.vy) * 0.5 }
+    }
+
     function tickBlobs() {
         const w  = canvas.width  || 64
         const h  = canvas.height || 64
@@ -99,12 +107,7 @@ Item {
             b.x += b.vx * sm
             b.y += b.vy * sm
 
-            // Bounce off walls (soft)
-            const margin = b.r * 0.5
-            if (b.x < margin)          { b.x = margin;      b.vx = Math.abs(b.vx) * 0.5 }
-            if (b.x > w - margin)      { b.x = w - margin;  b.vx = -Math.abs(b.vx) * 0.5 }
-            if (b.y < margin)          { b.y = margin;      b.vy = Math.abs(b.vy) * 0.5 }
-            if (b.y > h - margin)      { b.y = h - margin;  b.vy = -Math.abs(b.vy) * 0.5 }
+            root.clampBlobToBounds(b, w, h)
         }
         root.blobs = bs
     }

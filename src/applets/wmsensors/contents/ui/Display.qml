@@ -42,7 +42,8 @@ Item {
             root.activeSensor = null
             return
         }
-        root.cycleIndex  = root.cycleIndex % active.length
+        if (root.cycleIndex >= active.length)
+            root.cycleIndex = 0
         root.activeSensor = active[root.cycleIndex]
         root.cycleIndex  = (root.cycleIndex + 1) % active.length
     }
