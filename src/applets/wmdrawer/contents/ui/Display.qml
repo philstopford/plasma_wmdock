@@ -10,13 +10,19 @@ import org.kde.plasma.private.wmdock 1.0
 /**
  * WMDrawer – Application launcher drawer button.
  *
- * Displays a single dock button. Left-click opens a popup showing all
- * configured launchers. The popup stays open until the user presses
- * the Close button or clicks outside.
+ * Displays a single dock button. Left-click opens a strip of launcher
+ * buttons, each matching the drawer button's own size.
  *
- * Configuration (when embedded in WMDock) is supplied via externalDrawerIcon,
- * externalDrawerLabel and externalLaunchers, injected by DockSlot.  When used
- * as a standalone plasmoid the values come from Plasmoid.configuration.
+ * Orientation: for a horizontal dock the strip opens vertically; for a
+ * vertical dock the strip opens horizontally.
+ *
+ * Opening effects are selectable: instant, slide, or fade.
+ *
+ * Launchers can be drag-reordered inside the open strip.
+ *
+ * Configuration (when embedded in WMDock) is supplied via external*
+ * properties injected by DockSlot.  When used as a standalone plasmoid
+ * the values come from Plasmoid.configuration.
  */
 Item {
     id: root
@@ -27,6 +33,10 @@ Item {
     property string externalDrawerIcon:  ""
     property string externalDrawerLabel: ""
     property var    externalLaunchers:   null   // array of {command,icon,label}
+    property string externalOrientation: ""     // "horizontal" or "vertical"
+
+    // Emitted after a drag-reorder so the dock can persist the new order.
+    signal launchersReordered(var newLaunchers)
 
     // -----------------------------------------------------------------------
     // Resolved configuration
@@ -39,7 +49,36 @@ Item {
         catch(e) { return [] }
     }
 
+    // True when the parent dock sits on a horizontal edge (top/bottom).
+    // Falls back to Plasmoid.location when running standalone.
+    //   1 = LeftEdge, 2 = RightEdge → vertical dock
+    //   3 = TopEdge,  4 = BottomEdge, 0 = Floating → horizontal dock
+    readonly property bool isHorizontalDock: {
+        if (externalOrientation === "vertical")   return false
+        if (externalOrientation === "horizontal") return true
+        return Plasmoid.location !== 1 && Plasmoid.location !== 2
+    }
+
+    readonly property string openEffect: Plasmoid.configuration.openEffect || "slide"
+
     property bool pressed: false
+
+    // -----------------------------------------------------------------------
+    // Save reordered launchers back to the appropriate store.
+    // Called when a drag-reorder completes.
+    // -----------------------------------------------------------------------
+    function saveLaunchersFromModel() {
+        var arr = []
+        for (var i = 0; i < launcherModel.count; i++) {
+            var item = launcherModel.get(i)
+            arr.push({ command: item.command, icon: item.icon, label: item.label })
+        }
+        if (root.externalLaunchers !== null) {
+            root.launchersReordered(arr)
+        } else {
+            Plasmoid.configuration.launchersJson = JSON.stringify(arr)
+        }
+    }
 
     // -----------------------------------------------------------------------
     // Drawer button body
@@ -89,13 +128,23 @@ Item {
         isMask: false
     }
 
-    // Small "open" indicator arrow
+    // Small open/close indicator arrow
     Text {
         anchors {
             bottom: drawerIconItem.bottom
             right:  drawerIconItem.right
         }
-        text:  drawerPopup.visible ? "▲" : "▼"
+        text: {
+            if (drawerPopup.visible) {
+                if (!root.isHorizontalDock)
+                    return Plasmoid.location === 2 ? "\u25C4" : "\u25BA"
+                return "\u25B2"
+            } else {
+                if (!root.isHorizontalDock)
+                    return Plasmoid.location === 2 ? "\u25BA" : "\u25C4"
+                return "\u25BC"
+            }
+        }
         color: "#aaaaaa"
         font.pixelSize: Math.max(8, parent.height * 0.12)
     }
@@ -128,7 +177,7 @@ Item {
         onPressedChanged: root.pressed = tapHandler.pressed
         onTapped: {
             if (drawerPopup.visible) {
-                drawerPopup.close()
+                drawerPopup.closeDrawer()
             } else {
                 drawerPopup.openDrawer()
             }
@@ -143,203 +192,290 @@ Item {
     HoverHandler { id: hoverHandler }
 
     // -----------------------------------------------------------------------
+    // Launcher model – populated on each open so a previous reorder is
+    // reflected without requiring a re-parse of the config.
+    // -----------------------------------------------------------------------
+    ListModel { id: launcherModel }
+
+    // -----------------------------------------------------------------------
     // Drawer popup – uses a top-level Qt.Popup Window so it can appear
-    // above/below the panel regardless of the panel window's bounds.
-    // QQC2.Popup is confined to its parent Window's overlay item (the panel),
-    // which causes truncation when opening on a thin horizontal panel.
+    // above/below/beside the panel regardless of the panel window bounds.
     // -----------------------------------------------------------------------
     Window {
         id: drawerPopup
 
-        // Qt.Popup closes automatically when clicking outside (on X11 and Wayland).
         flags: Qt.Popup | Qt.FramelessWindowHint
         color: "transparent"
         visible: false
 
-        // Compute layout and position relative to the button in screen coordinates.
+        // Saved so closeDrawer() can animate back to the button.
+        property real _hiddenPos: 0    // y (horiz dock) or x (vert dock)
+        property real _targetPos: 0   // y (horiz dock) or x (vert dock)
+        property real _fixedX:    0   // fixed x when sliding vertically
+        property real _fixedY:    0   // fixed y when sliding horizontally
+
+        // --- Animations ---------------------------------------------------
+        NumberAnimation {
+            id: fadeInAnim
+            target: drawerPopup; property: "opacity"
+            from: 0; to: 1; duration: 200; easing.type: Easing.InQuad
+        }
+        SequentialAnimation {
+            id: fadeOutAnim
+            NumberAnimation {
+                target: drawerPopup; property: "opacity"
+                to: 0; duration: 200; easing.type: Easing.OutQuad
+            }
+            ScriptAction { script: drawerPopup.visible = false }
+        }
+        PropertyAnimation {
+            id: slideInAnim
+            target: drawerPopup; duration: 200; easing.type: Easing.OutQuad
+        }
+        SequentialAnimation {
+            id: slideOutAnim
+            PropertyAnimation {
+                id: slideOutPropAnim
+                target: drawerPopup; duration: 200; easing.type: Easing.InQuad
+            }
+            ScriptAction { script: drawerPopup.visible = false }
+        }
+
+        // --- Open / close -------------------------------------------------
         function openDrawer() {
-            var colCount = Math.max(1, Math.ceil(Math.sqrt(Math.max(1, root.launchers.length))))
-            var rowCount = Math.max(1, Math.ceil(root.launchers.length / colCount))
-            var popW = Math.max(180, colCount * 62 + 32)
-            // Overhead: 8 (padding) + ~24 (header row) + 4 (spacing) + 1 (divider) + 4 (spacing) + 8 (padding) = 49
-            // Flow: each row is 56px high; between rows 6px spacing.
-            var flowH = root.launchers.length > 0
-                        ? rowCount * 56 + Math.max(0, rowCount - 1) * 6
-                        : 42  // empty-state text
-            var popH = 49 + flowH
+            // Rebuild model from current launcher list
+            launcherModel.clear()
+            var ls = root.launchers
+            for (var i = 0; i < ls.length; i++) {
+                launcherModel.append({
+                    command: ls[i].command || "",
+                    icon:    ls[i].icon    || "application-x-executable",
+                    label:   ls[i].label   || ls[i].command || "Launch"
+                })
+            }
+
+            var n    = Math.max(1, ls.length)
+            var cellW = root.width
+            var cellH = root.height
+            var popW  = root.isHorizontalDock ? cellW      : cellW * n
+            var popH  = root.isHorizontalDock ? cellH * n  : cellH
 
             width  = popW
             height = popH
 
-            // Map button centre to screen (global) coordinates for true popup placement.
-            var btnScreenPos = root.mapToGlobal(root.width / 2, 0)
-            var sx = btnScreenPos.x - popW / 2
+            var btnPos = root.mapToGlobal(0, 0)
+            var scr    = root.Screen
+            var targetX, targetY
 
-            // Use the Screen attached property of the root item so that
-            // multi-monitor setups (including panels on secondary displays)
-            // are handled correctly.
-            var scr = root.Screen
-            var screenLeft   = scr.virtualX
-            var screenTop    = scr.virtualY
-            var screenRight  = scr.virtualX + scr.width
-            var screenBottom = scr.virtualY + scr.height
-
-            // Prefer opening above the button; fall back to below.
-            // Compare against screenTop (not 0) to work on non-primary monitors.
-            var sy
-            if (btnScreenPos.y - popH - 4 >= screenTop) {
-                sy = btnScreenPos.y - popH - 4
+            if (root.isHorizontalDock) {
+                targetX = btnPos.x
+                if (btnPos.y - popH - 4 >= scr.virtualY) {
+                    targetY      = btnPos.y - popH - 4
+                    _hiddenPos   = targetY + popH   // ≈ btnPos.y - 4 (just above button)
+                } else {
+                    targetY      = btnPos.y + root.height + 4
+                    _hiddenPos   = targetY - popH   // ≈ btn bottom
+                }
+                _targetPos = targetY
+                _fixedX    = targetX
             } else {
-                sy = root.mapToGlobal(0, root.height).y + 4
+                targetY = btnPos.y
+                if (Plasmoid.location === 2) {  // RightEdge: popup to the left
+                    targetX    = btnPos.x - popW - 4
+                    _hiddenPos = targetX + popW   // ≈ btnPos.x - 4
+                } else {                         // LeftEdge: popup to the right
+                    targetX    = btnPos.x + root.width + 4
+                    _hiddenPos = targetX - popW
+                }
+                _targetPos = targetX
+                _fixedY    = targetY
             }
 
-            // Clamp horizontally to the current screen to avoid spanning monitors.
-            sx = Math.max(screenLeft, Math.min(sx, screenRight - popW))
-            x = sx
-            y = sy
-            visible = true
+            // Clamp to current screen
+            targetX = Math.max(scr.virtualX, Math.min(targetX, scr.virtualX + scr.width  - popW))
+            targetY = Math.max(scr.virtualY, Math.min(targetY, scr.virtualY + scr.height - popH))
+
+            var effect = root.openEffect
+            if (effect === "fade") {
+                x = targetX; y = targetY
+                opacity = 0
+                visible = true
+                fadeInAnim.start()
+            } else if (effect === "slide") {
+                if (root.isHorizontalDock) {
+                    x = targetX; y = _hiddenPos
+                } else {
+                    x = _hiddenPos; y = targetY
+                }
+                opacity = 1
+                visible = true
+                slideInAnim.property = root.isHorizontalDock ? "y" : "x"
+                slideInAnim.from     = _hiddenPos
+                slideInAnim.to       = root.isHorizontalDock ? targetY : targetX
+                slideInAnim.start()
+            } else {
+                x = targetX; y = targetY
+                opacity = 1
+                visible = true
+            }
         }
 
-        function close() {
-            visible = false
+        function closeDrawer() {
+            var effect = root.openEffect
+            if (effect === "fade") {
+                fadeOutAnim.start()
+            } else if (effect === "slide") {
+                slideOutPropAnim.property = root.isHorizontalDock ? "y" : "x"
+                slideOutPropAnim.to       = _hiddenPos
+                slideOutAnim.start()
+            } else {
+                visible = false
+            }
         }
 
-        // Background
+        // --- Background ---------------------------------------------------
         Rectangle {
             anchors.fill: parent
-            color:   "#1c1c1c"
+            color:        "#1c1c1c"
             border.color: "#555"
             border.width: 1
-            radius: 6
-            Rectangle {
-                width: parent.width - 2
-                height: parent.height - 2
-                x: 1; y: 1
-                color: "transparent"
-                border.color: "#666"
-                border.width: 1
-                radius: parent.radius - 1
-                opacity: 0.4
-            }
+            radius: 4
         }
 
-        // Content
-        ColumnLayout {
-            anchors { fill: parent; margins: 8 }
-            spacing: 4
+        // --- Launcher strip -----------------------------------------------
+        ListView {
+            id: launcherList
+            anchors.fill: parent
+            model:       launcherModel
+            orientation: root.isHorizontalDock ? ListView.Vertical : ListView.Horizontal
+            spacing:     0
+            clip:        true
+            interactive: false
 
-            // Header bar
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 4
+            // Track the item currently being dragged (by model index)
+            property int dragActiveIndex: -1
 
+            displaced: Transition {
+                NumberAnimation { properties: "x,y"; duration: 80 }
+            }
+
+            delegate: Item {
+                id: delItem
+
+                // Make delegate index available to drag handler
+                readonly property int delegateIndex: index
+
+                width:  root.width
+                height: root.height
+
+                property bool itemPressed: false
+
+                // Button background
+                Rectangle {
+                    anchors { fill: parent; margins: delItem.itemPressed ? 2 : 1 }
+                    color:        delItem.itemPressed ? "#111" : "#252525"
+                    radius:       3
+                    border.color: delItem.itemPressed ? "#333" : "#555"
+                    border.width: 1
+                    Behavior on anchors.margins { NumberAnimation { duration: 60 } }
+                    Behavior on color           { ColorAnimation  { duration: 60 } }
+                }
+
+                // Launcher icon
+                Kirigami.Icon {
+                    anchors {
+                        horizontalCenter: parent.horizontalCenter
+                        top: parent.top
+                        bottom: itemLabel.top
+                        topMargin:    5
+                        bottomMargin: 1
+                    }
+                    width:  Math.min(implicitWidth, parent.width - 10)
+                    height: width
+                    source: model.icon || "application-x-executable"
+                    isMask: false
+                }
+
+                // Launcher label
                 Text {
-                    text: root.drawerLabel
+                    id: itemLabel
+                    anchors {
+                        bottom: parent.bottom
+                        horizontalCenter: parent.horizontalCenter
+                        bottomMargin: 3
+                    }
+                    text:  model.label || model.command || "Launch"
                     color: "#cccccc"
-                    font { pixelSize: 12; family: "monospace"; bold: true }
-                    Layout.fillWidth: true
+                    font { pixelSize: 9; family: "monospace" }
+                    elide: Text.ElideRight
+                    width: parent.width - 6
+                    horizontalAlignment: Text.AlignHCenter
                 }
 
-                QQC2.ToolButton {
-                    icon.name: "window-close"
-                    flat: true
-                    onClicked: drawerPopup.close()
-                    implicitWidth:  20
-                    implicitHeight: 20
-                }
-            }
-
-            // Horizontal divider
-            Rectangle {
-                Layout.fillWidth: true
-                height: 1
-                color: "#444"
-            }
-
-            // Launcher grid
-            Flow {
-                id: launcherFlow
-                Layout.fillWidth: true
-                spacing: 6
-
-                Repeater {
-                    model: root.launchers
-
-                    delegate: Item {
-                        id: launchItem
-                        width:  56
-                        height: 56
-
-                        property bool itemPressed: false
-
-                        Rectangle {
-                            anchors { fill: parent; margins: launchItem.itemPressed ? 2 : 1 }
-                            color:   launchItem.itemPressed ? "#111" : "#252525"
-                            radius:  4
-                            border.color: launchItem.itemPressed ? "#333" : "#555"
-                            border.width: 1
-
-                            Behavior on anchors.margins { NumberAnimation { duration: 60 } }
-                            Behavior on color           { ColorAnimation  { duration: 60 } }
-                        }
-
-                        Kirigami.Icon {
-                            anchors {
-                                horizontalCenter: parent.horizontalCenter
-                                top: parent.top
-                                bottom: itemLabel.top
-                                topMargin: 5
-                                bottomMargin: 1
-                            }
-                            width: Math.min(implicitWidth, parent.width - 10)
-                            height: width
-                            source: modelData.icon || "application-x-executable"
-                            isMask: false
-                        }
-
-                        Text {
-                            id: itemLabel
-                            anchors {
-                                bottom: parent.bottom
-                                horizontalCenter: parent.horizontalCenter
-                                bottomMargin: 3
-                            }
-                            text:  modelData.label || modelData.command || "Launch"
-                            color: "#cccccc"
-                            font { pixelSize: 9; family: "monospace" }
-                            elide: Text.ElideRight
-                            width: parent.width - 6
-                            horizontalAlignment: Text.AlignHCenter
-                        }
-
-                        TapHandler {
-                            acceptedButtons: Qt.LeftButton
-                            onPressedChanged: launchItem.itemPressed = pressed
-                            onTapped: {
-                                var cmd = modelData.command || ""
-                                if (cmd) ProcessLauncher.launch(cmd)
+                // ----- Drag to reorder ------------------------------------
+                DragHandler {
+                    id: dragH
+                    target: null
+                    onActiveChanged: {
+                        if (active) {
+                            launcherList.dragActiveIndex = index
+                        } else {
+                            if (launcherList.dragActiveIndex >= 0) {
+                                root.saveLaunchersFromModel()
+                                launcherList.dragActiveIndex = -1
                             }
                         }
-
-                        QQC2.ToolTip {
-                            visible: itemHover.hovered
-                            text:    modelData.command || ""
-                            delay:   700
+                    }
+                    onCentroidChanged: {
+                        if (!active) return
+                        // Convert centroid to ListView-local coordinates, then
+                        // compute which slot the drag is over and move the item.
+                        var listPos  = launcherList.mapFromItem(
+                                           delItem,
+                                           dragH.centroid.position.x,
+                                           dragH.centroid.position.y)
+                        var cellSize = root.isHorizontalDock ? root.height : root.width
+                        var coord    = root.isHorizontalDock ? listPos.y : listPos.x
+                        var targetIdx = Math.floor(coord / cellSize)
+                        targetIdx = Math.max(0, Math.min(targetIdx, launcherModel.count - 1))
+                        if (targetIdx !== index) {
+                            launcherModel.move(index, targetIdx, 1)
                         }
-                        HoverHandler { id: itemHover }
                     }
                 }
 
-                // Empty state
-                Text {
-                    visible: root.launchers.length === 0
-                    text:    i18n("No launchers configured.\nRight-click the drawer to configure.")
-                    color:   "#888888"
-                    font.pixelSize: 11
-                    wrapMode: Text.WordWrap
-                    width:   launcherFlow.width
+                // ----- Launch on tap (only when not dragging) -------------
+                TapHandler {
+                    acceptedButtons: Qt.LeftButton
+                    onPressedChanged: delItem.itemPressed = pressed
+                    onTapped: {
+                        if (launcherList.dragActiveIndex < 0) {
+                            var cmd = model.command || ""
+                            if (cmd) ProcessLauncher.launch(cmd)
+                        }
+                    }
                 }
+
+                QQC2.ToolTip {
+                    visible: itemHover.hovered && launcherList.dragActiveIndex < 0
+                    text:    model.command || ""
+                    delay:   700
+                }
+                HoverHandler { id: itemHover }
             }
+        }
+
+        // Empty-state message
+        Text {
+            anchors.centerIn: parent
+            visible: launcherModel.count === 0
+            text:    i18n("No launchers configured.\nRight-click the drawer to configure.")
+            color:   "#888888"
+            font.pixelSize: 11
+            wrapMode: Text.WordWrap
+            width:   parent.width - 16
+            horizontalAlignment: Text.AlignHCenter
         }
     }
 }
+

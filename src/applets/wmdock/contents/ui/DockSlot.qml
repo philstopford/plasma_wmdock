@@ -2,6 +2,7 @@
 import QtQuick
 import QtQuick.Controls as QQC2
 import QtQuick.Layouts
+import org.kde.plasma.plasmoid
 import org.kde.plasma.components 3.0 as PlasmaComponents
 import org.kde.kirigami as Kirigami
 
@@ -60,6 +61,19 @@ Item {
             }
             if (status === Loader.Ready) {
                 applySlotConfig()
+                // When the drawer completes a drag-reorder, persist the new
+                // order back into this slot's config so it survives restart.
+                if (appletId === "org.kde.plasma.wmdrawer") {
+                    appletLoader.item.launchersReordered.connect(function(newLaunchers) {
+                        try {
+                            var cfg = slotConfig ? JSON.parse(slotConfig) : {}
+                            cfg.launchers = newLaunchers
+                            slot.slotConfigSaved(slotIndex, JSON.stringify(cfg))
+                        } catch(e) {
+                            console.warn("WMDock: failed to save reordered launchers", e)
+                        }
+                    })
+                }
             }
         }
     }
@@ -78,6 +92,10 @@ Item {
             if (cfg.drawerIcon !== undefined) appletLoader.item.externalDrawerIcon  = cfg.drawerIcon
             if (cfg.drawerLabel!== undefined) appletLoader.item.externalDrawerLabel = cfg.drawerLabel
             if (cfg.launchers  !== undefined) appletLoader.item.externalLaunchers  = cfg.launchers
+            // Pass the dock's orientation so the drawer can open in the correct direction.
+            // 1 = LeftEdge, 2 = RightEdge → vertical dock; all others → horizontal dock.
+            appletLoader.item.externalOrientation =
+                (Plasmoid.location === 1 || Plasmoid.location === 2) ? "vertical" : "horizontal"
         } catch(e) {
             console.warn("WMDock: failed to parse slotConfig for", appletId, e)
         }

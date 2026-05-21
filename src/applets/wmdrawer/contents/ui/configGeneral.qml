@@ -16,6 +16,7 @@ Item {
     property string cfg_drawerIcon:    ""
     property string cfg_drawerLabel:   ""
     property string cfg_launchersJson: ""
+    property string cfg_openEffect:    ""
 
     property int editIndex: -1
 
@@ -122,6 +123,26 @@ Item {
                 Component.onCompleted: text = configPage.cfg_drawerLabel
                 onTextChanged: configPage.cfg_drawerLabel = text
             }
+        }
+
+        // ── Open effect ─────────────────────────────────────────────────────
+
+        QQC2.ComboBox {
+            id: openEffectCombo
+            Kirigami.FormData.label: i18n("Open effect:")
+            model: [
+                { text: i18n("Slide"),   value: "slide"   },
+                { text: i18n("Fade"),    value: "fade"    },
+                { text: i18n("Instant"), value: "instant" }
+            ]
+            textRole: "text"
+            Component.onCompleted: {
+                var v = configPage.cfg_openEffect || "slide"
+                for (var i = 0; i < model.length; i++) {
+                    if (model[i].value === v) { currentIndex = i; break }
+                }
+            }
+            onActivated: configPage.cfg_openEffect = model[currentIndex].value
         }
 
         // ── Launcher list ───────────────────────────────────────────────────

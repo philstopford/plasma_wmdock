@@ -17,5 +17,9 @@
       <label>JSON array of launcher entries (command, icon, label)</label>
       <default>[]</default>
     </entry>
+    <entry name="openEffect" type="String">
+      <label>Opening animation effect: instant, slide, or fade</label>
+      <default>slide</default>
+    </entry>
   </group>
 </kcfg>
