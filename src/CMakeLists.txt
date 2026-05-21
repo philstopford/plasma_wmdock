@@ -12,6 +12,7 @@ set(WMDOCK_APPLETS
     wmcal
     wmlauncher
     wmweather
+    wmdrawer
 )
 
 foreach(APPLET ${WMDOCK_APPLETS})

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 import QtQuick
 import QtQuick.Controls as QQC2
+import org.kde.plasma.plasmoid
 
 /**
  * WMClock – Analog clock applet styled after the classic wmclock dockapp.
@@ -13,6 +14,11 @@ import QtQuick.Controls as QQC2
  */
 Item {
     id: root
+
+    // Configuration bindings
+    readonly property bool use24Hour:   Plasmoid.configuration.use24Hour   ?? true
+    readonly property bool showSeconds: Plasmoid.configuration.showSeconds ?? true
+    readonly property bool showDate:    Plasmoid.configuration.showDate    ?? true
 
     // -----------------------------------------------------------------------
     // Layout constants (designed for 60×60 inside a 64×64 slot)
@@ -27,6 +33,11 @@ Item {
     readonly property real dotR:   faceR * 0.08
     readonly property real markR1: faceR * 0.82
     readonly property real markR2: faceR * 0.92
+
+    // Repaint when config changes
+    onUse24HourChanged:   faceCanvas.requestPaint()
+    onShowSecondsChanged: faceCanvas.requestPaint()
+    onShowDateChanged:    faceCanvas.requestPaint()
 
     // -----------------------------------------------------------------------
     // Background
@@ -46,7 +57,7 @@ Item {
         antialiasing: true
 
         Timer {
-            interval: 1000
+            interval: root.showSeconds ? 1000 : 60000
             running:  true
             repeat:   true
             onTriggered: faceCanvas.requestPaint()
@@ -140,17 +151,19 @@ Item {
 
             drawHand(hrs * 30, root.hourR, 2.5, "#ddd",    true)
             drawHand(mins * 6, root.minR,  1.8, "#ccc",    true)
-            drawHand(secs * 6, root.secR,  1.0, "#e03030", false)
+            if (root.showSeconds) {
+                drawHand(secs * 6, root.secR, 1.0, "#e03030", false)
 
-            // Second-hand counter-weight
-            const sa = (secs * 6 * Math.PI / 180) - Math.PI / 2
-            ctx.beginPath()
-            ctx.moveTo(cx, cy)
-            ctx.lineTo(cx - root.secR * 0.2 * Math.cos(sa),
-                       cy - root.secR * 0.2 * Math.sin(sa))
-            ctx.strokeStyle = "#e03030"
-            ctx.lineWidth   = 1.5
-            ctx.stroke()
+                // Second-hand counter-weight
+                const sa = (secs * 6 * Math.PI / 180) - Math.PI / 2
+                ctx.beginPath()
+                ctx.moveTo(cx, cy)
+                ctx.lineTo(cx - root.secR * 0.2 * Math.cos(sa),
+                           cy - root.secR * 0.2 * Math.sin(sa))
+                ctx.strokeStyle = "#e03030"
+                ctx.lineWidth   = 1.5
+                ctx.stroke()
+            }
 
             // Centre dot
             ctx.beginPath()
@@ -162,9 +175,11 @@ Item {
             ctx.fillStyle = "#444"
             ctx.fill()
 
-            // ---- Digital time (HH:MM) ----------------------------------------
+            // ---- Digital time (HH:MM or hh:MM AM/PM) -------------------------
             const pad     = n => String(n).padStart(2, "0")
-            const timeStr = pad(t.getHours()) + ":" + pad(t.getMinutes())
+            const hours   = root.use24Hour ? t.getHours() : (t.getHours() % 12 || 12)
+            const timeStr = pad(hours) + ":" + pad(t.getMinutes())
+                          + (root.use24Hour ? "" : (t.getHours() < 12 ? " AM" : " PM"))
             ctx.font         = "bold " + Math.round(R * 0.38) + "px monospace"
             ctx.textAlign    = "center"
             ctx.textBaseline = "middle"
@@ -175,15 +190,17 @@ Item {
             ctx.fillText(timeStr, cx, ty)
 
             // ---- Date line --------------------------------------------------
-            const days    = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"]
-            const months  = ["Jan","Feb","Mar","Apr","May","Jun",
-                             "Jul","Aug","Sep","Oct","Nov","Dec"]
-            const dateStr = days[t.getDay()] + " " +
-                            String(t.getDate()).padStart(2,"0") + " " +
-                            months[t.getMonth()]
-            ctx.font      = Math.round(R * 0.28) + "px monospace"
-            ctx.fillStyle = "#229922"
-            ctx.fillText(dateStr, cx, ty + R * 0.42)
+            if (root.showDate) {
+                const days    = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"]
+                const months  = ["Jan","Feb","Mar","Apr","May","Jun",
+                                 "Jul","Aug","Sep","Oct","Nov","Dec"]
+                const dateStr = days[t.getDay()] + " " +
+                                String(t.getDate()).padStart(2,"0") + " " +
+                                months[t.getMonth()]
+                ctx.font      = Math.round(R * 0.28) + "px monospace"
+                ctx.fillStyle = "#229922"
+                ctx.fillText(dateStr, cx, ty + R * 0.42)
+            }
         }
 
         Component.onCompleted: requestPaint()

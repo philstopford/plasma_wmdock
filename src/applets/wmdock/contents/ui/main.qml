@@ -24,6 +24,7 @@ PlasmoidItem {
     readonly property int    slotSize    : Plasmoid.configuration.slotSize
     readonly property int    slotSpacing : Plasmoid.configuration.slotSpacing
     readonly property var    appletList  : Plasmoid.configuration.appletList
+    readonly property var    slotConfigs : Plasmoid.configuration.slotConfigs || []
     readonly property bool   showBg      : Plasmoid.configuration.showBackground
     readonly property double bgOpacity   : Plasmoid.configuration.backgroundOpacity
 
@@ -95,11 +96,16 @@ PlasmoidItem {
                     appletId:   modelData
                     slotIndex:  index
                     totalCount: appletList.length
+                    slotConfig: index < slotConfigs.length ? slotConfigs[index] : ""
 
                     onRemoveRequested: {
                         const lst = [...appletList]
                         lst.splice(index, 1)
                         Plasmoid.configuration.appletList = lst
+                        // Also remove corresponding slotConfig
+                        const cfgLst = [...slotConfigs]
+                        if (index < cfgLst.length) cfgLst.splice(index, 1)
+                        Plasmoid.configuration.slotConfigs = cfgLst
                     }
 
                     onMoveLeft: {
@@ -109,6 +115,13 @@ PlasmoidItem {
                         lst[index - 1] = lst[index]
                         lst[index]     = tmp
                         Plasmoid.configuration.appletList = lst
+                        // Swap slotConfigs too
+                        const cfgLst = [...slotConfigs]
+                        while (cfgLst.length <= index) cfgLst.push("")
+                        const tmpCfg = cfgLst[index - 1]
+                        cfgLst[index - 1] = cfgLst[index]
+                        cfgLst[index]     = tmpCfg
+                        Plasmoid.configuration.slotConfigs = cfgLst
                     }
 
                     onMoveRight: {
@@ -118,6 +131,20 @@ PlasmoidItem {
                         lst[index + 1] = lst[index]
                         lst[index]     = tmp
                         Plasmoid.configuration.appletList = lst
+                        // Swap slotConfigs too
+                        const cfgLst = [...slotConfigs]
+                        while (cfgLst.length <= index + 1) cfgLst.push("")
+                        const tmpCfg = cfgLst[index + 1]
+                        cfgLst[index + 1] = cfgLst[index]
+                        cfgLst[index]     = tmpCfg
+                        Plasmoid.configuration.slotConfigs = cfgLst
+                    }
+
+                    onSlotConfigSaved: (idx, cfg) => {
+                        const cfgLst = [...slotConfigs]
+                        while (cfgLst.length <= idx) cfgLst.push("")
+                        cfgLst[idx] = cfg
+                        Plasmoid.configuration.slotConfigs = cfgLst
                     }
                 }
             }
@@ -188,6 +215,7 @@ PlasmoidItem {
                         ListElement { label: "WMLoad – Load average";             appletId: "org.kde.plasma.wmload"    }
                         ListElement { label: "WMCalendar – Date/calendar";        appletId: "org.kde.plasma.wmcal"     }
                         ListElement { label: "WMLauncher – App launcher button";  appletId: "org.kde.plasma.wmlauncher"}
+                        ListElement { label: "WMDrawer – Expandable launcher drawer"; appletId: "org.kde.plasma.wmdrawer" }
                         ListElement { label: "WMWeather – Weather conditions";    appletId: "org.kde.plasma.wmweather" }
                     }
 

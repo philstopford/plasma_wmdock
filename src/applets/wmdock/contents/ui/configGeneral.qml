@@ -2,22 +2,29 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
-import org.kde.plasma.components 3.0 as PlasmaComponents
 import org.kde.kirigami as Kirigami
-import org.kde.kcmutils as KCM
 
 /**
  * Configuration page for the WM Dock main applet.
  * Allows the user to add, remove and reorder applet slots.
+ *
+ * Root must be Item (not Kirigami.ScrollablePage) so Plasma can embed it in
+ * its own config dialog.  Explicit cfg_* properties are used instead of
+ * property aliases because Plasma's setInitialProperties() runs before
+ * children are constructed, causing aliases to resolve to nothing.
  */
-KCM.SimpleKCM {
-    property alias cfg_slotSize:          slotSizeSpinBox.value
-    property alias cfg_slotSpacing:       spacingSpinBox.value
-    property alias cfg_showBackground:    showBgCheck.checked
-    property alias cfg_backgroundOpacity: opacitySlider.value
-    property var   cfg_appletList:        []
+Item {
+    id: page
+
+    property int    cfg_slotSize:          0
+    property int    cfg_slotSpacing:       0
+    property bool   cfg_showBackground:    false
+    property real   cfg_backgroundOpacity: 0.0
+    property var    cfg_appletList:        []
 
     ColumnLayout {
+        anchors.left:  parent.left
+        anchors.right: parent.right
         spacing: Kirigami.Units.largeSpacing
 
         // ---- Slot size -------------------------------------------------------
@@ -28,17 +35,23 @@ KCM.SimpleKCM {
                 id: slotSizeSpinBox
                 Kirigami.FormData.label: i18n("Slot size (px):")
                 from: 32; to: 128; stepSize: 8
+                value: page.cfg_slotSize
+                onValueChanged: page.cfg_slotSize = value
             }
 
             QQC2.SpinBox {
                 id: spacingSpinBox
                 Kirigami.FormData.label: i18n("Slot spacing (px):")
                 from: 0; to: 16; stepSize: 1
+                value: page.cfg_slotSpacing
+                onValueChanged: page.cfg_slotSpacing = value
             }
 
             QQC2.CheckBox {
                 id: showBgCheck
                 Kirigami.FormData.label: i18n("Show background:")
+                checked: page.cfg_showBackground
+                onCheckedChanged: page.cfg_showBackground = checked
             }
 
             QQC2.Slider {
@@ -46,13 +59,15 @@ KCM.SimpleKCM {
                 Kirigami.FormData.label: i18n("Background opacity:")
                 from: 0.1; to: 1.0; stepSize: 0.05
                 enabled: showBgCheck.checked
+                value: page.cfg_backgroundOpacity
+                onValueChanged: page.cfg_backgroundOpacity = value
             }
         }
 
         Kirigami.Separator { Layout.fillWidth: true }
 
         // ---- Applet list management -----------------------------------------
-        PlasmaComponents.Label {
+        QQC2.Label {
             text: i18n("Active applets (drag to reorder):")
             font.bold: true
         }
@@ -78,7 +93,7 @@ KCM.SimpleKCM {
                         Layout.preferredHeight: Kirigami.Units.iconSizes.small
                     }
 
-                    PlasmaComponents.Label {
+                    QQC2.Label {
                         text: modelData.replace("org.kde.plasma.", "").replace(/^wm/, "WM")
                         Layout.fillWidth: true
                     }
@@ -132,6 +147,7 @@ KCM.SimpleKCM {
                     { text: i18n("WMLoad – Load average"),    value: "org.kde.plasma.wmload"     },
                     { text: i18n("WMCalendar – Calendar"),    value: "org.kde.plasma.wmcal"      },
                     { text: i18n("WMLauncher – Launcher"),    value: "org.kde.plasma.wmlauncher" },
+                    { text: i18n("WMDrawer – App drawer"),    value: "org.kde.plasma.wmdrawer"   },
                     { text: i18n("WMWeather – Weather"),      value: "org.kde.plasma.wmweather"  },
                 ]
                 textRole: "text"

@@ -17,11 +17,18 @@ import org.kde.plasma.private.wmdock 1.0
 Item {
     id: root
 
-    // Persisted configuration
-    property string launchCommand:  Plasmoid.configuration.command  || "konsole"
-    property string launchIcon:     Plasmoid.configuration.icon     || "utilities-terminal"
-    property string launchLabel:    Plasmoid.configuration.label    || "Launch"
-    property bool   showLabel:      Plasmoid.configuration.showLabel !== false
+    // Persisted configuration (used when running standalone)
+    property string launchCommand:  externalCommand  || Plasmoid.configuration.command  || "konsole"
+    property string launchIcon:     externalIcon     || Plasmoid.configuration.icon     || "utilities-terminal"
+    property string launchLabel:    externalLabel    || Plasmoid.configuration.label    || "Launch"
+    property bool   showLabel:      externalShowLabel !== null ? externalShowLabel
+                                    : (Plasmoid.configuration.showLabel !== false)
+
+    // External config injected by DockSlot when embedded in WMDock
+    property string externalCommand:  ""
+    property string externalIcon:     ""
+    property string externalLabel:    ""
+    property var    externalShowLabel: null
 
     property bool pressed: false
 

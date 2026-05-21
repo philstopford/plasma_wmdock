@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 import QtQuick
+import org.kde.plasma.plasmoid
 import org.kde.plasma.private.wmdock 1.0
 
 /**
@@ -11,6 +12,8 @@ import org.kde.plasma.private.wmdock 1.0
  */
 Item {
     id: root
+
+    readonly property int lowThreshold: Plasmoid.configuration.lowBatteryThreshold ?? 20
 
     Rectangle {
         anchors.fill: parent
@@ -41,6 +44,8 @@ Item {
             target: BatteryMonitor
             function onStatusChanged() { battCanvas.requestPaint() }
         }
+
+        onLowThresholdChanged: requestPaint()
 
         onPaint: {
             const ctx = getContext("2d")
@@ -85,8 +90,8 @@ Item {
             const fillH   = Math.max(0, (pct / 100) * (bh - 4))
             const fillCol = full    ? "#00ff44"
                           : charge  ? "#44aaff"
-                          : pct < 10 ? "#ff2200"
-                          : pct < 25 ? "#ff8800"
+                          : pct < root.lowThreshold / 2 ? "#ff2200"
+                          : pct < root.lowThreshold     ? "#ff8800"
                           : "#00cc44"
 
             ctx.fillStyle = fillCol
@@ -99,7 +104,7 @@ Item {
                 ctx.textAlign   = "center"
                 ctx.textBaseline = "middle"
                 ctx.fillText("⚡", bx + bw / 2, by + bh / 2)
-            } else if (pct < 15) {
+            } else if (pct < root.lowThreshold) {
                 ctx.fillStyle   = "#ff4400"
                 ctx.font        = "bold " + Math.round(bh * 0.45) + "px sans-serif"
                 ctx.textAlign   = "center"
@@ -140,8 +145,8 @@ Item {
         color: {
             const p = BatteryMonitor.percentage
             return BatteryMonitor.charging ? "#44aaff"
-                 : p < 10 ? "#ff2200"
-                 : p < 25 ? "#ff8800"
+                 : p < root.lowThreshold / 2 ? "#ff2200"
+                 : p < root.lowThreshold     ? "#ff8800"
                  : "#00cc44"
         }
         font { pixelSize: parent.height * 0.14; family: "monospace"; bold: true }

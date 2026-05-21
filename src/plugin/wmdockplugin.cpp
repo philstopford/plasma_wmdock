@@ -7,6 +7,7 @@
 #include "batterymonitor.h"
 #include "audiomanager.h"
 #include "weatherprovider.h"
+#include "desktopfilereader.h"
 #include "processlauncher.h"
 #ifdef WITH_XEMBED
 #include "xembedhost.h"
@@ -44,6 +45,11 @@ void WMDockPlugin::registerTypes(const char *uri)
     qmlRegisterSingletonType<ProcessLauncher>(uri, 1, 0, "ProcessLauncher",
         [](QQmlEngine *, QJSEngine *) -> QObject * {
             return new ProcessLauncher();
+        });
+
+    qmlRegisterSingletonType<DesktopFileReader>(uri, 1, 0, "DesktopFileReader",
+        [](QQmlEngine *, QJSEngine *) -> QObject * {
+            return new DesktopFileReader();
         });
 
 #ifdef WITH_XEMBED

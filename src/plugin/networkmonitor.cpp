@@ -4,10 +4,7 @@
 #include "networkmonitor.h"
 
 #include <QFile>
-#include <QTextStream>
 #include <QDateTime>
-#include <QStringList>
-#include <QDebug>
 
 NetworkMonitor::NetworkMonitor(QObject *parent)
     : QObject(parent)
@@ -21,9 +18,6 @@ NetworkMonitor::NetworkMonitor(QObject *parent)
             break;
         }
     }
-
-    qDebug() << "[wmdock/NetworkMonitor] created; interfaces=" << m_interfaces
-             << "selected iface=" << m_iface;
 
     connect(&m_timer, &QTimer::timeout, this, &NetworkMonitor::update);
     m_timer.setInterval(1000);
@@ -61,17 +55,18 @@ void NetworkMonitor::setUpdateInterval(int ms)
 void NetworkMonitor::scanInterfaces()
 {
     QFile f(QStringLiteral("/proc/net/dev"));
-    if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) return;
+    if (!f.open(QIODevice::ReadOnly)) return;
 
+    const QByteArray data = f.readAll();
     QStringList list;
-    QTextStream in(&f);
-    // Skip two header lines
-    in.readLine(); in.readLine();
-    while (!in.atEnd()) {
-        const QString line = in.readLine().trimmed();
-        const int colon = line.indexOf(QLatin1Char(':'));
+    int lineNum = 0;
+    for (const QByteArray &rawLine : data.split('\n')) {
+        // Skip the two header lines
+        if (lineNum++ < 2) continue;
+        const QByteArray line = rawLine.trimmed();
+        const int colon = line.indexOf(':');
         if (colon > 0)
-            list.append(line.left(colon).trimmed());
+            list.append(QString::fromLatin1(line.left(colon).trimmed()));
     }
 
     if (list != m_interfaces) {
@@ -85,16 +80,22 @@ void NetworkMonitor::readStats(qint64 &rx, qint64 &tx) const
     if (m_iface.isEmpty()) { rx = tx = 0; return; }
 
     QFile f(QStringLiteral("/proc/net/dev"));
-    if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) { rx = tx = 0; return; }
+    if (!f.open(QIODevice::ReadOnly)) { rx = tx = 0; return; }
 
-    QTextStream in(&f);
-    while (!in.atEnd()) {
-        const QString line = in.readLine().trimmed();
-        const int colon = line.indexOf(QLatin1Char(':'));
+    const QByteArray ifaceBytes = m_iface.toLatin1();
+    const QByteArray data = f.readAll();
+    for (const QByteArray &rawLine : data.split('\n')) {
+        const QByteArray line = rawLine.trimmed();
+        const int colon = line.indexOf(':');
         if (colon < 0) continue;
-        if (line.left(colon).trimmed() != m_iface) continue;
+        if (line.left(colon).trimmed() != ifaceBytes) continue;
 
-        const QStringList parts = line.mid(colon + 1).split(QLatin1Char(' '), Qt::SkipEmptyParts);
+        // Fields after the colon, space-separated (skip empty parts)
+        const QByteArray after = line.mid(colon + 1);
+        QList<QByteArray> parts;
+        for (const QByteArray &p : after.split(' '))
+            if (!p.isEmpty()) parts.append(p);
+
         if (parts.size() < 9) break;
         rx = parts[0].toLongLong();   // receive bytes
         tx = parts[8].toLongLong();   // transmit bytes
@@ -133,7 +134,5 @@ void NetworkMonitor::update()
     m_rxPrev = rxNow;
     m_txPrev = txNow;
 
-    qDebug() << "[wmdock/NetworkMonitor] statsChanged: iface=" << m_iface
-             << "rx=" << m_rxRate << "B/s tx=" << m_txRate << "B/s";
     Q_EMIT statsChanged();
 }

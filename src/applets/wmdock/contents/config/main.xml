@@ -21,5 +21,9 @@
     <entry name="backgroundOpacity" type="Double">
       <default>0.85</default>
     </entry>
+    <entry name="slotConfigs" type="StringList">
+      <label>Per-slot JSON configuration (parallel to appletList)</label>
+      <default></default>
+    </entry>
   </group>
 </kcfg>

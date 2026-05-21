@@ -10,39 +10,47 @@ import org.kde.plasma.private.wmdock 1.0
  * to monitor.  The interface list is populated from NetworkMonitor which
  * reads /proc/net/dev via the custom C++ plugin.
  */
-Kirigami.FormLayout {
+Item {
     id: page
 
-    // Standard cfg_ alias wired to Plasmoid.configuration.iface
-    property alias cfg_iface: ifaceCombo.currentValue
+    // Writable cfg_ property that Plasma reads/writes.
+    // (We can't alias ComboBox.currentValue directly because it is readonly.)
+    property string cfg_iface: ""
 
-    QQC2.ComboBox {
-        id: ifaceCombo
-        Kirigami.FormData.label: i18n("Network interface:")
+    Kirigami.FormLayout {
+        anchors.left:  parent.left
+        anchors.right: parent.right
 
-        // Build model: "Auto" entry + discovered interfaces
-        model: {
-            const items = [{ text: i18n("Auto (first non-loopback)"), value: "" }]
-            const ifaces = NetworkMonitor.interfaces
-            for (let i = 0; i < ifaces.length; ++i) {
-                items.push({ text: ifaces[i], value: ifaces[i] })
-            }
-            return items
-        }
+        QQC2.ComboBox {
+            id: ifaceCombo
+            Kirigami.FormData.label: i18n("Network interface:")
 
-        textRole:  "text"
-        valueRole: "value"
-
-        // Select the entry that matches the saved configuration
-        Component.onCompleted: {
-            const saved = cfg_iface
-            for (let i = 0; i < model.length; ++i) {
-                if (model[i].value === saved) {
-                    currentIndex = i
-                    return
+            // Build model: "Auto" entry + discovered interfaces
+            model: {
+                const items = [{ text: i18n("Auto (first non-loopback)"), value: "" }]
+                const ifaces = NetworkMonitor.interfaces
+                for (let i = 0; i < ifaces.length; ++i) {
+                    items.push({ text: ifaces[i], value: ifaces[i] })
                 }
+                return items
             }
-            currentIndex = 0  // fallback to "Auto"
+
+            textRole:  "text"
+            valueRole: "value"
+
+            // Set initial selection after both model and cfg_iface are available
+            Component.onCompleted: {
+                for (let i = 0; i < count; ++i) {
+                    if (model[i].value === page.cfg_iface) {
+                        currentIndex = i
+                        return
+                    }
+                }
+                currentIndex = 0  // fallback to "Auto"
+            }
+
+            // User-driven change → update cfg_iface so Plasma can save it
+            onActivated: page.cfg_iface = currentValue
         }
     }
 }

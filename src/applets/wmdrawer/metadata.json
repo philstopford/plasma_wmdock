@@ -1,0 +1,12 @@
+{
+    "KPlugin": {
+        "Category": "Application Launchers",
+        "Description": "Expandable drawer containing multiple configurable application launchers",
+        "Icon": "folder",
+        "Id": "org.kde.plasma.wmdrawer",
+        "License": "GPL-2.0-or-later",
+        "Name": "WMDrawer"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "KPackageStructure": "Plasma/Applet"
+}

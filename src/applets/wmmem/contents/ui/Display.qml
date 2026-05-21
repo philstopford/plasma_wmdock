@@ -9,8 +9,6 @@ import org.kde.plasma.private.wmdock 1.0
  * readouts, styled after the classic wmmemmon dockapp.
  *
  * Data source: SystemMonitor singleton from the wmdockplugin C++ extension.
- * Debug output appears in: journalctl --user -f -g wmmem
- * or when plasmashell is run from a terminal.
  *
  * Intentionally avoids QML inline components so that Qt6 property
  * change notifications from the C++ singleton propagate reliably to
@@ -18,17 +16,6 @@ import org.kde.plasma.private.wmdock 1.0
  */
 Item {
     id: root
-
-    Component.onCompleted: {
-        console.log(`[wmmem] Display loaded; memUsage=${SystemMonitor.memUsage.toFixed(1)}% memTotal=${SystemMonitor.memTotal} swapUsage=${SystemMonitor.swapUsage.toFixed(1)}%`)
-    }
-
-    Connections {
-        target: SystemMonitor
-        function onMemoryChanged() {
-            console.log(`[wmmem] memoryChanged: RAM=${SystemMonitor.memUsage.toFixed(1)}% SWAP=${SystemMonitor.swapUsage.toFixed(1)}%`)
-        }
-    }
 
     // -----------------------------------------------------------------------
     // Background

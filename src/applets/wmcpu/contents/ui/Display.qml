@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 import QtQuick
+import org.kde.plasma.plasmoid
 import org.kde.plasma.private.wmdock 1.0
 
 /**
@@ -11,23 +12,18 @@ import org.kde.plasma.private.wmdock 1.0
  * • Classic green-on-black dockapp palette
  *
  * Data source: SystemMonitor singleton from the wmdockplugin C++ extension.
- * Debug output (console.log / qDebug) appears in:
- *   journalctl --user -f -g wmcpu
- *   or when plasmashell is run from a terminal.
  */
 Item {
     id: root
 
     // Rolling history (filled left→right, newest on right)
-    property int histLen: 50
+    property int histLen: Plasmoid.configuration.histLen ?? 50
     property var history: []
 
     // Core usage (array of 0–100 values)
     property var coreUsage: SystemMonitor.cpuCoreUsage
 
     Component.onCompleted: {
-        console.log("[wmcpu] Display loaded; cpuCoreCount=" + SystemMonitor.cpuCoreCount
-                    + " cpuUsage=" + SystemMonitor.cpuUsage.toFixed(1))
         Qt.callLater(function() {
             graph.requestPaint()
             coreBar.requestPaint()
@@ -38,7 +34,6 @@ Item {
         target: SystemMonitor
         function onCpuUsageChanged() {
             const v = Math.min(100, Math.max(0, SystemMonitor.cpuUsage))
-            console.log("[wmcpu] cpuUsageChanged: " + v.toFixed(1) + "%")
             let h = [...root.history, v]
             if (h.length > root.histLen) h = h.slice(h.length - root.histLen)
             root.history = h

@@ -13,9 +13,6 @@ import org.kde.plasma.private.wmdock 1.0
  * Data source: NetworkMonitor singleton from the wmdockplugin C++ extension.
  * The active interface is read from Plasmoid.configuration.iface; when empty
  * NetworkMonitor auto-selects the first non-virtual interface.
- *
- * Debug output appears in: journalctl --user -f -g wmnet
- * or when plasmashell is run from a terminal.
  */
 Item {
     id: root
@@ -27,10 +24,8 @@ Item {
     // Apply saved interface preference once the component is ready
     Component.onCompleted: {
         const cfg = Plasmoid.configuration.iface
-        console.log(`[wmnet] Display loaded; configured iface='${cfg}' detected iface='${NetworkMonitor.iface}'`)
         if (cfg && cfg.length > 0) {
             NetworkMonitor.setIface(cfg)
-            console.log(`[wmnet] applied configured iface: ${cfg}`)
         }
         Qt.callLater(function() { graph.requestPaint() })
     }
@@ -40,7 +35,6 @@ Item {
         function onStatsChanged() {
             const rx = NetworkMonitor.rxBytesPerSec
             const tx = NetworkMonitor.txBytesPerSec
-            console.log(`[wmnet] statsChanged: iface=${NetworkMonitor.iface} rx=${rx.toFixed(0)}B/s tx=${tx.toFixed(0)}B/s`)
 
             let rh = [...root.rxHistory, rx]
             let th = [...root.txHistory, tx]
@@ -49,6 +43,31 @@ Item {
             root.rxHistory = rh
             root.txHistory = th
             graph.requestPaint()
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Mouse-wheel cycling through available interfaces.
+    // MouseArea (acceptedButtons: Qt.NoButton) only handles wheel events,
+    // so left-click on the widget still works normally.
+    // -----------------------------------------------------------------------
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.NoButton  // wheel-only; don't steal click events
+        onWheel: function(wheelEvent) {
+            const ifaces = NetworkMonitor.interfaces
+            if (ifaces.length < 2) {
+                wheelEvent.accepted = false
+                return
+            }
+            const cur = ifaces.indexOf(NetworkMonitor.iface)
+            const next = (cur + (wheelEvent.angleDelta.y < 0 ? 1 : -1) + ifaces.length) % ifaces.length
+            const newIface = ifaces[next]
+            NetworkMonitor.setIface(newIface)
+            // Persist the choice when running standalone.  Silently ignored
+            // when embedded in WMDock where Plasmoid.configuration has no 'iface'.
+            try { Plasmoid.configuration.iface = newIface } catch(e) { /* embedded context */ }
+            wheelEvent.accepted = true
         }
     }
 
