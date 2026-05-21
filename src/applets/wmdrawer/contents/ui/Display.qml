@@ -173,20 +173,20 @@ Item {
         acceptedButtons: Qt.LeftButton
         onPressedChanged: root.pressed = tapHandler.pressed
         onTapped: {
-            // Qt.Popup auto-closes the popup on any click outside of it,
-            // including a click on this very button.  By the time onTapped
-            // fires the popup is already hidden, so a naive visible-check
-            // would reopen it.  We detect this case by comparing timestamps:
-            // if the popup disappeared less than 300 ms ago the close was
-            // caused by this same gesture, so we leave it closed.
+            // If the drawer is logically open, always close it on a tap.
+            if (drawerPopup.drawerOpen) {
+                drawerPopup.closeDrawer()
+                return
+            }
+            // The drawer is closed.  Qt.Popup auto-closes the window when the
+            // user clicks outside it, which can include a click on this very
+            // button.  If the popup disappeared less than 300 ms ago the close
+            // was caused by this same gesture, so leave it closed instead of
+            // toggling it back open.
             if (Date.now() - drawerPopup._lastCloseTime < 300) {
                 return
             }
-            if (drawerPopup.visible) {
-                drawerPopup.closeDrawer()
-            } else {
-                drawerPopup.openDrawer()
-            }
+            drawerPopup.openDrawer()
         }
     }
 
@@ -214,9 +214,15 @@ Item {
         color: "transparent"
         visible: false
 
+        // Authoritative open/closed state set by openDrawer()/closeDrawer().
+        // Using this (rather than checking visible) makes the toggle reliable
+        // even when Qt.Popup auto-closes the window before onTapped fires.
+        property bool drawerOpen: false
+
         // Timestamp of the last time the popup became hidden.  Used by the
-        // TapHandler to distinguish "closed by this button click" (suppress
-        // reopen) from "closed by an unrelated outside click" (allow reopen).
+        // TapHandler to suppress reopening when Qt.Popup auto-closed the
+        // window as a result of the same button click that is about to fire
+        // onTapped.
         property real _lastCloseTime: 0
         onVisibleChanged: { if (!visible) _lastCloseTime = Date.now() }
 
@@ -255,6 +261,7 @@ Item {
 
         // --- Open / close -------------------------------------------------
         function openDrawer() {
+            drawerOpen = true
             // Rebuild model from current launcher list
             launcherModel.clear()
             var ls = root.launchers
@@ -333,6 +340,7 @@ Item {
         }
 
         function closeDrawer() {
+            drawerOpen = false
             var effect = root.openEffect
             if (effect === "fade") {
                 fadeOutAnim.start()
