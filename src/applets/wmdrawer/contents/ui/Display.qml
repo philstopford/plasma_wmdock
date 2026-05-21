@@ -20,6 +20,11 @@ import org.kde.plasma.private.wmdock 1.0
  *
  * Launchers can be drag-reordered inside the open strip.
  *
+ * Drag-and-drop creation: dragging a .desktop file onto the button
+ * auto-opens the drawer after 600 ms; releasing over the button appends
+ * the launcher to the end of the list.  Dropping onto the open popup
+ * inserts at the position closest to the drop point.
+ *
  * Configuration (when embedded in WMDock) is supplied via external*
  * properties injected by DockSlot.  When used as a standalone plasmoid
  * the values come from Plasmoid.configuration.
@@ -81,6 +86,98 @@ Item {
     }
 
     // -----------------------------------------------------------------------
+    // Desktop-file drag-and-drop helpers
+    // -----------------------------------------------------------------------
+
+    // Asynchronously read and parse a .desktop file at fileUrl (file:// URL).
+    // Calls callback({ command, icon, label }) on success, or callback(null)
+    // if the file cannot be read or has no Exec= value.
+    function parseDesktopFile(fileUrl, callback) {
+        var xhr = new XMLHttpRequest()
+        xhr.open("GET", fileUrl)
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState !== XMLHttpRequest.DONE) return
+            // Local file:// reads return status 0; network success is 200.
+            if (xhr.status !== 0 && xhr.status !== 200) { callback(null); return }
+            var lines = xhr.responseText.split("\n")
+            var inEntry = false
+            var name = "", exec = "", icon = ""
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i].trim()
+                if (line === "[Desktop Entry]") { inEntry = true; continue }
+                // Stop at the next section header
+                if (inEntry && line.length > 0 && line[0] === "[") break
+                if (!inEntry) continue
+                if (line.startsWith("Name=") && name === "")
+                    name = line.substring(5).trim()
+                else if (line.startsWith("Exec=") && exec === "")
+                    exec = line.substring(5).trim()
+                else if (line.startsWith("Icon=") && icon === "")
+                    icon = line.substring(5).trim()
+            }
+            // Strip .desktop field codes (%f, %F, %u, %U, %d, %D, %n, %N,
+            // %i, %c, %k, %v, %m) from the Exec value.
+            exec = exec.replace(/ ?%[fFuUdDnNickvmk]/g, "").trim()
+            if (!exec) { callback(null); return }
+            callback({
+                command: exec,
+                icon:    icon || "application-x-executable",
+                label:   name || exec
+            })
+        }
+        xhr.send()
+    }
+
+    // Add a launcher built from a .desktop file URL at the given position.
+    // insertIndex == -1 (or out of range) means append at the end.
+    // If the popup is open the live launcherModel is updated immediately;
+    // otherwise the persistent configuration is updated directly.
+    function addLauncherFromDesktop(fileUrl, insertIndex) {
+        parseDesktopFile(fileUrl, function(entry) {
+            if (!entry) return
+            if (drawerPopup.drawerOpen) {
+                var pos = (insertIndex >= 0 && insertIndex <= launcherModel.count)
+                          ? insertIndex : launcherModel.count
+                launcherModel.insert(pos, entry)
+                root.saveLaunchersFromModel()
+            } else {
+                var arr = root.launchers ? root.launchers.slice() : []
+                var pos2 = (insertIndex >= 0 && insertIndex <= arr.length)
+                           ? insertIndex : arr.length
+                arr.splice(pos2, 0, entry)
+                if (root.externalLaunchers !== null) {
+                    root.launchersReordered(arr)
+                } else {
+                    Plasmoid.configuration.launchersJson = JSON.stringify(arr)
+                }
+            }
+        })
+    }
+
+    // Convenience wrapper: iterate a list of dropped URLs and add each
+    // .desktop file as a launcher starting at insertIndex.
+    function addLauncherFromUrls(urls, insertIndex) {
+        var offset = 0
+        for (var i = 0; i < urls.length; i++) {
+            var url = urls[i].toString()
+            if (url.toLowerCase().endsWith(".desktop")) {
+                addLauncherFromDesktop(url, insertIndex < 0 ? -1 : insertIndex + offset)
+                offset++
+            }
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Timer: auto-open the drawer when a drag lingers over the button.
+    // -----------------------------------------------------------------------
+    Timer {
+        id: hoverOpenTimer
+        interval: 600
+        repeat: false
+        onTriggered: { if (!drawerPopup.drawerOpen) drawerPopup.openDrawer() }
+    }
+
+    // -----------------------------------------------------------------------
     // Drawer button body
     // -----------------------------------------------------------------------
     Rectangle {
@@ -88,7 +185,7 @@ Item {
         anchors { fill: parent; margins: pressed ? 2 : 1 }
         color:   pressed ? "#111" : "#1e1e1e"
         radius:  4
-        border.color: pressed ? "#333" : "#666"
+        border.color: pressed ? "#333" : (buttonDropArea.containsDrag ? "#5599ff" : "#666")
         border.width: 1
 
         Behavior on anchors.margins { NumberAnimation { duration: 60 } }
@@ -196,6 +293,27 @@ Item {
         delay:   700
     }
     HoverHandler { id: hoverHandler }
+
+    // -----------------------------------------------------------------------
+    // Drop-area on the drawer button: hover-to-open + drop-to-add launcher.
+    //
+    // Hovering with a drag for ≥ 600 ms auto-opens the drawer so the user
+    // can drop onto a specific slot. Releasing the drag directly on the
+    // button (without moving to the popup) appends the launcher(s) at the
+    // end of the list.
+    // -----------------------------------------------------------------------
+    DropArea {
+        id: buttonDropArea
+        anchors.fill: parent
+        keys: ["text/uri-list"]
+        onEntered: hoverOpenTimer.start()
+        onExited:  hoverOpenTimer.stop()
+        onDropped: function(drop) {
+            hoverOpenTimer.stop()
+            drop.acceptProposedAction()
+            root.addLauncherFromUrls(drop.urls, -1)
+        }
+    }
 
     // -----------------------------------------------------------------------
     // Launcher model – populated on each open so a previous reorder is
@@ -495,6 +613,29 @@ Item {
             wrapMode: Text.WordWrap
             width:   parent.width - 16
             horizontalAlignment: Text.AlignHCenter
+        }
+
+        // -------------------------------------------------------------------
+        // Drop-area inside the open popup: lets the user drag a .desktop file
+        // onto a specific position in the launcher strip.
+        //
+        // The insertion slot is computed from the drop coordinates:
+        //   horizontal dock → vertical strip → use drop.y
+        //   vertical dock   → horizontal strip → use drop.x
+        // A drop past the last slot appends at the end.
+        // -------------------------------------------------------------------
+        DropArea {
+            anchors.fill: parent
+            keys: ["text/uri-list"]
+            onDropped: function(drop) {
+                drop.acceptProposedAction()
+                var cellSize = root.isHorizontalDock ? root.height : root.width
+                var coord    = root.isHorizontalDock ? drop.y : drop.x
+                var idx      = Math.max(0, Math.min(
+                                   Math.floor(coord / cellSize),
+                                   launcherModel.count))
+                root.addLauncherFromUrls(drop.urls, idx)
+            }
         }
     }
 }
