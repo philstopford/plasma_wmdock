@@ -28,16 +28,11 @@ int NetworkMonitor::updateInterval() const
 
 void NetworkMonitor::setIface(const QString &iface)
 {
-    QString resolved = iface.trimmed();
-
-    auto pickAutoIface = [this]() -> QString {
-        for (const QString &candidate : std::as_const(m_interfaces)) {
-            if (!candidate.startsWith(QLatin1String("lo"))) {
-                return candidate;
-            }
-        }
-        return QString();
-    };
+    // Remember what the caller asked for (before resolving) so update() can
+    // re-apply the choice on every tick, even if the interface was momentarily
+    // absent from the list.
+    m_requestedIface = iface.trimmed();
+    QString resolved = m_requestedIface;
 
     if (!resolved.isEmpty() && !m_interfaces.contains(resolved)) {
         scanInterfaces();
@@ -120,10 +115,41 @@ void NetworkMonitor::readStats(qint64 &rx, qint64 &tx) const
 
 void NetworkMonitor::update()
 {
-    // Refresh interface list
     scanInterfaces();
-    if (m_iface.isEmpty() || !m_interfaces.contains(m_iface)) {
-        setIface(QString());
+
+    // Determine the interface to use, honouring m_requestedIface every tick.
+    //
+    // • Explicit request ("wlan0"):
+    //     – Use it when it is in the list (handles the iface coming back after
+    //       a temporary absence without requiring Display.qml to re-fire).
+    //     – Keep m_iface as-is when it is absent so we show the right name
+    //       with 0 stats rather than silently switching to another adapter.
+    //
+    // • Auto mode (m_requestedIface == ""):
+    //     – Keep current iface while it is valid.
+    //     – Re-pick when the current one disappears.
+    QString target;
+    if (!m_requestedIface.isEmpty()) {
+        if (m_interfaces.contains(m_requestedIface)) {
+            target = m_requestedIface;
+        } else if (!m_iface.isEmpty()) {
+            target = m_iface;       // keep showing requested name with 0 stats
+        } else {
+            target = pickAutoIface(); // nothing active yet; use any available iface
+        }
+    } else {
+        target = (!m_iface.isEmpty() && m_interfaces.contains(m_iface))
+                     ? m_iface
+                     : pickAutoIface();
+    }
+
+    if (target != m_iface) {
+        m_iface  = target;
+        m_rxPrev = m_txPrev = 0;
+        m_rxMax  = m_txMax  = 1.0;
+        readStats(m_rxPrev, m_txPrev);
+        m_lastMs = QDateTime::currentMSecsSinceEpoch();
+        Q_EMIT ifaceChanged();
     }
 
     const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
@@ -152,4 +178,14 @@ void NetworkMonitor::update()
     m_txPrev = txNow;
 
     Q_EMIT statsChanged();
+}
+
+QString NetworkMonitor::pickAutoIface() const
+{
+    for (const QString &candidate : std::as_const(m_interfaces)) {
+        if (!candidate.startsWith(QLatin1String("lo"))) {
+            return candidate;
+        }
+    }
+    return QString();
 }

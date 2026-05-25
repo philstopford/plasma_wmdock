@@ -58,9 +58,11 @@ private Q_SLOTS:
 private:
     void scanInterfaces();
     void readStats(qint64 &rx, qint64 &tx) const;
+    QString pickAutoIface() const;
 
     QTimer   m_timer;
-    QString  m_iface;
+    QString  m_requestedIface;   // "" = auto; set by callers of setIface()
+    QString  m_iface;            // currently active (resolved) interface
     QStringList m_interfaces;
 
     qint64 m_rxPrev  = 0, m_txPrev  = 0;
