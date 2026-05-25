@@ -123,6 +123,14 @@ Item {
                     font { pixelSize: parent.height * 0.65; family: "monospace"; bold: true }
                 }
             }
+
+            Text {
+                anchors.centerIn: volumeList
+                visible: StorageMonitor.volumes.length === 0
+                text: i18n("No volumes")
+                color: "#666"
+                font { pixelSize: parent.height * 0.11; family: "monospace" }
+            }
         }
     }
 

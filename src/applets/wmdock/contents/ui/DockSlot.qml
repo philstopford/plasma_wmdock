@@ -489,6 +489,12 @@ Item {
             "org.kde.plasma.wmlauncher": Qt.resolvedUrl("../../../org.kde.plasma.wmlauncher/contents/ui/Display.qml"),
             "org.kde.plasma.wmweather":  Qt.resolvedUrl("../../../org.kde.plasma.wmweather/contents/ui/Display.qml"),
             "org.kde.plasma.wmdrawer":   Qt.resolvedUrl("../../../org.kde.plasma.wmdrawer/contents/ui/Display.qml"),
+            "org.kde.plasma.wmviz":      Qt.resolvedUrl("../../../org.kde.plasma.wmviz/contents/ui/Display.qml"),
+            "org.kde.plasma.wmplay":     Qt.resolvedUrl("../../../org.kde.plasma.wmplay/contents/ui/Display.qml"),
+            "org.kde.plasma.wmeyes":     Qt.resolvedUrl("../../../org.kde.plasma.wmeyes/contents/ui/Display.qml"),
+            "org.kde.plasma.wmlava":     Qt.resolvedUrl("../../../org.kde.plasma.wmlava/contents/ui/Display.qml"),
+            "org.kde.plasma.wmsensors":  Qt.resolvedUrl("../../../org.kde.plasma.wmsensors/contents/ui/Display.qml"),
+            "org.kde.plasma.wmstorage":  Qt.resolvedUrl("../../../org.kde.plasma.wmstorage/contents/ui/Display.qml"),
         }
         return map[id] || ""
     }

@@ -23,7 +23,7 @@ Item {
         latitude:  Plasmoid.configuration.latitude  || 51.5
         longitude: Plasmoid.configuration.longitude || -0.12
         tempUnit:  Plasmoid.configuration.tempUnit  || "celsius"
-        updateIntervalMinutes: 30
+        updateIntervalMinutes: Math.max(1, Plasmoid.configuration.updateIntervalMinutes || 30)
     }
 
     // -----------------------------------------------------------------------

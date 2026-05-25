@@ -257,18 +257,29 @@ Item {
     // ----- drag-and-drop ---------------------------------------------------
     DropArea {
         anchors.fill: parent
-        keys: ["text/uri-list"]
+        onEntered: function(drag) {
+            drag.accepted = !!drag.hasUrls
+        }
 
-        onEntered: drag => drag.accepted = true
-
-        onDropped: drop => {
+        onDropped: function(drop) {
+            if (!drop.hasUrls) {
+                drop.accepted = false
+                return
+            }
             const urls = drop.urls
             let paths = []
             for (let i = 0; i < urls.length; i++) {
-                // Convert file:// URL to local path for MediaScanner
-                let p = urls[i].toString()
-                if (p.startsWith("file://"))
-                    p = p.substring(7)
+                // Convert dropped URL to local path for MediaScanner
+                let p = ""
+                if (urls[i] && urls[i].toLocalFile)
+                    p = urls[i].toLocalFile()
+                if (!p || p.length === 0) {
+                    p = urls[i].toString()
+                    if (p.startsWith("file://"))
+                        p = decodeURIComponent(p.substring(7))
+                }
+                if (!p || p.length === 0)
+                    continue
                 const scanned = MediaScanner.scan(p)
                 for (let j = 0; j < scanned.length; j++)
                     paths.push(scanned[j])

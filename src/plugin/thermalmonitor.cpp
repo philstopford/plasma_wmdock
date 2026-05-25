@@ -150,5 +150,8 @@ void ThermalMonitor::readTemperatures()
 
 void ThermalMonitor::update()
 {
+    if (m_sensorInfos.isEmpty()) {
+        scanSensors();
+    }
     readTemperatures();
 }

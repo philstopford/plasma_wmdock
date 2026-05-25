@@ -15,5 +15,8 @@
     <entry name="tempUnit" type="String">
       <default>celsius</default>
     </entry>
+    <entry name="updateIntervalMinutes" type="Int">
+      <default>30</default>
+    </entry>
   </group>
 </kcfg>

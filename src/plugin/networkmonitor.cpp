@@ -10,14 +10,7 @@ NetworkMonitor::NetworkMonitor(QObject *parent)
     : QObject(parent)
 {
     scanInterfaces();
-
-    // Pick first non-loopback interface as default
-    for (const QString &iface : std::as_const(m_interfaces)) {
-        if (!iface.startsWith(QLatin1String("lo"))) {
-            m_iface = iface;
-            break;
-        }
-    }
+    setIface(QString());
 
     connect(&m_timer, &QTimer::timeout, this, &NetworkMonitor::update);
     m_timer.setInterval(1000);
@@ -35,8 +28,29 @@ int NetworkMonitor::updateInterval() const
 
 void NetworkMonitor::setIface(const QString &iface)
 {
-    if (iface == m_iface) return;
-    m_iface  = iface;
+    QString resolved = iface.trimmed();
+
+    auto pickAutoIface = [this]() -> QString {
+        for (const QString &candidate : std::as_const(m_interfaces)) {
+            if (!candidate.startsWith(QLatin1String("lo"))) {
+                return candidate;
+            }
+        }
+        return m_interfaces.isEmpty() ? QString() : m_interfaces.constFirst();
+    };
+
+    if (!resolved.isEmpty() && !m_interfaces.contains(resolved)) {
+        scanInterfaces();
+    }
+    if (resolved.isEmpty() || !m_interfaces.contains(resolved)) {
+        resolved = pickAutoIface();
+    }
+
+    if (resolved == m_iface) {
+        return;
+    }
+
+    m_iface  = resolved;
     m_rxPrev = m_txPrev = 0;
     m_rxMax  = m_txMax  = 1.0;
     readStats(m_rxPrev, m_txPrev);
@@ -108,6 +122,9 @@ void NetworkMonitor::update()
 {
     // Refresh interface list
     scanInterfaces();
+    if (m_iface.isEmpty() || !m_interfaces.contains(m_iface)) {
+        setIface(QString());
+    }
 
     const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
     const double dtSec = double(nowMs - m_lastMs) / 1000.0;

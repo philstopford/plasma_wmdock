@@ -101,6 +101,30 @@ void StorageMonitor::update()
         newVolumes.append(m);
     }
 
+    // Some environments only expose a usable root volume through QStorageInfo::root().
+    if (newVolumes.isEmpty()) {
+        const QStorageInfo root = QStorageInfo::root();
+        if (root.isValid() && root.isReady() && root.bytesTotal() > 0) {
+            const qint64 total = root.bytesTotal();
+            const qint64 avail = root.bytesAvailable();
+            const qint64 used  = total - avail;
+            const QString fsType = QString::fromLatin1(root.fileSystemType());
+
+            if (!isVirtual(fsType)) {
+                QVariantMap m;
+                m[QStringLiteral("device")]      = root.device();
+                m[QStringLiteral("mountPath")]   = root.rootPath();
+                m[QStringLiteral("displayName")] = QStringLiteral("/");
+                m[QStringLiteral("fsType")]      = fsType;
+                m[QStringLiteral("totalBytes")]  = total;
+                m[QStringLiteral("availBytes")]  = avail;
+                m[QStringLiteral("usedBytes")]   = used;
+                m[QStringLiteral("usedPct")]     = qRound(100.0 * used / total);
+                newVolumes.append(m);
+            }
+        }
+    }
+
     m_volumes = newVolumes;
     Q_EMIT volumesChanged();
 }

@@ -20,18 +20,25 @@ Item {
     property int histLen: 50
     property var rxHistory: []
     property var txHistory: []
+    property string configuredIface: Plasmoid.configuration.iface || ""
+
+    function applyConfiguredIface() {
+        NetworkMonitor.setIface(root.configuredIface)
+    }
 
     // Apply saved interface preference once the component is ready
     Component.onCompleted: {
-        const cfg = Plasmoid.configuration.iface
-        if (cfg && cfg.length > 0) {
-            NetworkMonitor.setIface(cfg)
-        }
+        root.applyConfiguredIface()
         Qt.callLater(function() { graph.requestPaint() })
     }
+    onConfiguredIfaceChanged: root.applyConfiguredIface()
 
     Connections {
         target: NetworkMonitor
+        function onInterfacesChanged() {
+            if (root.configuredIface.length === 0)
+                NetworkMonitor.setIface("")
+        }
         function onStatsChanged() {
             const rx = NetworkMonitor.rxBytesPerSec
             const tx = NetworkMonitor.txBytesPerSec

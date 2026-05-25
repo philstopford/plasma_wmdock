@@ -149,6 +149,12 @@ Item {
                     { text: i18n("WMLauncher – Launcher"),    value: "org.kde.plasma.wmlauncher" },
                     { text: i18n("WMDrawer – App drawer"),    value: "org.kde.plasma.wmdrawer"   },
                     { text: i18n("WMWeather – Weather"),      value: "org.kde.plasma.wmweather"  },
+                    { text: i18n("WMViz – Audio visualizer"), value: "org.kde.plasma.wmviz"      },
+                    { text: i18n("WMPlay – Audio player"),    value: "org.kde.plasma.wmplay"     },
+                    { text: i18n("WMEyes – Mouse tracker"),   value: "org.kde.plasma.wmeyes"     },
+                    { text: i18n("WMLava – Lava lamp"),       value: "org.kde.plasma.wmlava"     },
+                    { text: i18n("WMSensors – Temperatures"), value: "org.kde.plasma.wmsensors"  },
+                    { text: i18n("WMStorage – Disks"),        value: "org.kde.plasma.wmstorage"  },
                 ]
                 textRole: "text"
             }

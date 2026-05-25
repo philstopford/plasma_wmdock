@@ -10,6 +10,7 @@ Item {
     property real   cfg_latitude:  0
     property real   cfg_longitude: 0
     property string cfg_tempUnit:  ""
+    property int    cfg_updateIntervalMinutes: 0
 
     // Geocoding state (not persisted)
     property var    _geoResults:   []
@@ -231,6 +232,16 @@ Item {
                 currentIndex = 0
             }
             onActivated: page.cfg_tempUnit = currentValue
+        }
+
+        QQC2.SpinBox {
+            id: updateIntervalSpin
+            Kirigami.FormData.label: i18n("Auto update interval (minutes):")
+            from: 1
+            to: 360
+            stepSize: 1
+            value: page.cfg_updateIntervalMinutes
+            onValueChanged: page.cfg_updateIntervalMinutes = value
         }
     }
 }
