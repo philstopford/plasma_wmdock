@@ -135,7 +135,7 @@ void NetworkMonitor::update()
         } else if (!m_iface.isEmpty()) {
             target = m_iface;       // keep showing requested name with 0 stats
         } else {
-            target = pickAutoIface(); // nothing active yet; use any available iface
+            target = pickAutoIface(); // nothing active yet; use any available interface
         }
     } else {
         target = (!m_iface.isEmpty() && m_interfaces.contains(m_iface))
@@ -144,7 +144,7 @@ void NetworkMonitor::update()
     }
 
     if (target != m_iface) {
-        m_iface  = target;
+        m_iface = target;
         m_rxPrev = m_txPrev = 0;
         m_rxMax  = m_txMax  = 1.0;
         readStats(m_rxPrev, m_txPrev);
