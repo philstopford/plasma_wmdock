@@ -61,4 +61,5 @@ private:
     QTimer m_timer;
     QVariantList m_gpus;
     QList<GpuInfo> m_gpuInfos;
+    int m_ticksUntilRescan = 0;
 };

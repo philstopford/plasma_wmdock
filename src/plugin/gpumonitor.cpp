@@ -140,7 +140,12 @@ void GpuMonitor::scanGpus()
 
 void GpuMonitor::update()
 {
-    scanGpus();
+    if (m_ticksUntilRescan <= 0) {
+        scanGpus();
+        m_ticksUntilRescan = 15;   // rescan topology roughly every 30 seconds
+    } else {
+        --m_ticksUntilRescan;
+    }
 
     QVariantList newGpus;
     newGpus.reserve(m_gpuInfos.size());
