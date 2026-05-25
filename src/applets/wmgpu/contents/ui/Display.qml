@@ -8,6 +8,7 @@ Item {
 
     readonly property string configuredGpu: Plasmoid.configuration.gpu || ""
     readonly property int cycleIntervalSec: Math.max(1, Plasmoid.configuration.cycleInterval || 4)
+    readonly property real barLabelScale: 0.52
 
     property int gpuIndex: 0
     property var activeGpu: null
@@ -129,7 +130,7 @@ Item {
                   ? ("Load " + root.activeGpu.busyPercent.toFixed(0) + "%")
                   : i18n("Load N/A")
             color: "#fff"
-            font { pixelSize: parent.height * 0.58; family: "monospace"; bold: true }
+            font { pixelSize: parent.height * root.barLabelScale; family: "monospace"; bold: true }
         }
     }
 
@@ -163,7 +164,7 @@ Item {
                   ? ("VRAM " + root.activeGpu.vramPercent.toFixed(0) + "%")
                   : i18n("VRAM N/A")
             color: "#fff"
-            font { pixelSize: parent.height * 0.58; family: "monospace"; bold: true }
+            font { pixelSize: parent.height * root.barLabelScale; family: "monospace"; bold: true }
         }
     }
 

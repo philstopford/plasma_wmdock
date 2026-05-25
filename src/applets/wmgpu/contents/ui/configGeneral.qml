@@ -48,7 +48,7 @@ Item {
             from: 1
             to: 30
             stepSize: 1
-            value: page.cfg_cycleInterval
+            value: Math.max(1, page.cfg_cycleInterval)
             onValueChanged: page.cfg_cycleInterval = value
         }
     }
