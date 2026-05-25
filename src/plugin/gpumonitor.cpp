@@ -53,6 +53,12 @@ static Fn fnCast(void *sym)
     return fn;
 }
 
+// Timeout for a single nvidia-smi invocation, in milliseconds.
+static constexpr int NVIDIA_SMI_TIMEOUT_MS = 1500;
+
+// Bytes per mebibyte — nvidia-smi reports memory in MiB.
+static constexpr quint64 MIB_TO_BYTES = 1024ULL * 1024ULL;
+
 // ---------------------------------------------------------------------------
 
 GpuMonitor::GpuMonitor(QObject *parent)
@@ -169,6 +175,7 @@ bool GpuMonitor::tryInitNvml()
 
     m_nvmlLib = dlopen("libnvidia-ml.so.1", RTLD_LAZY | RTLD_LOCAL);
     if (!m_nvmlLib) {
+        qWarning("GpuMonitor: could not load libnvidia-ml.so.1: %s", dlerror());
         return false;
     }
 
@@ -380,7 +387,7 @@ void GpuMonitor::update()
                            {QStringLiteral("-i"),        info.pciBusId,
                             QStringLiteral("--query-gpu=utilization.gpu,memory.used,memory.total"),
                             QStringLiteral("--format=csv,noheader,nounits")});
-                if (proc.waitForFinished(1500)) {
+                if (proc.waitForFinished(NVIDIA_SMI_TIMEOUT_MS)) {
                     const QString out = QString::fromLatin1(proc.readAllStandardOutput()).trimmed();
                     const QStringList parts = out.split(QLatin1Char(','));
                     if (parts.size() >= 3) {
@@ -393,8 +400,8 @@ void GpuMonitor::update()
                             hasBusy = true;
                         }
                         if (usedOk && totalOk && total > 0) {
-                            vramUsed  = used  * 1024ULL * 1024ULL;
-                            vramTotal = total * 1024ULL * 1024ULL;
+                            vramUsed  = used  * MIB_TO_BYTES;
+                            vramTotal = total * MIB_TO_BYTES;
                             hasVram   = true;
                         }
                     }
