@@ -258,7 +258,7 @@ Item {
     DropArea {
         anchors.fill: parent
         onEntered: function(drag) {
-            drag.accepted = !!drag.hasUrls
+            drag.accepted = drag.hasUrls
         }
 
         onDropped: function(drop) {
@@ -273,12 +273,12 @@ Item {
                 let p = ""
                 if (urls[i] && urls[i].toLocalFile)
                     p = urls[i].toLocalFile()
-                if (!p || p.length === 0) {
+                if (!p) {
                     p = urls[i].toString()
                     if (p.startsWith("file://"))
                         p = decodeURIComponent(p.substring(7))
                 }
-                if (!p || p.length === 0)
+                if (!p)
                     continue
                 const scanned = MediaScanner.scan(p)
                 for (let j = 0; j < scanned.length; j++)
