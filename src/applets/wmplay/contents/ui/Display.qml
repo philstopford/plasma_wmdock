@@ -270,13 +270,11 @@ Item {
             let paths = []
             for (let i = 0; i < urls.length; i++) {
                 // Convert dropped URL to local path for MediaScanner
-                let p = ""
-                if (urls[i] && urls[i].toLocalFile)
-                    p = urls[i].toLocalFile()
+                let p = urls[i].toLocalFile()
                 if (!p) {
                     p = urls[i].toString()
                     if (p.startsWith("file://"))
-                        p = decodeURIComponent(p.substring(7))
+                        p = p.substring(7)
                 }
                 if (!p)
                     continue
