@@ -49,8 +49,11 @@ Item {
                 currentIndex = 0  // fallback to "Auto"
             }
 
-            // User-driven change → update cfg_iface so Plasma can save it
-            onActivated: page.cfg_iface = currentValue
+            // User-driven change → update cfg_iface so Plasma can save it.
+            // Use model[index].value directly rather than currentValue: in Qt 6
+            // currentValue can return undefined with a JavaScript array model,
+            // which would silently save "" (auto) instead of the chosen interface.
+            onActivated: (index) => { page.cfg_iface = model[index].value }
         }
     }
 }

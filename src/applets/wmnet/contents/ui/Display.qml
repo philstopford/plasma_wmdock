@@ -20,7 +20,15 @@ Item {
     property int histLen: 50
     property var rxHistory: []
     property var txHistory: []
-    property string configuredIface: Plasmoid.configuration.iface || ""
+
+    // externalIface: set by WMDock's DockSlot when embedded (slot config).
+    // When non-empty it takes priority over Plasmoid.configuration.iface so
+    // the chosen interface survives even though Plasmoid refers to WMDock's
+    // context when Display.qml is loaded via Loader.source.
+    property string externalIface: ""
+
+    property string configuredIface: externalIface !== "" ? externalIface
+                                                          : (Plasmoid.configuration.iface || "")
 
     function applyConfiguredIface() {
         NetworkMonitor.setIface(root.configuredIface)
@@ -40,6 +48,11 @@ Item {
                 NetworkMonitor.setIface("")
         }
         function onStatsChanged() {
+            // Belt-and-suspenders: if the active interface has drifted away
+            // from our preference (e.g. due to an old plugin binary), re-apply.
+            if (root.configuredIface !== "" && NetworkMonitor.iface !== root.configuredIface)
+                NetworkMonitor.setIface(root.configuredIface)
+
             const rx = NetworkMonitor.rxBytesPerSec
             const tx = NetworkMonitor.txBytesPerSec
 

@@ -5,6 +5,7 @@ import QtQuick.Layouts
 import org.kde.plasma.plasmoid
 import org.kde.plasma.components 3.0 as PlasmaComponents
 import org.kde.kirigami as Kirigami
+import org.kde.plasma.private.wmdock 1.0
 
 /**
  * DockSlot – hosts one mini-applet by embedding its QML as a Loader.
@@ -97,6 +98,7 @@ Item {
             if (cfg.drawerIcon !== undefined) appletLoader.item.externalDrawerIcon  = cfg.drawerIcon
             if (cfg.drawerLabel!== undefined) appletLoader.item.externalDrawerLabel = cfg.drawerLabel
             if (cfg.launchers  !== undefined) appletLoader.item.externalLaunchers  = cfg.launchers
+            if (cfg.iface      !== undefined) appletLoader.item.externalIface      = cfg.iface
         } catch(e) {
             console.warn("WMDock: failed to parse slotConfig for", appletId, e)
         }
@@ -162,19 +164,23 @@ Item {
         QQC2.MenuItem {
             text: i18n("Configure Applet…")
             visible: appletId === "org.kde.plasma.wmlauncher" ||
-                     appletId === "org.kde.plasma.wmdrawer"
+                     appletId === "org.kde.plasma.wmdrawer"   ||
+                     appletId === "org.kde.plasma.wmnet"
             height: visible ? implicitHeight : 0
             onTriggered: {
                 if (appletId === "org.kde.plasma.wmlauncher") {
                     launcherConfigDialog.openForSlot()
                 } else if (appletId === "org.kde.plasma.wmdrawer") {
                     drawerConfigDialog.openForSlot()
+                } else if (appletId === "org.kde.plasma.wmnet") {
+                    wmnetConfigDialog.openForSlot()
                 }
             }
         }
         QQC2.MenuSeparator {
             visible: appletId === "org.kde.plasma.wmlauncher" ||
-                     appletId === "org.kde.plasma.wmdrawer"
+                     appletId === "org.kde.plasma.wmdrawer"   ||
+                     appletId === "org.kde.plasma.wmnet"
             height: visible ? implicitHeight : 0
         }
         QQC2.MenuItem {
@@ -470,6 +476,79 @@ Item {
                 drawerConfigDialog.editingLaunchers.push(entry)
             }
             launcherListView.reload()
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // WMNet configure dialog – lets the user pick the monitored interface
+    // when WMNet is embedded in WMDock (where Plasmoid refers to WMDock's
+    // context so Plasmoid.configuration.iface is always unavailable).
+    // The choice is persisted in slotConfig and forwarded to Display.qml
+    // via its externalIface property.
+    // -----------------------------------------------------------------------
+    QQC2.Dialog {
+        id: wmnetConfigDialog
+        title: i18n("Configure Network Monitor")
+        modal: true
+        parent: QQC2.Overlay.overlay
+        anchors.centerIn: parent
+        width: 320
+
+        function openForSlot() {
+            var savedIface = ""
+            try {
+                if (slotConfig) {
+                    var cfg = JSON.parse(slotConfig)
+                    if (cfg.iface !== undefined) savedIface = cfg.iface
+                }
+            } catch(e) {}
+            wmnetIfaceCombo.currentIndex = 0
+            for (var i = 0; i < wmnetIfaceCombo.model.length; i++) {
+                if (wmnetIfaceCombo.model[i].value === savedIface) {
+                    wmnetIfaceCombo.currentIndex = i
+                    break
+                }
+            }
+            open()
+        }
+
+        contentItem: Kirigami.FormLayout {
+            QQC2.ComboBox {
+                id: wmnetIfaceCombo
+                Kirigami.FormData.label: i18n("Network interface:")
+                model: {
+                    var items = [{ text: i18n("Auto (first non-loopback)"), value: "" }]
+                    var ifaces = NetworkMonitor.interfaces || []
+                    for (var i = 0; i < ifaces.length; i++) {
+                        if (!ifaces[i].startsWith("lo"))
+                            items.push({ text: ifaces[i], value: ifaces[i] })
+                    }
+                    return items
+                }
+                textRole: "text"
+                valueRole: "value"
+            }
+        }
+
+        footer: QQC2.DialogButtonBox {
+            QQC2.Button {
+                text: i18n("OK")
+                QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.AcceptRole
+            }
+            QQC2.Button {
+                text: i18n("Cancel")
+                QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.RejectRole
+            }
+        }
+
+        onAccepted: {
+            // Use model[currentIndex].value directly – currentValue is
+            // unreliable with JavaScript array models in some Qt 6 builds.
+            var newIface = wmnetIfaceCombo.model[wmnetIfaceCombo.currentIndex].value
+            var cfg = {}
+            try { if (slotConfig) cfg = JSON.parse(slotConfig) } catch(e) {}
+            cfg.iface = newIface
+            slot.slotConfigSaved(slotIndex, JSON.stringify(cfg))
         }
     }
 
