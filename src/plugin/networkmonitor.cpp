@@ -36,7 +36,7 @@ void NetworkMonitor::setIface(const QString &iface)
                 return candidate;
             }
         }
-        return m_interfaces.isEmpty() ? QString() : m_interfaces.constFirst();
+        return QString();
     };
 
     if (!resolved.isEmpty() && !m_interfaces.contains(resolved)) {

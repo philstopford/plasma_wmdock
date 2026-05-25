@@ -36,7 +36,7 @@ Item {
     Connections {
         target: NetworkMonitor
         function onInterfacesChanged() {
-            if (root.configuredIface.length === 0)
+            if (root.configuredIface === "")
                 NetworkMonitor.setIface("")
         }
         function onStatsChanged() {
