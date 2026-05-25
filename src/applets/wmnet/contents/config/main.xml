@@ -5,9 +5,21 @@
                           http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
   <kcfgfile name=""/>
   <group name="General">
-    <!-- Network interface to monitor; empty string means auto-detect -->
+    <!-- Legacy single-interface key kept for migration. Superseded by ifaces. -->
     <entry name="iface" type="String">
       <default></default>
+    </entry>
+    <!-- Selected interfaces (empty list = all non-loopback). -->
+    <entry name="ifaces" type="StringList">
+      <default></default>
+    </entry>
+    <!-- Whether to auto-cycle through selected interfaces. -->
+    <entry name="cycleMode" type="Bool">
+      <default>true</default>
+    </entry>
+    <!-- Auto-cycle interval in seconds. -->
+    <entry name="cycleInterval" type="Int">
+      <default>4</default>
     </entry>
   </group>
 </kcfg>

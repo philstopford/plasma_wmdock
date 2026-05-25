@@ -98,7 +98,15 @@ Item {
             if (cfg.drawerIcon !== undefined) appletLoader.item.externalDrawerIcon  = cfg.drawerIcon
             if (cfg.drawerLabel!== undefined) appletLoader.item.externalDrawerLabel = cfg.drawerLabel
             if (cfg.launchers  !== undefined) appletLoader.item.externalLaunchers  = cfg.launchers
-            if (cfg.iface      !== undefined) appletLoader.item.externalIface      = cfg.iface
+            // WMNet: support new multi-interface config (ifaces array + cycleMode + cycleInterval)
+            // with backward-compat fallback for the old singular iface key.
+            if (cfg.ifaces !== undefined) {
+                appletLoader.item.externalIfaces = cfg.ifaces
+            } else if (cfg.iface !== undefined) {
+                appletLoader.item.externalIfaces = cfg.iface ? [cfg.iface] : []
+            }
+            if (cfg.cycleMode     !== undefined) appletLoader.item.externalCycleMode     = cfg.cycleMode
+            if (cfg.cycleInterval !== undefined) appletLoader.item.externalCycleInterval = cfg.cycleInterval
         } catch(e) {
             console.warn("WMDock: failed to parse slotConfig for", appletId, e)
         }
@@ -480,11 +488,10 @@ Item {
     }
 
     // -----------------------------------------------------------------------
-    // WMNet configure dialog – lets the user pick the monitored interface
-    // when WMNet is embedded in WMDock (where Plasmoid refers to WMDock's
-    // context so Plasmoid.configuration.iface is always unavailable).
-    // The choice is persisted in slotConfig and forwarded to Display.qml
-    // via its externalIface property.
+    // WMNet configure dialog – lets the user pick which interfaces to monitor
+    // when WMNet is embedded in WMDock (Plasmoid.configuration is WMDock's,
+    // not WMNet's).  Choices are persisted in slotConfig and forwarded to
+    // Display.qml via externalIfaces / externalCycleMode / externalCycleInterval.
     // -----------------------------------------------------------------------
     QQC2.Dialog {
         id: wmnetConfigDialog
@@ -494,39 +501,76 @@ Item {
         anchors.centerIn: parent
         width: 320
 
+        // Mutable state held while the dialog is open
+        property var  editIfaces:        []
+        property bool editCycleMode:     true
+        property int  editCycleInterval: 4
+
         function openForSlot() {
-            var savedIface = ""
             try {
-                if (slotConfig) {
-                    var cfg = JSON.parse(slotConfig)
-                    if (cfg.iface !== undefined) savedIface = cfg.iface
+                var cfg = slotConfig ? JSON.parse(slotConfig) : {}
+                // Support both new ifaces array and legacy singular iface key
+                if (cfg.ifaces !== undefined) {
+                    editIfaces = cfg.ifaces.slice()
+                } else if (cfg.iface !== undefined) {
+                    editIfaces = cfg.iface ? [cfg.iface] : []
+                } else {
+                    editIfaces = []
                 }
-            } catch(e) {}
-            wmnetIfaceCombo.currentIndex = 0
-            for (var i = 0; i < wmnetIfaceCombo.model.length; i++) {
-                if (wmnetIfaceCombo.model[i].value === savedIface) {
-                    wmnetIfaceCombo.currentIndex = i
-                    break
-                }
+                editCycleMode     = cfg.cycleMode     !== undefined ? cfg.cycleMode     : true
+                editCycleInterval = cfg.cycleInterval !== undefined ? cfg.cycleInterval : 4
+            } catch(e) {
+                editIfaces        = []
+                editCycleMode     = true
+                editCycleInterval = 4
             }
             open()
         }
 
         contentItem: Kirigami.FormLayout {
-            QQC2.ComboBox {
-                id: wmnetIfaceCombo
-                Kirigami.FormData.label: i18n("Network interface:")
-                model: {
-                    var items = [{ text: i18n("Auto (first non-loopback)"), value: "" }]
-                    var ifaces = NetworkMonitor.interfaces || []
-                    for (var i = 0; i < ifaces.length; i++) {
-                        if (!ifaces[i].startsWith("lo"))
-                            items.push({ text: ifaces[i], value: ifaces[i] })
+
+            // Per-interface checkboxes (all non-loopback)
+            Repeater {
+                id: wmnetIfaceRepeater
+                model: NetworkMonitor.interfaces.filter(function(i) {
+                    return !i.startsWith("lo")
+                })
+                delegate: QQC2.CheckBox {
+                    Kirigami.FormData.label: index === 0 ? i18n("Interfaces\n(none = all):") : ""
+                    text: modelData
+                    // Checked when editIfaces is empty (= all) or explicitly contains this iface
+                    checked: wmnetConfigDialog.editIfaces.length === 0 ||
+                             wmnetConfigDialog.editIfaces.indexOf(modelData) >= 0
+                    onToggled: {
+                        var newList = []
+                        for (var i = 0; i < wmnetIfaceRepeater.count; i++) {
+                            var item = wmnetIfaceRepeater.itemAt(i)
+                            if (item && item.checked)
+                                newList.push(item.text)
+                        }
+                        // All checked = auto mode (empty list)
+                        if (newList.length === wmnetIfaceRepeater.count)
+                            newList = []
+                        wmnetConfigDialog.editIfaces = newList
                     }
-                    return items
                 }
-                textRole: "text"
-                valueRole: "value"
+            }
+
+            QQC2.CheckBox {
+                id: wmnetCycleModeCheck
+                Kirigami.FormData.label: i18n("Auto cycle interfaces:")
+                checked: wmnetConfigDialog.editCycleMode
+                onToggled: wmnetConfigDialog.editCycleMode = checked
+            }
+
+            QQC2.SpinBox {
+                Kirigami.FormData.label: i18n("Cycle interval (seconds):")
+                enabled: wmnetCycleModeCheck.checked
+                from: 1
+                to: 60
+                stepSize: 1
+                value: wmnetConfigDialog.editCycleInterval
+                onValueChanged: wmnetConfigDialog.editCycleInterval = value
             }
         }
 
@@ -542,12 +586,12 @@ Item {
         }
 
         onAccepted: {
-            // Use model[currentIndex].value directly – currentValue is
-            // unreliable with JavaScript array models in some Qt 6 builds.
-            var newIface = wmnetIfaceCombo.model[wmnetIfaceCombo.currentIndex].value
             var cfg = {}
             try { if (slotConfig) cfg = JSON.parse(slotConfig) } catch(e) {}
-            cfg.iface = newIface
+            cfg.ifaces        = wmnetConfigDialog.editIfaces
+            cfg.cycleMode     = wmnetConfigDialog.editCycleMode
+            cfg.cycleInterval = wmnetConfigDialog.editCycleInterval
+            delete cfg.iface   // remove legacy singular key
             slot.slotConfigSaved(slotIndex, JSON.stringify(cfg))
         }
     }

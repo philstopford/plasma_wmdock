@@ -6,11 +6,16 @@ PlasmoidItem {
     preferredRepresentation: fullRepresentation
     fullRepresentation: Display {
         anchors.fill: parent
-        // Explicitly forward the saved interface so Display.qml always
-        // receives it via externalIface (the same path used when embedded
-        // in WMDock via Loader), rather than relying on
-        // Plasmoid.configuration inside Display.qml where the Plasmoid
-        // context may refer to a parent applet's configuration.
-        externalIface: Plasmoid.configuration.iface || ""
+
+        // Forward selected interfaces, falling back to the legacy singular
+        // iface key for users upgrading from the old single-interface config.
+        externalIfaces: {
+            const ifaces = Plasmoid.configuration.ifaces || []
+            if (ifaces.length > 0) return ifaces
+            const iface = Plasmoid.configuration.iface || ""
+            return iface ? [iface] : []
+        }
+        externalCycleMode:     Plasmoid.configuration.cycleMode
+        externalCycleInterval: Math.max(1, Plasmoid.configuration.cycleInterval || 4)
     }
 }
