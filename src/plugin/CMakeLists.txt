@@ -28,6 +28,7 @@ target_link_libraries(wmdockplugin
     Qt6::Network
     KF6::CoreAddons
     KF6::I18n
+    ${CMAKE_DL_LIBS}
 )
 
 if(WITH_XEMBED)

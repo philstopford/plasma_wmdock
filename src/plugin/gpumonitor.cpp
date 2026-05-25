@@ -6,10 +6,54 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QProcess>
 #include <QRegularExpression>
 #include <QVariantMap>
 #include <QtGlobal>
+#include <cstring>
+#include <dlfcn.h>
 #include <utility>
+
+// ---------------------------------------------------------------------------
+// Minimal NVML type declarations — no NVIDIA headers required at build time.
+//
+// Field layouts match the NVML C API (nvidia-ml.h). These types are ABI-stable
+// and have not changed since NVML was first released.
+// ---------------------------------------------------------------------------
+using NvmlReturn = unsigned int;
+static constexpr NvmlReturn NVML_SUCCESS = 0u;
+
+struct NvmlUtilization {
+    unsigned int gpu;       // GPU kernel activity, 0–100 %
+    unsigned int memory;    // Memory I/O activity, 0–100 %
+};
+
+struct NvmlMemory {
+    unsigned long long total;   // Total installed frame-buffer memory, bytes
+    unsigned long long free;    // Unallocated memory, bytes
+    unsigned long long used;    // Allocated memory, bytes
+};
+
+using FnNvmlInit      = NvmlReturn (*)();
+using FnNvmlShutdown  = NvmlReturn (*)();
+using FnNvmlGetHandle = NvmlReturn (*)(const char *, void **);
+using FnNvmlGetUtil   = NvmlReturn (*)(void *, NvmlUtilization *);
+using FnNvmlGetMem    = NvmlReturn (*)(void *, NvmlMemory *);
+
+// Type-safe cast from dlsym() void* to a function pointer via memcpy.
+// Avoids strict-aliasing undefined behaviour while still working on every
+// POSIX platform where data-pointer and function-pointer representations
+// are the same size.
+template<typename Fn>
+static Fn fnCast(void *sym)
+{
+    static_assert(sizeof(Fn) == sizeof(void *), "function/data pointer size mismatch");
+    Fn fn = nullptr;
+    std::memcpy(&fn, &sym, sizeof(fn));
+    return fn;
+}
+
+// ---------------------------------------------------------------------------
 
 GpuMonitor::GpuMonitor(QObject *parent)
     : QObject(parent)
@@ -19,6 +63,11 @@ GpuMonitor::GpuMonitor(QObject *parent)
     m_timer.start();
 
     update();
+}
+
+GpuMonitor::~GpuMonitor()
+{
+    shutdownNvml();
 }
 
 int GpuMonitor::updateInterval() const
@@ -34,6 +83,10 @@ void GpuMonitor::setUpdateInterval(int ms)
     m_timer.setInterval(ms);
     Q_EMIT updateIntervalChanged();
 }
+
+// ---------------------------------------------------------------------------
+// Sysfs helpers
+// ---------------------------------------------------------------------------
 
 QString GpuMonitor::readTextFile(const QString &path)
 {
@@ -90,6 +143,93 @@ QString GpuMonitor::buildGpuName(const QString &card, const QString &devicePath,
     return name;
 }
 
+QString GpuMonitor::readPciBusId(const QString &cardPath)
+{
+    // /sys/class/drm/card<N>/device/uevent contains a line of the form:
+    //   PCI_SLOT_NAME=0000:01:00.0
+    const QString uevent = readTextFile(cardPath + QStringLiteral("/device/uevent"));
+    static const QRegularExpression re(QStringLiteral("^PCI_SLOT_NAME=(.+)$"),
+                                       QRegularExpression::MultilineOption);
+    const QRegularExpressionMatch m = re.match(uevent);
+    if (m.hasMatch()) {
+        return m.captured(1).trimmed();
+    }
+    return QString();
+}
+
+// ---------------------------------------------------------------------------
+// NVML lifecycle
+// ---------------------------------------------------------------------------
+
+bool GpuMonitor::tryInitNvml()
+{
+    if (m_nvmlInitialized) {
+        return true;
+    }
+
+    m_nvmlLib = dlopen("libnvidia-ml.so.1", RTLD_LAZY | RTLD_LOCAL);
+    if (!m_nvmlLib) {
+        return false;
+    }
+
+    m_fnNvmlInit      = dlsym(m_nvmlLib, "nvmlInit_v2");
+    m_fnNvmlShutdown  = dlsym(m_nvmlLib, "nvmlShutdown");
+    m_fnNvmlGetHandle = dlsym(m_nvmlLib, "nvmlDeviceGetHandleByPciBusId_v2");
+    m_fnNvmlGetUtil   = dlsym(m_nvmlLib, "nvmlDeviceGetUtilizationRates");
+    m_fnNvmlGetMem    = dlsym(m_nvmlLib, "nvmlDeviceGetMemoryInfo");
+
+    if (!m_fnNvmlInit || !m_fnNvmlShutdown || !m_fnNvmlGetHandle
+        || !m_fnNvmlGetUtil || !m_fnNvmlGetMem) {
+        shutdownNvml();
+        return false;
+    }
+
+    const NvmlReturn ret = fnCast<FnNvmlInit>(m_fnNvmlInit)();
+    if (ret != NVML_SUCCESS) {
+        shutdownNvml();
+        return false;
+    }
+
+    m_nvmlInitialized = true;
+    return true;
+}
+
+void GpuMonitor::shutdownNvml()
+{
+    if (m_nvmlInitialized && m_fnNvmlShutdown) {
+        fnCast<FnNvmlShutdown>(m_fnNvmlShutdown)();
+        m_nvmlInitialized = false;
+    }
+    if (m_nvmlLib) {
+        dlclose(m_nvmlLib);
+        m_nvmlLib         = nullptr;
+        m_fnNvmlInit      = nullptr;
+        m_fnNvmlShutdown  = nullptr;
+        m_fnNvmlGetHandle = nullptr;
+        m_fnNvmlGetUtil   = nullptr;
+        m_fnNvmlGetMem    = nullptr;
+    }
+}
+
+bool GpuMonitor::openNvmlDevice(GpuInfo &info)
+{
+    if (!m_nvmlInitialized || info.pciBusId.isEmpty()) {
+        return false;
+    }
+    void *handle = nullptr;
+    const NvmlReturn ret = fnCast<FnNvmlGetHandle>(m_fnNvmlGetHandle)(
+        info.pciBusId.toLatin1().constData(), &handle);
+    if (ret != NVML_SUCCESS || !handle) {
+        return false;
+    }
+    info.nvmlDevice = handle;
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// GPU topology scan
+// ---------------------------------------------------------------------------
+
 void GpuMonitor::scanGpus()
 {
     m_gpuInfos.clear();
@@ -103,47 +243,74 @@ void GpuMonitor::scanGpus()
             continue;
         }
 
-        const QString cardPath = drmDir.absoluteFilePath(entry);
+        const QString cardPath   = drmDir.absoluteFilePath(entry);
         const QString devicePath = cardPath + QStringLiteral("/device");
         if (!QFileInfo::exists(devicePath)) {
             continue;
         }
 
         GpuInfo info;
-        info.key = entry;
+        info.key    = entry;
         info.driver = driverNameFromPath(devicePath);
-        info.name = buildGpuName(entry, devicePath, info.driver);
+        info.name   = buildGpuName(entry, devicePath, info.driver);
 
-        const QStringList busyCandidates = {
-            QStringLiteral("/gpu_busy_percent"),
-            QStringLiteral("/gpu_busy"),
-            QStringLiteral("/busy_percent"),
-        };
-        for (const QString &candidate : busyCandidates) {
-            const QString path = devicePath + candidate;
-            if (QFileInfo::exists(path)) {
-                info.busyPath = path;
-                break;
+        const bool isNvidia = (info.driver == QLatin1String("nvidia"));
+        const bool isIntel  = (info.driver == QLatin1String("i915")
+                                || info.driver == QLatin1String("xe"));
+
+        if (isNvidia) {
+            // NVIDIA proprietary driver: prefer NVML, fall back to nvidia-smi.
+            info.pciBusId = readPciBusId(cardPath);
+
+            if (tryInitNvml() && openNvmlDevice(info)) {
+                info.backend = Backend::NvidiaNvml;
+            } else {
+                info.backend = Backend::NvidiaSmi;
             }
-        }
+        } else {
+            // AMD (amdgpu/radeon), Intel (i915/xe), nouveau, and unknown drivers:
+            // probe whichever sysfs attributes are actually present.
+            info.backend = Backend::Sysfs;
 
-        const QString vramUsedPath = devicePath + QStringLiteral("/mem_info_vram_used");
-        const QString vramTotalPath = devicePath + QStringLiteral("/mem_info_vram_total");
-        if (QFileInfo::exists(vramUsedPath) && QFileInfo::exists(vramTotalPath)) {
-            info.vramUsedPath = vramUsedPath;
-            info.vramTotalPath = vramTotalPath;
+            const QStringList busyCandidates = {
+                QStringLiteral("/gpu_busy_percent"),
+                QStringLiteral("/gpu_busy"),
+                QStringLiteral("/busy_percent"),
+            };
+            for (const QString &candidate : busyCandidates) {
+                const QString path = devicePath + candidate;
+                if (QFileInfo::exists(path)) {
+                    info.busyPath = path;
+                    break;
+                }
+            }
+
+            // Intel GPUs use shared system RAM; dedicated VRAM sysfs files are
+            // absent. Skip the probe to avoid surfacing N/A for VRAM.
+            if (!isIntel) {
+                const QString vramUsedPath  = devicePath + QStringLiteral("/mem_info_vram_used");
+                const QString vramTotalPath = devicePath + QStringLiteral("/mem_info_vram_total");
+                if (QFileInfo::exists(vramUsedPath) && QFileInfo::exists(vramTotalPath)) {
+                    info.vramUsedPath  = vramUsedPath;
+                    info.vramTotalPath = vramTotalPath;
+                }
+            }
         }
 
         m_gpuInfos.append(info);
     }
 }
 
+// ---------------------------------------------------------------------------
+// Per-tick update
+// ---------------------------------------------------------------------------
+
 void GpuMonitor::update()
 {
     if (m_ticksUntilRescan <= 0) {
         scanGpus();
         const int intervalMs = qMax(1, m_timer.interval());
-        m_ticksUntilRescan = qMax(1, 30000 / intervalMs);   // rescan topology about every 30 seconds
+        m_ticksUntilRescan = qMax(1, 30000 / intervalMs);   // rescan topology about every 30 s
     } else {
         --m_ticksUntilRescan;
     }
@@ -153,26 +320,99 @@ void GpuMonitor::update()
 
     for (const GpuInfo &info : std::as_const(m_gpuInfos)) {
         QVariantMap map;
-        map[QStringLiteral("key")] = info.key;
-        map[QStringLiteral("name")] = info.name;
+        map[QStringLiteral("key")]    = info.key;
+        map[QStringLiteral("name")]   = info.name;
         map[QStringLiteral("driver")] = info.driver;
 
-        bool busyOk = false;
-        const quint64 busyRaw = info.busyPath.isEmpty() ? 0 : readUInt64File(info.busyPath, &busyOk);
-        const double busyPct = busyOk ? qBound(0.0, double(busyRaw), 100.0) : -1.0;
-        map[QStringLiteral("busyPercent")] = busyPct;
-        map[QStringLiteral("hasBusy")] = busyOk;
+        double  busyPct   = -1.0;
+        bool    hasBusy   = false;
+        quint64 vramUsed  = 0;
+        quint64 vramTotal = 0;
+        bool    hasVram   = false;
 
-        bool usedOk = false;
-        bool totalOk = false;
-        const quint64 vramUsed = info.vramUsedPath.isEmpty() ? 0 : readUInt64File(info.vramUsedPath, &usedOk);
-        const quint64 vramTotal = info.vramTotalPath.isEmpty() ? 0 : readUInt64File(info.vramTotalPath, &totalOk);
-        const bool hasVram = usedOk && totalOk && vramTotal > 0;
+        switch (info.backend) {
 
-        map[QStringLiteral("vramUsedBytes")] = qint64(vramUsed);
+        case Backend::Sysfs: {
+            bool busyOk = false;
+            const quint64 busyRaw = info.busyPath.isEmpty()
+                                    ? 0 : readUInt64File(info.busyPath, &busyOk);
+            if (busyOk) {
+                busyPct = qBound(0.0, double(busyRaw), 100.0);
+                hasBusy = true;
+            }
+
+            bool usedOk = false, totalOk = false;
+            vramUsed  = info.vramUsedPath.isEmpty()
+                        ? 0 : readUInt64File(info.vramUsedPath,  &usedOk);
+            vramTotal = info.vramTotalPath.isEmpty()
+                        ? 0 : readUInt64File(info.vramTotalPath, &totalOk);
+            hasVram   = usedOk && totalOk && vramTotal > 0;
+            break;
+        }
+
+        case Backend::NvidiaNvml: {
+            if (info.nvmlDevice && m_nvmlInitialized) {
+                NvmlUtilization util{};
+                if (fnCast<FnNvmlGetUtil>(m_fnNvmlGetUtil)(info.nvmlDevice, &util) == NVML_SUCCESS) {
+                    busyPct = qBound(0.0, double(util.gpu), 100.0);
+                    hasBusy = true;
+                }
+
+                NvmlMemory mem{};
+                if (fnCast<FnNvmlGetMem>(m_fnNvmlGetMem)(info.nvmlDevice, &mem) == NVML_SUCCESS
+                    && mem.total > 0) {
+                    vramUsed  = mem.used;
+                    vramTotal = mem.total;
+                    hasVram   = true;
+                }
+            }
+            break;
+        }
+
+        case Backend::NvidiaSmi: {
+            if (!info.pciBusId.isEmpty()) {
+                // nvidia-smi -i <busId> --query-gpu=utilization.gpu,memory.used,memory.total
+                //            --format=csv,noheader,nounits
+                // Output example: "15, 1024, 8192"
+                // Memory is reported in MiB; convert to bytes.
+                QProcess proc;
+                proc.start(QStringLiteral("nvidia-smi"),
+                           {QStringLiteral("-i"),        info.pciBusId,
+                            QStringLiteral("--query-gpu=utilization.gpu,memory.used,memory.total"),
+                            QStringLiteral("--format=csv,noheader,nounits")});
+                if (proc.waitForFinished(1500)) {
+                    const QString out = QString::fromLatin1(proc.readAllStandardOutput()).trimmed();
+                    const QStringList parts = out.split(QLatin1Char(','));
+                    if (parts.size() >= 3) {
+                        bool gpuOk = false, usedOk = false, totalOk = false;
+                        const double    gpu   = parts.at(0).trimmed().toDouble(&gpuOk);
+                        const quint64   used  = parts.at(1).trimmed().toULongLong(&usedOk);
+                        const quint64   total = parts.at(2).trimmed().toULongLong(&totalOk);
+                        if (gpuOk) {
+                            busyPct = qBound(0.0, gpu, 100.0);
+                            hasBusy = true;
+                        }
+                        if (usedOk && totalOk && total > 0) {
+                            vramUsed  = used  * 1024ULL * 1024ULL;
+                            vramTotal = total * 1024ULL * 1024ULL;
+                            hasVram   = true;
+                        }
+                    }
+                }
+            }
+            break;
+        }
+
+        } // switch (info.backend)
+
+        map[QStringLiteral("busyPercent")]    = busyPct;
+        map[QStringLiteral("hasBusy")]        = hasBusy;
+        map[QStringLiteral("vramUsedBytes")]  = qint64(vramUsed);
         map[QStringLiteral("vramTotalBytes")] = qint64(vramTotal);
-        map[QStringLiteral("vramPercent")] = hasVram ? (100.0 * double(vramUsed) / double(vramTotal)) : -1.0;
-        map[QStringLiteral("hasVram")] = hasVram;
+        map[QStringLiteral("vramPercent")]    = hasVram
+                                                ? (100.0 * double(vramUsed) / double(vramTotal))
+                                                : -1.0;
+        map[QStringLiteral("hasVram")]        = hasVram;
 
         newGpus.append(map);
     }
