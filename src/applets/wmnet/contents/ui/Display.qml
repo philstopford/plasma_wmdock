@@ -289,16 +289,7 @@ Item {
             // One row per effective interface; model is interface names (changes
             // rarely), so Repeater structure is stable across 1-second stat ticks.
             Repeater {
-                model: {
-                    const allNonLo = NetworkMonitor.interfaces.filter(function(i) {
-                        return !i.startsWith("lo")
-                    })
-                    if (!root.externalIfaces || root.externalIfaces.length === 0)
-                        return allNonLo
-                    return root.externalIfaces.filter(function(i) {
-                        return allNonLo.indexOf(i) >= 0
-                    })
-                }
+                model: root.effectiveIfaces
 
                 // Each delegate is a two-line block: name + rates
                 Item {
