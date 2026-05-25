@@ -11,8 +11,9 @@ import org.kde.plasma.private.wmdock 1.0
  * Shows current interface name and rates below the graph.
  *
  * Data source: NetworkMonitor singleton from the wmdockplugin C++ extension.
- * The active interface is read from Plasmoid.configuration.iface; when empty
- * NetworkMonitor auto-selects the first non-virtual interface.
+ * The active interface comes via the externalIface property: in standalone
+ * mode main.qml forwards Plasmoid.configuration.iface; when embedded in
+ * WMDock, DockSlot.applySlotConfig() sets it from the slot's JSON config.
  */
 Item {
     id: root
@@ -21,14 +22,12 @@ Item {
     property var rxHistory: []
     property var txHistory: []
 
-    // externalIface: set by WMDock's DockSlot when embedded (slot config).
-    // When non-empty it takes priority over Plasmoid.configuration.iface so
-    // the chosen interface survives even though Plasmoid refers to WMDock's
-    // context when Display.qml is loaded via Loader.source.
+    // externalIface: set by WMDock's DockSlot when embedded (slot config),
+    // or by main.qml forwarding Plasmoid.configuration.iface in standalone
+    // mode.  Either way, "" means "auto" (pick first non-loopback).
     property string externalIface: ""
 
-    property string configuredIface: externalIface !== "" ? externalIface
-                                                          : (Plasmoid.configuration.iface || "")
+    property string configuredIface: externalIface
 
     function applyConfiguredIface() {
         NetworkMonitor.setIface(root.configuredIface)
