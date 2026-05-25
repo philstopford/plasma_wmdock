@@ -223,6 +223,7 @@ PlasmoidItem {
                         ListElement { label: "WMLava – Lava lamp simulation";     appletId: "org.kde.plasma.wmlava" }
                         ListElement { label: "WMSensors – Thermal sensors";       appletId: "org.kde.plasma.wmsensors" }
                         ListElement { label: "WMStorage – Disk usage";            appletId: "org.kde.plasma.wmstorage" }
+                        ListElement { label: "WMGPU – GPU load and VRAM";         appletId: "org.kde.plasma.wmgpu" }
                     }
 
                     delegate: QQC2.ItemDelegate {

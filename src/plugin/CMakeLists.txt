@@ -9,6 +9,7 @@ set(PLUGIN_SOURCES
     weatherprovider.cpp
     thermalmonitor.cpp
     storagemonitor.cpp
+    gpumonitor.cpp
     cursortracker.cpp
     mediascanner.cpp
 )

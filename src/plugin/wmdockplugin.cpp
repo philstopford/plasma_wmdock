@@ -11,6 +11,7 @@
 #include "processlauncher.h"
 #include "thermalmonitor.h"
 #include "storagemonitor.h"
+#include "gpumonitor.h"
 #include "cursortracker.h"
 #include "mediascanner.h"
 #ifdef WITH_XEMBED
@@ -64,6 +65,11 @@ void WMDockPlugin::registerTypes(const char *uri)
     qmlRegisterSingletonType<StorageMonitor>(uri, 1, 0, "StorageMonitor",
         [](QQmlEngine *, QJSEngine *) -> QObject * {
             return new StorageMonitor();
+        });
+
+    qmlRegisterSingletonType<GpuMonitor>(uri, 1, 0, "GpuMonitor",
+        [](QQmlEngine *, QJSEngine *) -> QObject * {
+            return new GpuMonitor();
         });
 
     qmlRegisterSingletonType<CursorTracker>(uri, 1, 0, "CursorTracker",

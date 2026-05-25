@@ -1,0 +1,12 @@
+{
+    "KPlugin": {
+        "Category": "System Information",
+        "Description": "GPU load and VRAM usage monitor with multi-GPU support",
+        "Icon": "video-display",
+        "Id": "org.kde.plasma.wmgpu",
+        "License": "GPL-2.0-or-later",
+        "Name": "WMGPU"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "KPackageStructure": "Plasma/Applet"
+}

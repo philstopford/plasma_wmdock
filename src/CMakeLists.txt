@@ -19,6 +19,7 @@ set(WMDOCK_APPLETS
     wmlava
     wmsensors
     wmstorage
+    wmgpu
 )
 
 foreach(APPLET ${WMDOCK_APPLETS})

@@ -495,6 +495,7 @@ Item {
             "org.kde.plasma.wmlava":     Qt.resolvedUrl("../../../org.kde.plasma.wmlava/contents/ui/Display.qml"),
             "org.kde.plasma.wmsensors":  Qt.resolvedUrl("../../../org.kde.plasma.wmsensors/contents/ui/Display.qml"),
             "org.kde.plasma.wmstorage":  Qt.resolvedUrl("../../../org.kde.plasma.wmstorage/contents/ui/Display.qml"),
+            "org.kde.plasma.wmgpu":      Qt.resolvedUrl("../../../org.kde.plasma.wmgpu/contents/ui/Display.qml"),
         }
         return map[id] || ""
     }

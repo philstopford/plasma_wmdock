@@ -155,6 +155,7 @@ Item {
                     { text: i18n("WMLava – Lava lamp"),       value: "org.kde.plasma.wmlava"     },
                     { text: i18n("WMSensors – Temperatures"), value: "org.kde.plasma.wmsensors"  },
                     { text: i18n("WMStorage – Disks"),        value: "org.kde.plasma.wmstorage"  },
+                    { text: i18n("WMGPU – GPU monitor"),      value: "org.kde.plasma.wmgpu"      },
                 ]
                 textRole: "text"
             }
