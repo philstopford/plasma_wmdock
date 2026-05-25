@@ -1,46 +1,82 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 import QtQuick
 import org.kde.plasma.plasmoid
+import org.kde.plasma.private.wmdock 1.0
 
 /**
- * WMLava – Lava lamp simulation applet.
+ * WMLava – Lava lamp simulation driven by system heat.
  *
- * Renders metaball-style blobs that float up and down inside a glass
- * container, merging when close together – just like a classic lava lamp.
+ * Renders metaball-style blobs that float inside a glass container.
+ * At idle the blobs rest at the bottom; as CPU load rises they heat up,
+ * rise to the top, and move more turbulently – just like a real lava lamp.
  *
  * Algorithm:
- *   Each blob has a position (x, y) and radius r.  Every frame the canvas
- *   is redrawn by evaluating the metaball scalar field at each pixel of a
- *   coarse 4×4 grid, thresholding at 1.0 to determine blob vs. fluid.
- *   Blobs float up when below mid-height and sink when above, with small
- *   random perturbations to keep things interesting.
+ *   Each blob has a position (x, y) and radius r.  Every ~50 ms the canvas
+ *   is redrawn by evaluating the metaball scalar field on a coarse 4×4 grid.
+ *   Blob buoyancy is biased upward when heat is high and downward when idle.
+ *   Speed and turbulence both scale linearly with the smoothed CPU heat.
  *
- * Configuration: color scheme, speed multiplier, blob count.
+ * System heat source: SystemMonitor.cpuUsage (smoothed exponentially).
+ * Configuration: color scheme, blob count.
  */
 Item {
     id: root
 
     readonly property string blobColor: Plasmoid.configuration.blobColor || "red"
-    readonly property real   speedMult: Math.max(0.5, Math.min(5, Plasmoid.configuration.speed || 3)) * 0.4
     readonly property int    blobCount: Math.max(2, Math.min(10, Plasmoid.configuration.blobCount || 5))
 
-    // ----- blob state (initialised when canvas is ready) -------------------
+    // ----- system heat (0 = idle, 1 = fully loaded) -------------------------
+    // Smoothed exponentially so the lamp reacts gradually to load changes.
+    property real heat: 0.1
+
+    Connections {
+        target: SystemMonitor
+        function onCpuUsageChanged() {
+            const raw = Math.min(1.0, Math.max(0.0, SystemMonitor.cpuUsage / 100.0))
+            root.heat = root.heat * 0.85 + raw * 0.15
+        }
+    }
+
+    // Speed multiplier: 0.2 at idle → 3.0 at full load
+    readonly property real speedMult: 0.2 + root.heat * 2.8
+
+    // ----- blob state -------------------------------------------------------
     property var blobs: []
 
-    // Colour helpers
-    function blobFill(field) {
-        // field: 0 (deep) → 1 (peak)
+    // ----- colour helpers (CSS strings – required for Canvas fillStyle) -----
+    function blobFillCss(intensity) {
+        // intensity: 0 (deep/dim) → 1 (peak/bright)
         switch (root.blobColor) {
         case "blue":
-            return Qt.hsla(0.58 + field * 0.06, 0.95, 0.25 + field * 0.35, 1)
+            return "hsl(" + Math.round(209 + intensity * 22) + ",95%,"
+                          + Math.round(25  + intensity * 35) + "%)"
         case "green":
-            return Qt.hsla(0.30 + field * 0.05, 0.95, 0.20 + field * 0.35, 1)
+            return "hsl(" + Math.round(108 + intensity * 18) + ",95%,"
+                          + Math.round(20  + intensity * 35) + "%)"
         case "purple":
-            return Qt.hsla(0.75 + field * 0.05, 0.90, 0.25 + field * 0.30, 1)
+            return "hsl(" + Math.round(270 + intensity * 18) + ",90%,"
+                          + Math.round(25  + intensity * 30) + "%)"
         case "rainbow":
-            return Qt.hsla(field * 0.70, 1.0, 0.30 + field * 0.25, 1)
+            return "hsl(" + Math.round(intensity * 252) + ",100%,"
+                          + Math.round(30  + intensity * 25) + "%)"
         default: // red/orange
-            return Qt.hsla(0.03 + field * 0.08, 1.0, 0.20 + field * 0.40, 1)
+            return "hsl(" + Math.round(11  + intensity * 29) + ",100%,"
+                          + Math.round(20  + intensity * 40) + "%)"
+        }
+    }
+
+    function glowCss(glow) {
+        // Soft surface glow tinted to the colour scheme.
+        // RGB components are scaled fractions of 255 chosen to match each scheme's hue.
+        switch (root.blobColor) {
+        case "blue":   // ~hsl(210): R=0, G=20%, B=50%
+            return "rgba(0,"   + Math.round(glow * 51)  + "," + Math.round(glow * 128) + "," + (glow * 0.5).toFixed(2) + ")"
+        case "green":  // ~hsl(108): R=0, G=40%, B=0
+            return "rgba(0,"   + Math.round(glow * 102) + ",0,"                               + (glow * 0.5).toFixed(2) + ")"
+        case "purple": // ~hsl(270): R=25%, G=0, B=30%
+            return "rgba(" + Math.round(glow * 64) + ",0," + Math.round(glow * 77)    + "," + (glow * 0.5).toFixed(2) + ")"
+        default:       // red/orange/rainbow: R=30%, G=5%, B=0
+            return "rgba(" + Math.round(glow * 77) + "," + Math.round(glow * 13) + ",0," + (glow * 0.5).toFixed(2) + ")"
         }
     }
 
@@ -56,18 +92,17 @@ Item {
 
     // ----- initialise blobs ------------------------------------------------
     function initBlobs() {
-        const w = canvas.width  || 64
-        const h = canvas.height || 64
-        if (w < 4 || h < 4) return
+        const w = canvas.width  > 4 ? canvas.width  : 64
+        const h = canvas.height > 4 ? canvas.height : 64
 
         let bs = []
         for (let i = 0; i < root.blobCount; i++) {
             bs.push({
-                x:  w * (0.2 + Math.random() * 0.6),
-                y:  h * (0.2 + Math.random() * 0.6),
-                r:  Math.min(w, h) * (0.12 + Math.random() * 0.12),
-                vy: (Math.random() - 0.5) * root.speedMult * 0.6,
-                vx: (Math.random() - 0.5) * root.speedMult * 0.3,
+                x:     w * (0.2 + Math.random() * 0.6),
+                y:     h * (0.55 + Math.random() * 0.35), // start in lower half
+                r:     Math.min(w, h) * (0.12 + Math.random() * 0.10),
+                vy:    -(Math.random() * 0.3),
+                vx:    (Math.random() - 0.5) * 0.2,
                 phase: Math.random() * Math.PI * 2
             })
         }
@@ -75,39 +110,41 @@ Item {
     }
 
     // ----- physics tick ----------------------------------------------------
-    function clampBlobToBounds(b, w, h) {
-        const margin = b.r * 0.5
-        if (b.x < margin)     { b.x = margin;     b.vx =  Math.abs(b.vx) * 0.5 }
-        if (b.x > w - margin) { b.x = w - margin; b.vx = -Math.abs(b.vx) * 0.5 }
-        if (b.y < margin)     { b.y = margin;     b.vy =  Math.abs(b.vy) * 0.5 }
-        if (b.y > h - margin) { b.y = h - margin; b.vy = -Math.abs(b.vy) * 0.5 }
-    }
-
     function tickBlobs() {
-        const w  = canvas.width  || 64
-        const h  = canvas.height || 64
+        if (root.blobs.length !== root.blobCount) {
+            initBlobs()
+            return
+        }
+
+        const w  = canvas.width  > 4 ? canvas.width  : 64
+        const h  = canvas.height > 4 ? canvas.height : 64
         const sm = root.speedMult
+        const ht = root.heat
 
         let bs = root.blobs.map(b => Object.assign({}, b))
         for (let i = 0; i < bs.length; i++) {
             const b = bs[i]
             b.phase += 0.05 * sm
 
-            // Buoyancy: blobs float toward their "natural" y
-            const naturalY = h * (0.25 + (i / bs.length) * 0.5)
-            const buoyancy = (naturalY - b.y) * 0.0015 * sm
-            b.vy += buoyancy
-            b.vy += Math.sin(b.phase) * 0.02 * sm  // random wobble
-            b.vx += (Math.random() - 0.5) * 0.01 * sm
+            // Natural height: cool → bottom 80%, hot → upper 20–60%
+            const naturalY = h * (0.80 - ht * 0.60)
+            b.vy += (naturalY - b.y) * 0.002 * (0.5 + sm) // buoyancy
+            b.vy += Math.sin(b.phase) * 0.015 * sm         // wobble
+            b.vx += (Math.random() - 0.5) * 0.008 * (1 + ht * 2) // turbulence
 
             // Damping
-            b.vy *= 0.98
-            b.vx *= 0.97
+            b.vy *= 0.97
+            b.vx *= 0.96
 
             b.x += b.vx * sm
             b.y += b.vy * sm
 
-            root.clampBlobToBounds(b, w, h)
+            // Clamp to canvas bounds
+            const margin = b.r * 0.4
+            if (b.x < margin)     { b.x = margin;     b.vx =  Math.abs(b.vx) * 0.5 }
+            if (b.x > w - margin) { b.x = w - margin; b.vx = -Math.abs(b.vx) * 0.5 }
+            if (b.y < margin)     { b.y = margin;     b.vy =  Math.abs(b.vy) * 0.5 }
+            if (b.y > h - margin) { b.y = h - margin; b.vy = -Math.abs(b.vy) * 0.5 }
         }
         root.blobs = bs
     }
@@ -118,8 +155,6 @@ Item {
         repeat:   true
         running:  true
         onTriggered: {
-            if (root.blobs.length !== root.blobCount)
-                root.initBlobs()
             root.tickBlobs()
             canvas.requestPaint()
         }
@@ -138,19 +173,23 @@ Item {
     Canvas {
         id: canvas
         anchors { fill: parent; margins: 2 }
+        renderTarget: Canvas.Image   // software path – reliable in all compositors
 
-        Component.onCompleted: root.initBlobs()
-
+        Component.onCompleted: {
+            root.initBlobs()
+            Qt.callLater(requestPaint)
+        }
         onWidthChanged:  root.initBlobs()
         onHeightChanged: root.initBlobs()
 
         onPaint: {
-            const ctx    = getContext("2d")
-            const w      = width,  h = height
-            const blobs  = root.blobs
+            const ctx   = getContext("2d")
+            if (!ctx) return
+            const w     = width
+            const h     = height
+            const blobs = root.blobs
 
             ctx.clearRect(0, 0, w, h)
-
             if (!blobs || blobs.length === 0) return
 
             // Coarse pixel grid – each "pixel" is step×step
@@ -158,37 +197,27 @@ Item {
 
             for (let py = 0; py < h; py += step) {
                 for (let px = 0; px < w; px += step) {
-                    // Metaball field value at (px, py)
                     let field = 0
                     for (let i = 0; i < blobs.length; i++) {
                         const dx = px - blobs[i].x
                         const dy = py - blobs[i].y
                         const r2 = blobs[i].r * blobs[i].r
                         const d2 = dx * dx + dy * dy
-                        if (d2 > 0)
-                            field += r2 / d2
+                        if (d2 > 0) field += r2 / d2
                     }
 
                     if (field >= 1.0) {
                         // Inside a blob (or merged blobs)
                         const intensity = Math.min(1, (field - 1.0) / 2.0)
-                        ctx.fillStyle = root.blobFill(intensity)
+                        ctx.fillStyle = root.blobFillCss(intensity)
                         ctx.fillRect(px, py, step, step)
                     } else {
-                        // Fluid background with slight glow near surface
+                        // Subtle surface glow
                         const glow = Math.max(0, field - 0.5) * 2
                         if (glow > 0.02) {
-                            ctx.fillStyle = Qt.rgba(
-                                glow * (root.blobColor === "blue"  ? 0.0
-                                      : root.blobColor === "green" ? 0.0 : 0.3),
-                                glow * (root.blobColor === "green" ? 0.4
-                                      : root.blobColor === "blue"  ? 0.2 : 0.05),
-                                glow * (root.blobColor === "blue"  ? 0.5 : 0.0),
-                                glow * 0.5
-                            )
+                            ctx.fillStyle = root.glowCss(glow)
                             ctx.fillRect(px, py, step, step)
                         }
-                        // else: transparent – clearRect already handled it
                     }
                 }
             }

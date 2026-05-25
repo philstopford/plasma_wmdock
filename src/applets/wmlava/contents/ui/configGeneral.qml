@@ -7,7 +7,6 @@ Item {
     id: page
 
     property string cfg_blobColor: ""
-    property int    cfg_speed:      0
     property int    cfg_blobCount:  0
 
     Kirigami.FormLayout {
@@ -35,14 +34,6 @@ Item {
                 currentIndex = 0
             }
             onActivated: page.cfg_blobColor = currentValue
-        }
-
-        QQC2.SpinBox {
-            id: speedSpinBox
-            Kirigami.FormData.label: i18n("Speed (1–5):")
-            from: 1; to: 5; stepSize: 1
-            value: page.cfg_speed
-            onValueChanged: page.cfg_speed = value
         }
 
         QQC2.SpinBox {

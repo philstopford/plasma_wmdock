@@ -24,18 +24,30 @@ Item {
     readonly property string effect:      Plasmoid.configuration.effect      || "bars"
     readonly property string colorScheme: Plasmoid.configuration.colorScheme || "green"
 
-    // ----- colour helpers --------------------------------------------------
-    function schemeColor(t) {
-        // t in [0,1]; returns a CSS colour string for the active scheme
+    // ----- colour helpers (CSS strings – required for Canvas fillStyle) ----
+    function schemeColorCss(t) {
+        // t in [0,1]; returns a CSS hsl() string for the active scheme
         switch (root.colorScheme) {
         case "blue":
-            return Qt.hsla(0.58 + t * 0.05, 0.9, 0.3 + t * 0.4, 1)
+            return "hsl(" + Math.round((0.58 + t * 0.05) * 360) + ",90%,"
+                          + Math.round((0.3 + t * 0.4) * 100) + "%)"
         case "amber":
-            return Qt.hsla(0.10 + t * 0.03, 1.0, 0.2 + t * 0.45, 1)
+            return "hsl(" + Math.round((0.10 + t * 0.03) * 360) + ",100%,"
+                          + Math.round((0.2 + t * 0.45) * 100) + "%)"
         case "rainbow":
-            return Qt.hsla(t * 0.75, 1.0, 0.35 + t * 0.2, 1)
+            return "hsl(" + Math.round(t * 0.75 * 360) + ",100%,"
+                          + Math.round((0.35 + t * 0.2) * 100) + "%)"
         default: // green
-            return Qt.hsla(0.33 - t * 0.08, 1.0, 0.15 + t * 0.4, 1)
+            return "hsl(" + Math.round((0.33 - t * 0.08) * 360) + ",100%,"
+                          + Math.round((0.15 + t * 0.4) * 100) + "%)"
+        }
+    }
+
+    function ringColorCss(alpha) {
+        switch (root.colorScheme) {
+        case "blue":   return "rgba(26,153,255,"  + alpha.toFixed(2) + ")"
+        case "amber":  return "rgba(255,128,0,"   + alpha.toFixed(2) + ")"
+        default:       return "rgba(26,230,26,"   + alpha.toFixed(2) + ")"
         }
     }
 
@@ -152,7 +164,7 @@ Item {
         id: titleText
         anchors { top: parent.top; horizontalCenter: parent.horizontalCenter; topMargin: 1 }
         text: "VIZ"
-        color: root.schemeColor(0.8)
+        color: root.schemeColorCss(0.8)
         font { pixelSize: parent.height * 0.10; family: "monospace"; bold: true }
     }
 
@@ -169,9 +181,13 @@ Item {
             rightMargin:  3
             bottomMargin: 3
         }
+        renderTarget: Canvas.Image   // software path – reliable in all compositors
+
+        Component.onCompleted: Qt.callLater(requestPaint)
 
         onPaint: {
             const ctx = getContext("2d")
+            if (!ctx) return
             ctx.clearRect(0, 0, width, height)
 
             switch (root.effect) {
@@ -193,8 +209,7 @@ Item {
             for (let i = 0; i < N; i++) {
                 const frac  = bh[i]
                 const barH  = Math.max(1, frac * h)
-                const t     = frac
-                ctx.fillStyle = root.schemeColor(t)
+                ctx.fillStyle = root.schemeColorCss(frac)
                 ctx.fillRect(Math.round(i * (bw + 1)), h - barH, Math.max(1, Math.floor(bw)), barH)
             }
 
@@ -214,7 +229,7 @@ Item {
             const mid  = h / 2
             const step = w / (hist.length - 1)
 
-            ctx.strokeStyle = root.schemeColor(root.smoothVol)
+            ctx.strokeStyle = root.schemeColorCss(root.smoothVol)
             ctx.lineWidth   = 1.5
             ctx.beginPath()
             for (let i = 0; i < hist.length; i++) {
@@ -226,7 +241,7 @@ Item {
             ctx.stroke()
 
             // Centre line
-            ctx.strokeStyle = root.schemeColor(0.2)
+            ctx.strokeStyle = root.schemeColorCss(0.2)
             ctx.lineWidth   = 0.5
             ctx.beginPath()
             ctx.moveTo(0, mid); ctx.lineTo(w, mid)
@@ -240,12 +255,7 @@ Item {
 
             for (let i = 0; i < rings.length; i++) {
                 const ring = rings[i]
-                ctx.strokeStyle = Qt.rgba(
-                    root.colorScheme === "blue"  ? 0.1 : root.colorScheme === "amber" ? 1.0 : 0.1,
-                    root.colorScheme === "amber" ? 0.5 : root.colorScheme === "blue"  ? 0.6 : 0.9,
-                    root.colorScheme === "blue"  ? 1.0 : root.colorScheme === "amber" ? 0.0 : 0.1,
-                    ring.alpha
-                )
+                ctx.strokeStyle = root.ringColorCss(ring.alpha)
                 ctx.lineWidth = 1.5
                 ctx.beginPath()
                 ctx.arc(cx, cy, ring.r, 0, 2 * Math.PI)
@@ -254,7 +264,7 @@ Item {
 
             // Central dot (volume indicator)
             const r = Math.max(2, root.smoothVol * Math.min(cx, cy) * 0.4)
-            ctx.fillStyle = root.schemeColor(root.smoothVol)
+            ctx.fillStyle = root.schemeColorCss(root.smoothVol)
             ctx.beginPath()
             ctx.arc(cx, cy, r, 0, 2 * Math.PI)
             ctx.fill()
@@ -276,7 +286,7 @@ Item {
                               Math.sin((nx + ny) * 4 + t * 0.7) +
                               Math.sin(Math.sqrt(nx * nx + ny * ny) * 8 + t * vol * 2)
                     const norm = (v + 4) / 8    // 0–1
-                    ctx.fillStyle = root.schemeColor(norm)
+                    ctx.fillStyle = root.schemeColorCss(norm)
                     ctx.fillRect(x, y, step, step)
                 }
             }

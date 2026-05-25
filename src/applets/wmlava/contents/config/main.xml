@@ -9,10 +9,6 @@
       <label>Blob color scheme</label>
       <default>red</default>
     </entry>
-    <entry name="speed" type="Int">
-      <label>Animation speed (1=slow, 5=fast)</label>
-      <default>3</default>
-    </entry>
     <entry name="blobCount" type="Int">
       <label>Number of blobs</label>
       <default>5</default>
