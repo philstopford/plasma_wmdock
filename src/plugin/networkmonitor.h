@@ -51,8 +51,8 @@ public:
     double       txMaxRate()      const { return m_txMax; }
     QVariantList allIfaceStats()  const;
     int          updateInterval() const;
-    void         setIface(const QString &iface);
-    void         setUpdateInterval(int ms);
+    Q_INVOKABLE void setIface(const QString &iface);
+    Q_INVOKABLE void setUpdateInterval(int ms);
 
 Q_SIGNALS:
     void ifaceChanged();
