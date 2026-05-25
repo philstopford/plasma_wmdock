@@ -142,7 +142,7 @@ void GpuMonitor::update()
 {
     if (m_ticksUntilRescan <= 0) {
         scanGpus();
-        m_ticksUntilRescan = 15;   // rescan topology roughly every 30 seconds
+        m_ticksUntilRescan = 15;   // rescan topology every 30 seconds
     } else {
         --m_ticksUntilRescan;
     }
