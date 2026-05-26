@@ -21,6 +21,9 @@ Item {
                 { text: i18n("Scope"),      value: "wave"     },
                 { text: i18n("Starfield"),  value: "circles"  },
                 { text: i18n("Tunnel"),     value: "plasma"   },
+                { text: i18n("Terrain"),    value: "terrain"  },
+                { text: i18n("Vortex"),     value: "vortex"   },
+                { text: i18n("Warp"),       value: "warp"     },
             ]
             textRole:  "text"
             valueRole: "value"

@@ -6,13 +6,18 @@ import org.kde.plasma.private.wmdock 1.0
 /**
  * WMViz – Audio spectrum visualizer backed by CAVA (via AudioSpectrum).
  *
- * Four MilkDrop-inspired effects driven by real spectral data:
+ * Seven MilkDrop-inspired effects driven by real spectral data:
  *
  *   bars      – classic spectrum analyser with per-bar peak markers
  *   wave      – radial scope: 16 bands plotted as a rotating petal blob
  *   circles   – starfield: per-band particles fired in radial directions
- *   plasma    – tunnel:    concentric circles zooming from centre, speed
- *               driven by bass energy
+ *   plasma    – tunnel:    concentric circles zooming from centre
+ *   terrain   – pseudo-3D spectral landscape flyover scrolling toward viewer;
+ *               each of the 16 bands drives a hill height with perspective
+ *   vortex    – spectrally-deformed spinning tunnel; each of 10 ring slices is
+ *               a 16-vertex polygon whose vertices are pushed out by their band
+ *   warp      – 16 glowing radial beams (one per band) shooting from centre,
+ *               triple-layer glow with beat bursts; hyperspace / warp effect
  *
  * All effects react to beat transients (white flash) detected by the
  * AudioSpectrumMonitor C++ singleton.
@@ -63,6 +68,7 @@ Item {
     readonly property real particleLifeDecay:  0.028 // life lost per tick (~35 ticks = 1.4 s)
     readonly property real particleSpawnThresh:0.08  // minimum band energy to spawn
     readonly property real particleSpawnProb:  0.4   // probability multiplier per band
+    readonly property int  numBands:           16    // CAVA band count
 
     // ----- bars state -------------------------------------------------------
     property var peakBands: []
@@ -76,9 +82,23 @@ Item {
     // ----- tunnel (plasma) state --------------------------------------------
     property var tunnelRings: []
 
+    // ----- terrain state ----------------------------------------------------
+    // Each entry is a snapshot of 16 band values; index 0 = newest (nearest).
+    property var terrainHistory: []
+    readonly property int terrainMaxRows: 24
+
+    // ----- vortex state -----------------------------------------------------
+    property real vortexAngle: 0
+
+    // ----- warp state -------------------------------------------------------
+    // Per-band beam length in 0-1; each beam immediately jumps up when its
+    // band energy rises and then decays exponentially.
+    property var warpLengths: []
+
     Component.onCompleted: {
-        peakBands = new Array(16).fill(0)
-        bandVals  = new Array(16).fill(0)
+        peakBands   = new Array(numBands).fill(0)
+        bandVals    = new Array(numBands).fill(0)
+        warpLengths = new Array(numBands).fill(0)
     }
 
     // ----- beat → flash ------------------------------------------------------
@@ -119,6 +139,9 @@ Item {
             case "wave":    tickScope();   break
             case "circles": tickStars();   break
             case "plasma":  tickTunnel();  break
+            case "terrain": tickTerrain(); break
+            case "vortex":  tickVortex();  break
+            case "warp":    tickWarp();    break
             default:        tickBars();    break
             }
 
@@ -210,6 +233,40 @@ Item {
         root.tunnelRings = rings
     }
 
+    // ----- terrain tick -------------------------------------------------------
+    function tickTerrain() {
+        const snap = (root.bandVals && root.bandVals.length === root.numBands)
+                     ? root.bandVals.slice() : new Array(root.numBands).fill(0)
+        // Mutate in place to avoid creating a new array every frame.
+        let hist = root.terrainHistory
+        hist.unshift(snap)
+        if (hist.length > root.terrainMaxRows)
+            hist.pop()
+        root.terrainHistory = hist
+    }
+
+    // ----- vortex tick --------------------------------------------------------
+    function tickVortex() {
+        const rotSpeed = 0.018 + root.rms * 0.045 + (root.gotBeat ? 0.14 : 0)
+        root.vortexAngle = (root.vortexAngle + rotSpeed) % (2 * Math.PI)
+    }
+
+    // ----- warp tick ----------------------------------------------------------
+    function tickWarp() {
+        const bands     = root.bandVals
+        const decayRate = 0.90
+        const boom      = root.gotBeat ? 1.5 : 1.0
+        // Reuse the existing array when possible; only allocate on first call.
+        let lens = root.warpLengths
+        if (lens.length !== root.numBands)
+            lens = new Array(root.numBands).fill(0)
+        for (let i = 0; i < root.numBands; i++) {
+            const target = Math.min(1, (bands[i] || 0) * (1 + root.bass * 0.8) * boom)
+            lens[i] = Math.max(target, lens[i] * decayRate)
+        }
+        root.warpLengths = lens
+    }
+
     // ----- background -------------------------------------------------------
     Rectangle {
         anchors.fill: parent
@@ -254,6 +311,9 @@ Item {
             case "wave":    paintScope(ctx);   break
             case "circles": paintStars(ctx);   break
             case "plasma":  paintTunnel(ctx);  break
+            case "terrain": paintTerrain(ctx); break
+            case "vortex":  paintVortex(ctx);  break
+            case "warp":    paintWarp(ctx);    break
             default:        paintBars(ctx);    break
             }
 
@@ -364,6 +424,151 @@ Item {
                 ctx.arc(cx, cy, radius, 0, 2 * Math.PI)
                 ctx.stroke()
             }
+        }
+
+        // ---- terrain (pseudo-3D spectral landscape flyover) ------------------
+        function paintTerrain(ctx) {
+            const w        = width,  h = height
+            const history  = root.terrainHistory
+            const numRows  = history.length
+            if (numRows === 0) return
+
+            const horizonY = h * 0.30
+
+            // Draw from farthest row (near horizon) to nearest (bottom canvas).
+            // In terrainHistory index 0 is NEWEST (nearest), numRows-1 is OLDEST.
+            for (let r = numRows - 1; r >= 0; r--) {
+                const t     = r / Math.max(1, numRows - 1) // 0=nearest, 1=farthest
+                const baseY = h - t * (h - horizonY)       // ground baseline
+                const rowW  = w * (1.0 - t * 0.60)         // narrower at horizon
+                const xOff  = (w - rowW) / 2
+                const maxH  = (baseY - horizonY) * 0.88    // max hill height
+
+                const row = history[r]
+                ctx.beginPath()
+                ctx.moveTo(xOff, baseY)
+                for (let i = 0; i < root.numBands; i++) {
+                    const xPos = xOff + i * rowW / Math.max(1, root.numBands - 1) // spread numBands points across [0, rowW]
+                    const yPos = baseY - (row[i] || 0) * maxH
+                    ctx.lineTo(xPos, yPos)
+                }
+                ctx.lineTo(xOff + rowW, baseY)
+                ctx.closePath()
+
+                const energy = row.reduce((s, v) => s + v, 0) / root.numBands
+                const alpha  = 0.12 + (1 - t) * 0.70
+                ctx.fillStyle   = root.withAlpha(
+                    root.schemeColorCss((1 - t) * 0.55 + energy * 0.45), alpha)
+                ctx.fill()
+
+                // Wireframe ridge line on top of each terrain slice
+                ctx.strokeStyle = root.withAlpha(root.schemeColorCss(1 - t), (1 - t) * 0.55)
+                ctx.lineWidth   = 0.6
+                ctx.stroke()
+            }
+
+            // Horizon rule
+            ctx.strokeStyle = root.schemeColorCss(0.65)
+            ctx.lineWidth   = 0.5
+            ctx.beginPath()
+            ctx.moveTo(0, horizonY); ctx.lineTo(w, horizonY)
+            ctx.stroke()
+        }
+
+        // ---- vortex (spectrally-deformed spinning tunnel) --------------------
+        function paintVortex(ctx) {
+            const w       = width,  h  = height
+            const cx      = w / 2,  cy = h / 2
+            const N       = 16      // polygon vertices per ring
+            const numRings = 10
+            const maxR    = Math.min(cx, cy) * 0.92
+            const bands   = root.bandVals
+
+            // Draw innermost (vanishing point) first, outermost last.
+            for (let ring = numRings - 1; ring >= 0; ring--) {
+                // depth 0 = outermost ring (viewer side); 1 = innermost (vanishing)
+                const depth  = ring / numRings
+                const scaleR = 1.0 - depth * 0.92
+                const baseR  = maxR * scaleR
+
+                // Alternating twist direction gives the tunnel a braided look.
+                const twist = root.vortexAngle * (ring % 2 === 0 ? 1 : -1.3)
+                              + depth * 1.2   // extra angular offset per depth
+
+                ctx.beginPath()
+                for (let v = 0; v <= N; v++) {
+                    const idx    = v % N
+                    const angle  = (2 * Math.PI * idx / N) + twist
+                    // Vertices displaced outward by their matching spectral band.
+                    const deform = (bands[idx] || 0) * 0.55 * (1 - depth * 0.4)
+                    const r      = baseR * (1 + deform)
+                    const x      = cx + Math.cos(angle) * r
+                    const y      = cy + Math.sin(angle) * r
+                    if (v === 0) ctx.moveTo(x, y)
+                    else         ctx.lineTo(x, y)
+                }
+                ctx.closePath()
+
+                const alpha = 0.12 + (1 - depth) * 0.68
+                ctx.strokeStyle = root.withAlpha(
+                    root.schemeColorCss(root.treble * 0.3 + depth * 0.7), alpha)
+                ctx.lineWidth = Math.max(0.5, (1 - depth) * 2.2)
+                ctx.stroke()
+            }
+
+            // Vanishing-point glow pulsed by RMS
+            if (root.rms > 0.04) {
+                const glowR = Math.max(1.5, root.rms * 5)
+                ctx.fillStyle = root.withAlpha(root.schemeColorCss(root.treble), 0.75)
+                ctx.beginPath()
+                ctx.arc(cx, cy, glowR, 0, 2 * Math.PI)
+                ctx.fill()
+            }
+        }
+
+        // ---- warp (radial beam hyperspace) -----------------------------------
+        function paintWarp(ctx) {
+            const w      = width,  h  = height
+            const cx     = w / 2,  cy = h / 2
+            const maxLen = Math.min(cx, cy) * 0.93
+            const lens   = root.warpLengths
+            if (!lens || lens.length < root.numBands) return
+
+            for (let i = 0; i < root.numBands; i++) {
+                const len = (lens[i] || 0) * maxLen
+                if (len < 1.5) continue
+
+                // Beams start at 12 o'clock and fan clockwise around 360°.
+                const angle = 2 * Math.PI * i / root.numBands - Math.PI / 2
+                const x2   = cx + Math.cos(angle) * len
+                const y2   = cy + Math.sin(angle) * len
+                const col  = root.schemeColorCss(i / root.numBands)
+
+                // Triple-layer glow: wide halo → mid beam → bright core
+                ctx.lineWidth   = 6
+                ctx.strokeStyle = root.withAlpha(col, 0.12)
+                ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(x2, y2); ctx.stroke()
+
+                ctx.lineWidth   = 2.5
+                ctx.strokeStyle = root.withAlpha(col, 0.50)
+                ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(x2, y2); ctx.stroke()
+
+                ctx.lineWidth   = 0.8
+                ctx.strokeStyle = col
+                ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(x2, y2); ctx.stroke()
+
+                // Tip sparkle dot
+                const ts = Math.max(1.0, lens[i] * 3)
+                ctx.fillStyle = "#ffffff"
+                ctx.fillRect(x2 - ts * 0.5, y2 - ts * 0.5, ts, ts)
+            }
+
+            // Pulsing core dot
+            const coreR = Math.max(1.5, root.rms * 5)
+            ctx.fillStyle = root.schemeColorCss(0.85)
+            ctx.beginPath()
+            ctx.arc(cx, cy, coreR, 0, 2 * Math.PI)
+            ctx.fill()
         }
     }
 }
