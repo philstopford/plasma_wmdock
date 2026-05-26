@@ -6,15 +6,22 @@ import org.kde.plasma.private.wmdock 1.0
 /**
  * WMLava – Lava lamp simulation driven by system heat.
  *
- * Renders metaball-style blobs that float inside a glass container.
- * At idle the blobs rest at the bottom; as CPU load rises they heat up,
- * rise to the top, and move more turbulently – just like a real lava lamp.
+ * Renders metaball-style blobs that flow inside a glass container.
+ * The outer walls are modelled as colder, creating a convective circulation:
+ * the central column rises while the wall columns sink, with horizontal return
+ * flow at top and bottom – like a classic convection cell.
+ * As CPU load rises, blobs move faster and more turbulently.
+ * Nearby blobs merge (area-weighted, momentum-conserving); large blobs split.
  *
  * Algorithm:
- *   Each blob has a position (x, y) and radius r.  Every ~50 ms the canvas
- *   is redrawn by evaluating the metaball scalar field on a coarse 4×4 grid.
- *   Blob buoyancy is biased upward when heat is high and downward when idle.
- *   Speed and turbulence both scale linearly with the smoothed CPU heat.
+ *   Each blob has a position (x, y), radius r, velocity (vx, vy) and a phase
+ *   offset for organic wobble.  Every ~50 ms the canvas is redrawn by
+ *   evaluating the metaball scalar field on a coarse 4×4 pixel grid.
+ *   Forces applied each tick:
+ *     • Convective vortex  – cold-wall driven circulation (dominant)
+ *     • Residual buoyancy  – overall upward push scaled by heat
+ *     • Organic wobble     – sinusoidal perturbation
+ *     • Random turbulence  – small stochastic kick
  *
  * System heat source: SystemMonitor.cpuUsage (smoothed exponentially).
  * Configuration: color scheme, blob count.
@@ -111,41 +118,147 @@ Item {
 
     // ----- physics tick ----------------------------------------------------
     function tickBlobs() {
-        if (root.blobs.length !== root.blobCount) {
-            initBlobs()
-            return
-        }
+        if (root.blobs.length === 0) { initBlobs(); return }
 
         const w  = canvas.width  > 4 ? canvas.width  : 64
         const h  = canvas.height > 4 ? canvas.height : 64
+        const cx = w / 2,  cy = h / 2
         const sm = root.speedMult
         const ht = root.heat
+        // Blob radius bounds (fraction of shorter side)
+        const minR = Math.min(w, h) * 0.08
+        const maxR = Math.min(w, h) * 0.30
 
+        // Physics tuning constants
+        // xn² > RISE_THRESHOLD → blob is in wall region and sinks; < threshold → rises
+        const RISE_THRESHOLD       = 0.28   // centre fraction² that rises (≈53% width)
+        const MERGE_THRESH_FACTOR  = 0.70   // merge when dist < factor * (r_a + r_b)
+        const SPLIT_POS_OFFSET     = 0.40   // daughter centre offset as fraction of new r
+        const SPLIT_VEL_KICK       = 0.35   // speed imparted to each daughter on split
+
+        // Deep-copy so QML property binding fires on reassignment.
         let bs = root.blobs.map(b => Object.assign({}, b))
+
+        // ── 1. Forces ─────────────────────────────────────────────────────────
         for (let i = 0; i < bs.length; i++) {
             const b = bs[i]
-            b.phase += 0.05 * sm
+            b.phase += 0.04 * sm
 
-            // Natural height: cool → bottom 80%, hot → upper 20–60%
-            const naturalY = h * (0.80 - ht * 0.60)
-            b.vy += (naturalY - b.y) * 0.002 * (0.5 + sm) // buoyancy
-            b.vy += Math.sin(b.phase) * 0.015 * sm         // wobble
-            b.vx += (Math.random() - 0.5) * 0.008 * (1 + ht * 2) // turbulence
+            // Normalised position: -1 = left/top wall, +1 = right/bottom wall
+            const xn = (b.x - cx) / Math.max(1, cx)
+            const yn = (b.y - cy) / Math.max(1, cy)
 
-            // Damping
-            b.vy *= 0.97
+            // Convective circulation driven by cold outer walls:
+            //  • Vertical: central column rises (xn≈0 → up), wall columns sink (|xn|≈1 → down)
+            //  • Horizontal: outward near top (yn<0), inward near bottom (yn>0)
+            // heightZoneFactor clamps yn to [-1,1] with a 3× amplification so only
+            // the outer thirds of the vertical extent drive horizontal return flow.
+            const heightZoneFactor = Math.max(-1, Math.min(1, yn * 3))
+            b.vx -= 0.06 * ht * xn * heightZoneFactor          // horizontal return flow
+            b.vy += 0.06 * ht * (xn * xn - RISE_THRESHOLD)     // up at centre, down at walls
+
+            // Residual heat buoyancy (all hot blobs want to rise a little)
+            b.vy -= ht * 0.003
+
+            // Organic wobble
+            b.vy += Math.sin(b.phase * 1.1) * 0.008 * sm
+            b.vx += Math.cos(b.phase * 0.7) * 0.005 * sm
+
+            // Small random turbulence
+            b.vx += (Math.random() - 0.5) * 0.004 * (1 + ht)
+            b.vy += (Math.random() - 0.5) * 0.003 * (1 + ht)
+
+            // Velocity damping
             b.vx *= 0.96
+            b.vy *= 0.96
 
+            // Integrate position
             b.x += b.vx * sm
             b.y += b.vy * sm
 
-            // Clamp to canvas bounds
-            const margin = b.r * 0.4
-            if (b.x < margin)     { b.x = margin;     b.vx =  Math.abs(b.vx) * 0.5 }
-            if (b.x > w - margin) { b.x = w - margin; b.vx = -Math.abs(b.vx) * 0.5 }
-            if (b.y < margin)     { b.y = margin;     b.vy =  Math.abs(b.vy) * 0.5 }
-            if (b.y > h - margin) { b.y = h - margin; b.vy = -Math.abs(b.vy) * 0.5 }
+            // Elastic bounce off container walls
+            const margin = b.r * 0.30
+            if (b.x < margin)     { b.x = margin;     b.vx =  Math.abs(b.vx) * 0.50 }
+            if (b.x > w - margin) { b.x = w - margin; b.vx = -Math.abs(b.vx) * 0.50 }
+            if (b.y < margin)     { b.y = margin;     b.vy =  Math.abs(b.vy) * 0.50 }
+            if (b.y > h - margin) { b.y = h - margin; b.vy = -Math.abs(b.vy) * 0.50 }
         }
+
+        // ── 2. Merging ────────────────────────────────────────────────────────
+        // When two blob centres are within MERGE_THRESH_FACTOR*(r_a+r_b), absorb
+        // the smaller into the larger (area-weighted, momentum-conserving).
+        const absorbed = new Array(bs.length).fill(false)
+        const postMerge = []
+        for (let i = 0; i < bs.length; i++) {
+            if (absorbed[i]) continue
+            let a = bs[i]
+            for (let j = i + 1; j < bs.length; j++) {
+                if (absorbed[j]) continue
+                const dx    = a.x - bs[j].x
+                const dy    = a.y - bs[j].y
+                const dist2 = dx * dx + dy * dy
+                const thresh = (a.r + bs[j].r) * MERGE_THRESH_FACTOR
+                if (dist2 < thresh * thresh) {
+                    const ra2 = a.r * a.r,  rb2 = bs[j].r * bs[j].r
+                    const tot = ra2 + rb2
+                    a = {
+                        x:     (a.x  * ra2 + bs[j].x  * rb2) / tot,
+                        y:     (a.y  * ra2 + bs[j].y  * rb2) / tot,
+                        vx:    (a.vx * ra2 + bs[j].vx * rb2) / tot,
+                        vy:    (a.vy * ra2 + bs[j].vy * rb2) / tot,
+                        r:     Math.min(maxR, Math.sqrt(tot)),
+                        phase: a.phase
+                    }
+                    absorbed[j] = true
+                }
+            }
+            postMerge.push(a)
+        }
+        bs = postMerge
+
+        // ── 3. Splitting oversized blobs ──────────────────────────────────────
+        // A blob that grew beyond maxR breaks into two equal-area daughters.
+        // Only split if total count is below twice the target (prevents explosions).
+        const canSplit = bs.length < root.blobCount * 2
+        const postSplit = []
+        for (let i = 0; i < bs.length; i++) {
+            const b = bs[i]
+            if (canSplit && b.r > maxR) {
+                const nr    = b.r / Math.SQRT2
+                const angle = Math.random() * Math.PI * 2
+                const off   = nr * SPLIT_POS_OFFSET
+                postSplit.push(
+                    { x: b.x + Math.cos(angle) * off,
+                      y: b.y + Math.sin(angle) * off,
+                      r: nr,
+                      vx: b.vx + Math.cos(angle) * SPLIT_VEL_KICK,
+                      vy: b.vy + Math.sin(angle) * SPLIT_VEL_KICK,
+                      phase: b.phase },
+                    { x: b.x - Math.cos(angle) * off,
+                      y: b.y - Math.sin(angle) * off,
+                      r: nr,
+                      vx: b.vx - Math.cos(angle) * SPLIT_VEL_KICK,
+                      vy: b.vy - Math.sin(angle) * SPLIT_VEL_KICK,
+                      phase: b.phase + Math.PI }
+                )
+            } else {
+                postSplit.push(b)
+            }
+        }
+        bs = postSplit
+
+        // ── 4. Respawn when blobs are lost to repeated merging ─────────────────
+        while (bs.length < root.blobCount) {
+            bs.push({
+                x:     w * (0.25 + Math.random() * 0.50),
+                y:     h * (0.55 + Math.random() * 0.38),
+                r:     Math.max(minR, Math.min(maxR * 0.6, Math.min(w, h) * (0.09 + Math.random() * 0.09))),
+                vx:    (Math.random() - 0.5) * 0.20,
+                vy:   -(Math.random() * 0.25),
+                phase: Math.random() * Math.PI * 2
+            })
+        }
+
         root.blobs = bs
     }
 
