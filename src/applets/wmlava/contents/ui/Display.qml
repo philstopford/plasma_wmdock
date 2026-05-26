@@ -232,7 +232,7 @@ Item {
         gradient: Gradient {
             orientation: Gradient.Horizontal
             GradientStop { position: 0.0; color: "transparent" }
-            GradientStop { position: 0.5; color: Qt.rgba(1, 1, 1, 0.18) }
+            GradientStop { position: 0.5; color: "#2effffff" }
             GradientStop { position: 1.0; color: "transparent" }
         }
     }

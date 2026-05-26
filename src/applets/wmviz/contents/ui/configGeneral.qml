@@ -18,9 +18,9 @@ Item {
             Kirigami.FormData.label: i18n("Visualization effect:")
             model: [
                 { text: i18n("Bars"),       value: "bars"     },
-                { text: i18n("Waveform"),   value: "wave"     },
-                { text: i18n("Circles"),    value: "circles"  },
-                { text: i18n("Plasma"),     value: "plasma"   },
+                { text: i18n("Scope"),      value: "wave"     },
+                { text: i18n("Starfield"),  value: "circles"  },
+                { text: i18n("Tunnel"),     value: "plasma"   },
             ]
             textRole:  "text"
             valueRole: "value"

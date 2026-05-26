@@ -6,6 +6,7 @@
 #include "networkmonitor.h"
 #include "batterymonitor.h"
 #include "audiomanager.h"
+#include "audiospectrummonitor.h"
 #include "weatherprovider.h"
 #include "desktopfilereader.h"
 #include "processlauncher.h"
@@ -43,6 +44,11 @@ void WMDockPlugin::registerTypes(const char *uri)
     qmlRegisterSingletonType<AudioManager>(uri, 1, 0, "AudioManager",
         [](QQmlEngine *, QJSEngine *) -> QObject * {
             return new AudioManager();
+        });
+
+    qmlRegisterSingletonType<AudioSpectrumMonitor>(uri, 1, 0, "AudioSpectrum",
+        [](QQmlEngine *, QJSEngine *) -> QObject * {
+            return new AudioSpectrumMonitor();
         });
 
     qmlRegisterType<WeatherProvider>(uri, 1, 0, "WeatherProvider");

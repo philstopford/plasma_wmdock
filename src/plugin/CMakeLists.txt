@@ -6,6 +6,7 @@ set(PLUGIN_SOURCES
     networkmonitor.cpp
     batterymonitor.cpp
     audiomanager.cpp
+    audiospectrummonitor.cpp
     weatherprovider.cpp
     thermalmonitor.cpp
     storagemonitor.cpp
