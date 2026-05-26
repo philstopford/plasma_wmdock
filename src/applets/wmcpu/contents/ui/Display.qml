@@ -19,6 +19,7 @@ Item {
     // Rolling history (filled left→right, newest on right)
     property int histLen: Plasmoid.configuration.histLen ?? 50
     property var history: []
+    readonly property bool showTitle: Plasmoid.configuration.showTitle ?? true
 
     // Core usage (array of 0–100 values)
     property var coreUsage: SystemMonitor.cpuCoreUsage
@@ -54,19 +55,43 @@ Item {
     }
 
     // -----------------------------------------------------------------------
+    // Title
+    // -----------------------------------------------------------------------
+    Text {
+        id: titleText
+        visible: root.showTitle
+        anchors {
+            top:        parent.top
+            left:       parent.left
+            right:      parent.right
+            topMargin:  2
+            leftMargin: 3
+            rightMargin: 3
+        }
+        text: "CPU"
+        color: "#00aa44"
+        font { pixelSize: parent.height * 0.12; family: "monospace"; bold: true }
+        horizontalAlignment: Text.AlignHCenter
+        height: visible ? implicitHeight : 0
+    }
+
+    // -----------------------------------------------------------------------
     // Per-core bars (thin strip at top)
     // -----------------------------------------------------------------------
     Canvas {
         id: coreBar
         anchors {
-            top:        parent.top
-            left:       parent.left
-            right:      parent.right
-            topMargin:  3
-            leftMargin: 3
+            top:         root.showTitle ? titleText.bottom : parent.top
+            left:        parent.left
+            right:       parent.right
+            topMargin:   root.showTitle ? 1 : 3
+            leftMargin:  3
             rightMargin: 3
         }
         height: Math.max(4, Math.ceil(SystemMonitor.cpuCoreCount / 4) * 4)
+
+        onWidthChanged:  Qt.callLater(requestPaint)
+        onHeightChanged: Qt.callLater(requestPaint)
 
         onPaint: {
             const ctx = getContext("2d")
@@ -105,6 +130,9 @@ Item {
             rightMargin: 3
             bottomMargin: 2
         }
+
+        onWidthChanged:  Qt.callLater(requestPaint)
+        onHeightChanged: Qt.callLater(requestPaint)
 
         onPaint: {
             const ctx  = getContext("2d")

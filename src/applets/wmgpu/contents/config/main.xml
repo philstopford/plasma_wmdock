@@ -11,5 +11,9 @@
     <entry name="cycleInterval" type="Int">
       <default>4</default>
     </entry>
+    <entry name="showTitle" type="Bool">
+      <label>Show GPU name title</label>
+      <default>true</default>
+    </entry>
   </group>
 </kcfg>

@@ -179,9 +179,7 @@ Item {
             topMargin:    6
             bottomMargin: 2
         }
-        width:  Math.min(implicitWidth, parent.width - 12)
-        height: width
-        source: drawerIcon
+        width:  height
         isMask: false
     }
 
@@ -488,8 +486,7 @@ Item {
                         topMargin:    5
                         bottomMargin: 1
                     }
-                    width:  Math.min(implicitWidth, parent.width - 10)
-                    height: width
+                    width:  height
                     source: model.icon || "application-x-executable"
                     isMask: false
                 }

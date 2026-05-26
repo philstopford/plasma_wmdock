@@ -6,10 +6,6 @@
   <kcfgfile name=""/>
 
   <group name="General">
-    <entry name="histLen" type="Int">
-      <label>Number of history samples in the CPU graph</label>
-      <default>50</default>
-    </entry>
     <entry name="showTitle" type="Bool">
       <label>Show title text</label>
       <default>true</default>

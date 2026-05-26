@@ -37,6 +37,9 @@ Item {
     // Cycle interval in seconds
     property int  externalCycleInterval: 4
 
+    // Show "NET" title text at top
+    readonly property bool showTitle: Plasmoid.configuration.showTitle ?? true
+
     // -----------------------------------------------------------------------
     // Derived state
     // -----------------------------------------------------------------------
@@ -175,12 +178,38 @@ Item {
     }
 
     // -----------------------------------------------------------------------
+    // Title
+    // -----------------------------------------------------------------------
+    Text {
+        id: titleText
+        visible: root.showTitle
+        anchors {
+            top:        parent.top
+            left:       parent.left
+            right:      parent.right
+            topMargin:  2
+            leftMargin: 3
+            rightMargin: 3
+        }
+        text: "NET"
+        color: "#00aaff"
+        font { pixelSize: parent.height * 0.12; family: "monospace"; bold: true }
+        horizontalAlignment: Text.AlignHCenter
+        height: visible ? implicitHeight : 0
+    }
+
+    // -----------------------------------------------------------------------
     // Single / cycle mode: scrolling dual-channel graph
     // -----------------------------------------------------------------------
     Item {
         id: singleView
         visible: root.useSingleDisplay
-        anchors.fill: parent
+        anchors {
+            top:    root.showTitle ? titleText.bottom : parent.top
+            left:   parent.left
+            right:  parent.right
+            bottom: parent.bottom
+        }
 
         Canvas {
             id: graph
@@ -194,6 +223,9 @@ Item {
                 rightMargin:  3
                 bottomMargin: 2
             }
+
+            onWidthChanged:  Qt.callLater(requestPaint)
+            onHeightChanged: Qt.callLater(requestPaint)
 
             onPaint: {
                 const ctx = getContext("2d")
@@ -260,20 +292,17 @@ Item {
     Item {
         id: multiView
         visible: !root.useSingleDisplay
-        anchors.fill: parent
+        anchors {
+            top:    root.showTitle ? titleText.bottom : parent.top
+            left:   parent.left
+            right:  parent.right
+            bottom: parent.bottom
+        }
 
         Column {
             anchors { fill: parent; margins: 2 }
             spacing: 1
             clip: true
-
-            Text {
-                width: parent.width
-                text: "NET"
-                color: "#00aaff"
-                font { pixelSize: root.height * 0.11; family: "monospace"; bold: true }
-                horizontalAlignment: Text.AlignHCenter
-            }
 
             // One row per effective interface; model is interface names (changes
             // rarely), so Repeater structure is stable across 1-second stat ticks.

@@ -17,6 +17,7 @@ Item {
     property var  cfg_ifaces:        []
     property bool cfg_cycleMode:     false
     property int  cfg_cycleInterval: 0
+    property bool cfg_showTitle:     true
 
     Kirigami.FormLayout {
         anchors.left:  parent.left
@@ -77,6 +78,12 @@ Item {
 
             value: Math.max(1, page.cfg_cycleInterval || 4)
             onValueChanged: page.cfg_cycleInterval = value
+        }
+
+        QQC2.CheckBox {
+            Kirigami.FormData.label: i18n("Show title:")
+            checked: page.cfg_showTitle
+            onToggled: page.cfg_showTitle = checked
         }
     }
 }

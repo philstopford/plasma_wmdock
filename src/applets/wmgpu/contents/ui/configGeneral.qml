@@ -8,7 +8,8 @@ Item {
     id: page
 
     property string cfg_gpu: ""
-    property int cfg_cycleInterval: 0
+    property int    cfg_cycleInterval: 0
+    property bool   cfg_showTitle: true
 
     Kirigami.FormLayout {
         anchors.left: parent.left
@@ -50,6 +51,12 @@ Item {
             stepSize: 1
             value: Math.max(1, page.cfg_cycleInterval)
             onValueChanged: page.cfg_cycleInterval = value
+        }
+
+        QQC2.CheckBox {
+            Kirigami.FormData.label: i18n("Show GPU name:")
+            checked: page.cfg_showTitle
+            onToggled: page.cfg_showTitle = checked
         }
     }
 }

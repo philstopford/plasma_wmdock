@@ -9,6 +9,7 @@ Item {
     readonly property string configuredGpu: Plasmoid.configuration.gpu || ""
     readonly property int cycleIntervalSec: Math.max(1, Plasmoid.configuration.cycleInterval || 4)
     readonly property real barLabelScale: 0.52
+    readonly property bool showTitle: Plasmoid.configuration.showTitle ?? true
 
     property int gpuIndex: 0
     property var activeGpu: null
@@ -77,6 +78,7 @@ Item {
 
     Text {
         id: nameText
+        visible: root.showTitle
         anchors {
             top: parent.top
             left: parent.left
@@ -90,13 +92,14 @@ Item {
         font { pixelSize: parent.height * 0.08; family: "monospace" }
         horizontalAlignment: Text.AlignHCenter
         elide: Text.ElideRight
+        height: visible ? implicitHeight : 0
     }
 
     // GPU load bar
     Rectangle {
         id: loadBarBg
         anchors {
-            top: nameText.bottom
+            top: root.showTitle ? nameText.bottom : parent.top
             left: parent.left
             right: parent.right
             topMargin: 4

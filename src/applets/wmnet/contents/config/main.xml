@@ -21,5 +21,9 @@
     <entry name="cycleInterval" type="Int">
       <default>4</default>
     </entry>
+    <!-- Show title text at the top of the display. -->
+    <entry name="showTitle" type="Bool">
+      <default>true</default>
+    </entry>
   </group>
 </kcfg>
