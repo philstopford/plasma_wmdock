@@ -44,7 +44,9 @@ Item {
         target: SystemMonitor
         function onCpuUsageChanged() {
             const raw = Math.min(1.0, Math.max(0.0, SystemMonitor.cpuUsage / 100.0))
-            root.heat = root.heat * 0.92 + raw * 0.08
+            // Faster smoothing (tau ≈ 5 ticks / 0.25 s) so the lamp reacts
+            // promptly to load changes without jarring instant jumps.
+            root.heat = root.heat * 0.80 + raw * 0.20
         }
     }
 
@@ -148,20 +150,24 @@ Item {
 
         // ── Physics constants ─────────────────────────────────────────────────
         // Net force = BUOYANCY*temp - GRAVITY.  Breakeven temp = GRAVITY/BUOYANCY.
-        // At breakeven ≈ 0.44 the blob is neutrally buoyant.
-        const GRAVITY        = 0.08    // px/tick² downward
-        const BUOYANCY       = 0.18    // px/tick² upward at temp=1
+        // At breakeven ≈ 0.40 the blob is neutrally buoyant.
+        //
+        // Gravity is kept deliberately weak so that even cold blobs settle slowly
+        // and gently onto the floor instead of slamming into it and bouncing.
+        // The floor is a hard stop (not elastic) – cold lava rests, it doesn't bounce.
+        const GRAVITY        = 0.018   // px/tick² downward (slow gentle sink)
+        const BUOYANCY       = 0.045   // px/tick² upward at temp=1
         // Blobs with y > HEAT_ZONE_Y * h are in the bottom heat zone (canvas y
         // increases downward, so this selects the lower portion of the container).
-        const HEAT_ZONE_Y    = 0.68
-        const HEAT_RATE      = 0.022   // temp/tick gained in heat zone
-        const COOL_RATE      = 0.006   // temp/tick lost outside heat zone
-        // Drag coefficient (per tick, applied to velocity before integration)
-        const DRAG           = 0.91
+        const HEAT_ZONE_Y    = 0.60    // generous bottom zone so blobs heat reliably
+        const HEAT_RATE      = 0.030   // temp/tick gained in heat zone
+        const COOL_RATE      = 0.006   // temp/tick lost outside heat zone (symmetric with heat)
+        // Strong viscous drag so blobs move with the lazy heaviness of real lava.
+        const DRAG           = 0.88
         // Merge threshold: merge when centre distance < factor * (ra+rb)
         const MERGE_THRESH   = 0.70
         const SPLIT_OFFSET   = 0.38
-        const SPLIT_KICK     = 0.22
+        const SPLIT_KICK     = 0.10
 
         // Deep-copy so QML property binding fires on reassignment.
         let bs = root.blobs.map(b => Object.assign({}, b))
@@ -209,12 +215,19 @@ Item {
             b.x += b.vx
             b.y += b.vy
 
-            // ─ Elastic bounce off container walls ─────────────────────────────
-            const margin = b.r * 0.25
-            if (b.x < margin)     { b.x = margin;     b.vx =  Math.abs(b.vx) * 0.30 }
-            if (b.x > w - margin) { b.x = w - margin; b.vx = -Math.abs(b.vx) * 0.30 }
-            if (b.y < margin)     { b.y = margin;     b.vy =  Math.abs(b.vy) * 0.30 }
-            if (b.y > h - margin) { b.y = h - margin; b.vy = -Math.abs(b.vy) * 0.30 }
+            // ─ Wall constraints ───────────────────────────────────────────────
+            // margin: 20% of blob radius so the visible edge of the blob stays
+            // clearly within the canvas boundary at all wall contacts.
+            // Side walls: gentle elastic rebound.
+            // Top wall: gentle rebound (blobs can reach it when very hot).
+            // Bottom floor: HARD STOP – cold lava rests on the floor without
+            //   bouncing.  Any downward velocity is simply cancelled so blobs
+            //   settle smoothly and don't jiggle.
+            const margin = b.r * 0.20
+            if (b.x < margin)     { b.x = margin;     b.vx =  Math.abs(b.vx) * 0.20 }
+            if (b.x > w - margin) { b.x = w - margin; b.vx = -Math.abs(b.vx) * 0.20 }
+            if (b.y < margin)     { b.y = margin;     b.vy =  Math.abs(b.vy) * 0.15 }
+            if (b.y > h - margin) { b.y = h - margin; if (b.vy > 0) b.vy = 0 }
         }
 
         // ── 2. Merging ────────────────────────────────────────────────────────
