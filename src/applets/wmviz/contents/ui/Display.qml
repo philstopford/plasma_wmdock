@@ -358,17 +358,11 @@ Item {
     // ----- main canvas ------------------------------------------------------
     Canvas {
         id: canvas
-        anchors {
-            top:          parent.top
-            left:         parent.left
-            right:        parent.right
-            bottom:       parent.bottom
-            topMargin:    3
-            leftMargin:   3
-            rightMargin:  3
-            bottomMargin: 3
-        }
+        anchors { fill: parent; margins: 3 }
         renderTarget: Canvas.Image
+
+        onWidthChanged:  Qt.callLater(requestPaint)
+        onHeightChanged: Qt.callLater(requestPaint)
 
         Component.onCompleted: Qt.callLater(requestPaint)
 
