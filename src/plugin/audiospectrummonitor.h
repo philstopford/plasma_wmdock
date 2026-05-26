@@ -68,4 +68,10 @@ private:
     // Beat detection state
     float        m_bassHistory    = 0.0f;
     int          m_beatCooldown   = 0;
+
+    static constexpr float BEAT_THRESHOLD_MULTIPLIER = 1.4f;   // 40% above baseline
+    static constexpr float BEAT_MIN_BASS             = 0.25f;
+    static constexpr int   BEAT_COOLDOWN_FRAMES      = 7;       // ~280 ms at 25 fps
+    static constexpr float BASS_HISTORY_DECAY        = 0.88f;
+    static constexpr float BASS_HISTORY_WEIGHT       = 0.12f;
 };

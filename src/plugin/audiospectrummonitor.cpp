@@ -171,14 +171,14 @@ void AudioSpectrumMonitor::parseLine(const QByteArray &line)
     const float bassNow = static_cast<float>(m_bass);
     bool newBeat = false;
     if (m_beatCooldown <= 0
-            && bassNow > 0.25f
-            && bassNow > m_bassHistory * 1.4f) {
+            && bassNow > BEAT_MIN_BASS
+            && bassNow > m_bassHistory * BEAT_THRESHOLD_MULTIPLIER) {
         newBeat = true;
-        m_beatCooldown = 7;   // ~280 ms at 25 fps
+        m_beatCooldown = BEAT_COOLDOWN_FRAMES;
     }
     if (m_beatCooldown > 0)
         --m_beatCooldown;
-    m_bassHistory = m_bassHistory * 0.88f + bassNow * 0.12f;
+    m_bassHistory = m_bassHistory * BASS_HISTORY_DECAY + bassNow * BASS_HISTORY_WEIGHT;
 
     m_bands = newBands;
 

@@ -58,6 +58,12 @@ Item {
     property bool gotBeat:   false      // true for exactly one tick on beat
     property int  tickCount: 0
 
+    // ----- tuning constants -------------------------------------------------
+    readonly property real signalDecay:        0.88  // per-frame decay when unavailable
+    readonly property real particleLifeDecay:  0.028 // life lost per tick (~35 ticks = 1.4 s)
+    readonly property real particleSpawnThresh:0.08  // minimum band energy to spawn
+    readonly property real particleSpawnProb:  0.4   // probability multiplier per band
+
     // ----- bars state -------------------------------------------------------
     property var peakBands: []
 
@@ -101,10 +107,10 @@ Item {
                 root.bass   = AudioSpectrum.bass
                 root.treble = AudioSpectrum.treble
             } else {
-                root.bandVals = root.bandVals.map(v => v * 0.88)
-                root.rms    = root.rms    * 0.88
-                root.bass   = root.bass   * 0.88
-                root.treble = root.treble * 0.88
+                root.bandVals = root.bandVals.map(v => v * root.signalDecay)
+                root.rms    = root.rms    * root.signalDecay
+                root.bass   = root.bass   * root.signalDecay
+                root.treble = root.treble * root.signalDecay
             }
 
             root.beatFlash = Math.max(0, root.beatFlash - 0.12)
@@ -152,7 +158,7 @@ Item {
         let active = []
         for (let i = 0; i < root.stars.length; i++) {
             const s  = root.stars[i]
-            const nl = s.life - 0.028
+            const nl = s.life - root.particleLifeDecay
             if (nl > 0)
                 active.push({ x: s.x + s.vx, y: s.y + s.vy,
                              vx: s.vx, vy: s.vy, life: nl, hue: s.hue })
@@ -162,7 +168,7 @@ Item {
         if (active.length < 80) {
             for (let i = 0; i < 16; i++) {
                 const v = bands[i] || 0
-                if (v > 0.08 && Math.random() < v * 0.4) {
+                if (v > root.particleSpawnThresh && Math.random() < v * root.particleSpawnProb) {
                     const angle = 2 * Math.PI * i / 16
                     const speed = v * maxSpeed
                     active.push({ x: cx, y: cy,
