@@ -15,9 +15,11 @@ import org.kde.plasma.private.wmdock 1.0
  *   terrain   – pseudo-3D spectral landscape flyover scrolling toward viewer;
  *               each of the 16 bands drives a hill height with perspective;
  *               optional view rotation (speed: treble) and wireframe mode
- *   vortex    – spectrally-deformed spinning tunnel; each of 10 ring slices is
- *               a 16-vertex polygon whose vertices are pushed out by their band;
- *               centre drifts on a Lissajous path driven by treble / bass
+ *   vortex    – wormhole fly-through: first-person tunnel with 30 perspective
+ *               rings (32 vertices each) zooming toward viewer, 8 longitudinal
+ *               rib lines forming the tunnel walls, helix centreline driven by
+ *               treble/bass Lissajous (pitch/yaw turns), and continuous camera
+ *               roll (banking) accelerated by bass transients
  *   warp      – 16 glowing radial beams (one per band) shooting from centre,
  *               triple-layer glow with beat bursts; hyperspace / warp effect
  *   ripple    – concentric ripples fired on beats and bass transients, with a
@@ -96,9 +98,11 @@ Item {
     readonly property int terrainMaxRows: 24
 
     // ----- vortex state -----------------------------------------------------
-    property real vortexAngle:  0
-    property real vortexDriftX: 0   // centre offset fraction (−1..1)
-    property real vortexDriftY: 0
+    property real vortexAngle:   0
+    property real vortexDriftX:  0   // tunnel centreline pitch/yaw fraction (−1..1)
+    property real vortexDriftY:  0
+    property real vortexRoll:    0   // camera banking (roll about tunnel axis)
+    property real vortexTravelZ: 0   // z-travel fraction [0,1); cycles each full fly-through
 
     // ----- warp state -------------------------------------------------------
     // Per-band beam length in 0-1; each beam immediately jumps up when its
@@ -274,12 +278,20 @@ Item {
 
     // ----- vortex tick --------------------------------------------------------
     function tickVortex() {
+        // Primary tunnel spin speed (drives twist / helix accumulation)
         const rotSpeed = 0.018 + root.rms * 0.045 + (root.gotBeat ? 0.14 : 0)
         root.vortexAngle = (root.vortexAngle + rotSpeed) % (2 * Math.PI)
 
-        // Centre drifts on a Lissajous path whose amplitude is driven by
-        // treble (high-freq detail) and bass (sub-freq impulse).
-        const driftAmp = Math.min(0.28, root.treble * 0.32 + root.bass * 0.08)
+        // Banking (camera roll): continuous slow roll, kicked by bass transients
+        const rollSpeed = 0.003 + root.bass * 0.018 + (root.gotBeat ? 0.09 : 0)
+        root.vortexRoll = (root.vortexRoll + rollSpeed) % (2 * Math.PI)
+
+        // Forward travel through tunnel: advances all ring depths toward viewer
+        const travelSpeed = 0.009 + root.rms * 0.014
+        root.vortexTravelZ = (root.vortexTravelZ + travelSpeed) % 1.0
+
+        // Pitch / yaw Lissajous drives tunnel centreline curvature (turning/winding)
+        const driftAmp = Math.min(0.35, root.treble * 0.32 + root.bass * 0.10)
         root.vortexDriftX = root.vortexDriftX * 0.94
                             + Math.sin(root.vortexAngle * 1.7) * driftAmp
         root.vortexDriftY = root.vortexDriftY * 0.94
@@ -558,68 +570,138 @@ Item {
                 ctx.restore()
         }
 
-        // ---- vortex (spectrally-deformed spinning tunnel) --------------------
+        // ---- vortex (wormhole: first-person fly-through tunnel) ---------------
         function paintVortex(ctx) {
-            const w       = width,  h  = height
-            // The vanishing point is fixed at the canvas centre.
-            // Only the outermost ring (depth=0, viewer side) drifts on a Lissajous
-            // path driven by treble/bass.  Each ring's centre is linearly
-            // interpolated so that innermost rings are nearly stationary, producing
-            // a genuine parallax / wormhole perspective rather than a flat shift.
-            const baseCx = w / 2,  baseCy = h / 2
-            const driftScale  = Math.min(w, h) * 0.12
-            const mouthDriftX = root.vortexDriftX * driftScale
-            const mouthDriftY = root.vortexDriftY * driftScale
-            const N       = 16      // polygon vertices per ring
-            const numRings = 10
-            const maxR    = Math.min(w / 2, h / 2) * 0.92
-            const bands   = root.bandVals
+            const w      = width,  h  = height
+            const cx0    = w / 2,  cy0 = h / 2
+            const bands  = root.bandVals
+            const minDim = Math.min(w, h)
 
-            // Draw innermost (vanishing point) first, outermost last.
-            for (let ring = numRings - 1; ring >= 0; ring--) {
-                // depth 0 = outermost ring (viewer side); 1 = innermost (vanishing)
-                const depth  = ring / numRings
-                const scaleR = 1.0 - depth * 0.92
-                const baseR  = maxR * scaleR
+            // Geometry / perspective constants
+            // RINGS × VERTS gives the ring mesh; N_RIBS longitudinal lines add
+            // the lengthwise structure visible in wormhole / stargate visuals.
+            const RINGS  = 30        // depth slices (cross-section rings)
+            const VERTS  = 32        // polygon vertices per ring
+            const N_RIBS = 8         // longitudinal rib lines along tunnel walls
+            const Z_NEAR = 0.25      // depth of nearest ring (fills ~screen)
+            const Z_FAR  = 7.0       // depth of farthest ring (vanishing point)
+            const FOCAL  = minDim * 0.50   // focal length in screen pixels
+            const TUBE_R = 0.35      // world-space tube radius (calibrated for FOV)
 
-                // Ring centre: full drift at depth=0, no drift at depth=1.
-                // The quadratic falloff (1-depth)² concentrates the motion in the
-                // outermost rings, accentuating the parallax cue.
-                const t    = (1 - depth) * (1 - depth)
-                const ringCx = baseCx + mouthDriftX * t
-                const ringCy = baseCy + mouthDriftY * t
+            ctx.fillStyle = "#000000"
+            ctx.fillRect(0, 0, w, h)
 
-                // Alternating twist direction gives the tunnel a braided look.
-                const twist = root.vortexAngle * (ring % 2 === 0 ? 1 : -1.3)
-                              + depth * 1.2   // extra angular offset per depth
+            // Apply camera roll (banking): rotate entire scene around screen centre.
+            // This creates the barrel-roll / wormhole banking sensation.
+            ctx.save()
+            ctx.translate(cx0, cy0)
+            ctx.rotate(root.vortexRoll * 0.45)
+            ctx.translate(-cx0, -cy0)
+
+            // Pre-compute per-ring geometry so both the ring pass and the rib pass
+            // can reuse the data without redundant trigonometry.
+            const ringData = []
+            for (let k = 0; k < RINGS; k++) {
+                // tNorm 0 = vanishing (far, small on screen)
+                //        1 = right in front of viewer (large, about to clip)
+                // vortexTravelZ advances 0→1 continuously, sliding all rings
+                // toward the viewer; when a ring reaches tNorm=1 it wraps to 0.
+                const tNorm = (k / RINGS + root.vortexTravelZ) % 1.0
+
+                // Logarithmic depth: rings appear evenly spaced in perspective.
+                const z = Z_FAR * Math.pow(Z_NEAR / Z_FAR, tNorm)
+
+                // Perspective scale: screen pixels per world unit at depth z.
+                const ps    = FOCAL / z
+                const baseR = TUBE_R * ps   // screen-space ring radius
+
+                // Cull rings that are invisible (vanishingly small or clipping).
+                if (baseR < 0.4 || baseR > minDim * 3.0) {
+                    ringData.push(null)
+                    continue
+                }
+
+                // Tunnel centreline curves as a smooth helix driven by pitch/yaw.
+                // Bend amplitude grows with sqrt(z) so near rings hug the travel
+                // axis while far rings show the curve — the "looking into a bend"
+                // depth cue.
+                const ph    = root.vortexAngle * 0.55 + z * 0.20
+                const bendR = FOCAL * 0.38 * Math.sqrt(z / Z_FAR)
+                const cx    = cx0 + root.vortexDriftX * bendR * Math.sin(ph)
+                const cy    = cy0 + root.vortexDriftY * bendR * Math.cos(ph * 0.71)
+
+                // Twist angle: each ring is rotated around the tunnel axis by an
+                // amount that depends on both time and depth, giving the spiral
+                // corridor appearance.
+                const twist = root.vortexAngle * 2.8 + z * 0.42
+
+                ringData.push({ cx, cy, baseR, twist, tNorm })
+            }
+
+            // ---- Cross-section rings, drawn far → near (k=0 farthest) ----------
+            for (let k = 0; k < RINGS; k++) {
+                const rd = ringData[k]
+                if (!rd) continue
 
                 ctx.beginPath()
-                for (let v = 0; v <= N; v++) {
-                    const idx    = v % N
-                    const angle  = (2 * Math.PI * idx / N) + twist
-                    // Vertices displaced outward by their matching spectral band.
-                    const deform = (bands[idx] || 0) * 0.55 * (1 - depth * 0.4)
-                    const r      = baseR * (1 + deform)
-                    const x      = ringCx + Math.cos(angle) * r
-                    const y      = ringCy + Math.sin(angle) * r
-                    if (v === 0) ctx.moveTo(x, y)
-                    else         ctx.lineTo(x, y)
+                for (let v = 0; v <= VERTS; v++) {
+                    const idx     = v % VERTS
+                    const bandIdx = idx % 16
+                    const angle   = (2 * Math.PI * idx / VERTS) + rd.twist
+                    // Spectral deformation: vertices pushed out by their band;
+                    // effect is strongest for near rings (tNorm → 1).
+                    const deform  = (bands[bandIdx] || 0) * 0.50 * rd.tNorm
+                    const r = rd.baseR * (1 + deform)
+                    const x = rd.cx + Math.cos(angle) * r
+                    const y = rd.cy + Math.sin(angle) * r
+                    if (v === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y)
                 }
                 ctx.closePath()
 
-                const alpha = 0.12 + (1 - depth) * 0.68
+                const alpha = 0.06 + rd.tNorm * 0.84
                 ctx.strokeStyle = root.withAlpha(
-                    root.schemeColorCss(root.treble * 0.3 + depth * 0.7), alpha)
-                ctx.lineWidth = Math.max(0.5, (1 - depth) * 2.2)
+                    root.schemeColorCss(root.treble * 0.2 + rd.tNorm * 0.8), alpha)
+                ctx.lineWidth = Math.max(0.3, rd.tNorm * 3.0)
                 ctx.stroke()
             }
 
-            // Vanishing-point glow pulsed by RMS (always at fixed centre)
-            if (root.rms > 0.04) {
-                const glowR = Math.max(1.5, root.rms * 5)
-                ctx.fillStyle = root.withAlpha(root.schemeColorCss(root.treble), 0.75)
+            // ---- Longitudinal ribs (tunnel structure lines) ---------------------
+            // Each rib is a single path connecting one vertex index across all
+            // visible rings from far to near, creating the grid-like wormhole wall.
+            for (let r = 0; r < N_RIBS; r++) {
+                const vIdx    = Math.floor(r * VERTS / N_RIBS)
+                const bandIdx = vIdx % 16
+                const bandVal = bands[bandIdx] || 0
+
                 ctx.beginPath()
-                ctx.arc(baseCx, baseCy, glowR, 0, 2 * Math.PI)
+                let started = false
+                for (let k = 0; k < RINGS; k++) {
+                    const rd = ringData[k]
+                    if (!rd) continue
+                    const angle  = (2 * Math.PI * vIdx / VERTS) + rd.twist
+                    const deform = bandVal * 0.50 * rd.tNorm
+                    const radius = rd.baseR * (1 + deform)
+                    const x = rd.cx + Math.cos(angle) * radius
+                    const y = rd.cy + Math.sin(angle) * radius
+                    if (!started) { ctx.moveTo(x, y); started = true }
+                    else          { ctx.lineTo(x, y) }
+                }
+
+                const ribAlpha = 0.10 + bandVal * 0.42
+                ctx.strokeStyle = root.withAlpha(
+                    root.schemeColorCss(bandIdx / 16), ribAlpha)
+                ctx.lineWidth = Math.max(0.4, bandVal * 1.8 + 0.4)
+                ctx.stroke()
+            }
+
+            ctx.restore()
+
+            // Vanishing-point glow at screen centre, pulsed by RMS
+            if (root.rms > 0.04) {
+                const glowR = Math.max(2, root.rms * 10)
+                ctx.fillStyle = root.withAlpha(root.schemeColorCss(root.treble), 0.85)
+                ctx.beginPath()
+                ctx.arc(cx0, cy0, glowR, 0, 2 * Math.PI)
                 ctx.fill()
             }
         }
