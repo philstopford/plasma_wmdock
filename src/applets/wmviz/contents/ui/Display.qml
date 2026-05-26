@@ -55,13 +55,22 @@ Item {
     property real smoothVol: 0        // 0–1, smoothed
     property real peakVol:   0        // 0–1, slow-falling peak
 
+    function sampleVolume() {
+        const v = Math.min(1, AudioManager.volume / 100)
+        root.smoothVol = root.smoothVol * 0.85 + v * 0.15
+        if (v > root.peakVol) root.peakVol = v
+    }
+
+    // Seed from current volume immediately so the viz is live from the start.
+    Component.onCompleted: {
+        const v = Math.min(1, AudioManager.volume / 100)
+        smoothVol = v
+        peakVol   = v
+    }
+
     Connections {
         target: AudioManager
-        function onVolumeChanged() {
-            const v = Math.min(1, AudioManager.volume / 100)
-            root.smoothVol = root.smoothVol * 0.6 + v * 0.4
-            if (v > root.peakVol) root.peakVol = v
-        }
+        function onVolumeChanged() { root.sampleVolume() }
     }
 
     // ----- per-effect state ------------------------------------------------
@@ -90,8 +99,12 @@ Item {
         onTriggered: {
             root.tickCount++
 
+            // Re-sample current volume every tick so a steady (unchanged)
+            // volume level still drives the animation.
+            root.sampleVolume()
+
             // Decay peak volume slowly
-            root.peakVol = Math.max(0, root.peakVol - 0.01)
+            root.peakVol = Math.max(0, root.peakVol - 0.003)
 
             switch (root.effect) {
             case "wave":    tickWave();    break
