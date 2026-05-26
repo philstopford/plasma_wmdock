@@ -588,6 +588,17 @@ Item {
             const FOCAL  = minDim * 0.50   // focal length in screen pixels
             const TUBE_R = 0.35      // world-space tube radius (calibrated for FOV)
 
+            // Tuning constants (separated for ease of adjustment)
+            const ROLL_DAMP       = 0.45  // fraction of vortexRoll applied as canvas rotation
+            const MIN_RING_RADIUS = 0.4   // cull rings smaller than this (pixels)
+            const MAX_RING_MULT   = 3.0   // cull rings larger than minDim × this
+            const HELIX_PHASE_T   = 0.55  // time contribution to helix phase per radian
+            const HELIX_PHASE_Z   = 0.20  // depth contribution to helix phase per world unit
+            const BEND_AMP        = 0.38  // helix bend amplitude (fraction of FOCAL)
+            const LISSAJOUS_Y     = 0.71  // Y-axis phase ratio for Lissajous centreline
+            const TWIST_T         = 2.8   // time multiplier for per-ring twist
+            const TWIST_Z         = 0.42  // depth multiplier for per-ring twist
+
             ctx.fillStyle = "#000000"
             ctx.fillRect(0, 0, w, h)
 
@@ -595,7 +606,7 @@ Item {
             // This creates the barrel-roll / wormhole banking sensation.
             ctx.save()
             ctx.translate(cx0, cy0)
-            ctx.rotate(root.vortexRoll * 0.45)
+            ctx.rotate(root.vortexRoll * ROLL_DAMP)
             ctx.translate(-cx0, -cy0)
 
             // Pre-compute per-ring geometry so both the ring pass and the rib pass
@@ -616,7 +627,7 @@ Item {
                 const baseR = TUBE_R * ps   // screen-space ring radius
 
                 // Cull rings that are invisible (vanishingly small or clipping).
-                if (baseR < 0.4 || baseR > minDim * 3.0) {
+                if (baseR < MIN_RING_RADIUS || baseR > minDim * MAX_RING_MULT) {
                     ringData.push(null)
                     continue
                 }
@@ -625,15 +636,15 @@ Item {
                 // Bend amplitude grows with sqrt(z) so near rings hug the travel
                 // axis while far rings show the curve — the "looking into a bend"
                 // depth cue.
-                const ph    = root.vortexAngle * 0.55 + z * 0.20
-                const bendR = FOCAL * 0.38 * Math.sqrt(z / Z_FAR)
+                const ph    = root.vortexAngle * HELIX_PHASE_T + z * HELIX_PHASE_Z
+                const bendR = FOCAL * BEND_AMP * Math.sqrt(z / Z_FAR)
                 const cx    = cx0 + root.vortexDriftX * bendR * Math.sin(ph)
-                const cy    = cy0 + root.vortexDriftY * bendR * Math.cos(ph * 0.71)
+                const cy    = cy0 + root.vortexDriftY * bendR * Math.cos(ph * LISSAJOUS_Y)
 
                 // Twist angle: each ring is rotated around the tunnel axis by an
                 // amount that depends on both time and depth, giving the spiral
                 // corridor appearance.
-                const twist = root.vortexAngle * 2.8 + z * 0.42
+                const twist = root.vortexAngle * TWIST_T + z * TWIST_Z
 
                 ringData.push({ cx, cy, baseR, twist, tNorm })
             }
