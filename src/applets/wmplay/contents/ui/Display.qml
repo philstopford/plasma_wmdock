@@ -260,13 +260,10 @@ Item {
             const urls = drop.urls
             let paths = []
             for (let i = 0; i < urls.length; i++) {
-                // Convert dropped URL to local path for MediaScanner
-                let p = urls[i].toLocalFile()
-                if (!p) {
-                    p = urls[i].toString()
-                    if (p.startsWith("file://"))
-                        p = p.substring(7)
-                }
+                // drop.urls entries are strings in QML; strip the file:// scheme
+                let p = urls[i].toString()
+                if (p.startsWith("file://"))
+                    p = decodeURIComponent(p.substring(7))
                 if (!p)
                     continue
                 const scanned = MediaScanner.scan(p)
