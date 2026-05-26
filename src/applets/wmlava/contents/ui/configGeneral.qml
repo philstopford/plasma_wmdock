@@ -65,8 +65,8 @@ Item {
                 id: gravitySlider
                 Layout.preferredWidth: 140
                 from: 0.01; to: 0.30; stepSize: 0.01
+                value: page.cfg_gravity
                 onMoved: page.cfg_gravity = value
-                Component.onCompleted: value = page.cfg_gravity
             }
             Text {
                 text: gravitySlider.value.toFixed(2)
@@ -82,8 +82,8 @@ Item {
                 id: buoyancySlider
                 Layout.preferredWidth: 140
                 from: 0.05; to: 0.50; stepSize: 0.01
+                value: page.cfg_buoyancy
                 onMoved: page.cfg_buoyancy = value
-                Component.onCompleted: value = page.cfg_buoyancy
             }
             Text {
                 text: buoyancySlider.value.toFixed(2)
@@ -99,8 +99,8 @@ Item {
                 id: dragSlider
                 Layout.preferredWidth: 140
                 from: 0.70; to: 0.99; stepSize: 0.01
+                value: page.cfg_drag
                 onMoved: page.cfg_drag = value
-                Component.onCompleted: value = page.cfg_drag
             }
             Text {
                 text: dragSlider.value.toFixed(2)
@@ -116,8 +116,8 @@ Item {
                 id: baseHeatSlider
                 Layout.preferredWidth: 140
                 from: 0.00; to: 0.80; stepSize: 0.05
+                value: page.cfg_baseHeat
                 onMoved: page.cfg_baseHeat = value
-                Component.onCompleted: value = page.cfg_baseHeat
             }
             Text {
                 text: baseHeatSlider.value.toFixed(2)
@@ -133,8 +133,8 @@ Item {
                 id: heatRateSlider
                 Layout.preferredWidth: 140
                 from: 0.005; to: 0.100; stepSize: 0.005
+                value: page.cfg_heatRate
                 onMoved: page.cfg_heatRate = value
-                Component.onCompleted: value = page.cfg_heatRate
             }
             Text {
                 text: heatRateSlider.value.toFixed(3)
@@ -150,8 +150,8 @@ Item {
                 id: coolRateSlider
                 Layout.preferredWidth: 140
                 from: 0.001; to: 0.050; stepSize: 0.001
+                value: page.cfg_coolRate
                 onMoved: page.cfg_coolRate = value
-                Component.onCompleted: value = page.cfg_coolRate
             }
             Text {
                 text: coolRateSlider.value.toFixed(3)
@@ -167,8 +167,8 @@ Item {
                 id: heatZoneYSlider
                 Layout.preferredWidth: 140
                 from: 0.30; to: 0.90; stepSize: 0.05
+                value: page.cfg_heatZoneY
                 onMoved: page.cfg_heatZoneY = value
-                Component.onCompleted: value = page.cfg_heatZoneY
             }
             Text {
                 text: heatZoneYSlider.value.toFixed(2)
