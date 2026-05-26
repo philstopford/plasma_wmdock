@@ -180,6 +180,11 @@ Item {
         // Daughter separation = 2 * nr * SPLIT_OFFSET; merge threshold = 2 * nr * MERGE_THRESH.
         // With SPLIT_OFFSET = 0.80 > 0.70 daughters start safely separated.
         const SPLIT_OFFSET   = 0.80
+        // SPLIT_KICK increased proportionally with SPLIT_OFFSET: daughters start
+        // further apart so they need enough outward velocity to stay beyond the
+        // merge threshold as they decelerate under drag.  0.30 gives roughly the
+        // same number of ticks-to-clear as the old (0.38, 0.22) pair did before
+        // the merge threshold bug was discovered.
         const SPLIT_KICK     = 0.30
 
         // ── Effective heat: base minimum + CPU component ──────────────────────
@@ -345,6 +350,9 @@ Item {
                 x:     w * (0.20 + Math.random() * 0.60),
                 y:     h * (0.70 + Math.random() * 0.25),  // spawn at bottom
                 r:     rr,
+                // Small lateral drift only; vy=0 so the blob sinks smoothly
+                // under gravity rather than popping in with a jarring random
+                // upward or downward kick.
                 vx:    (Math.random() - 0.5) * 0.06,
                 vy:    0,
                 phase: Math.random() * Math.PI * 2,
