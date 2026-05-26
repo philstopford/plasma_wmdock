@@ -561,10 +561,15 @@ Item {
         // ---- vortex (spectrally-deformed spinning tunnel) --------------------
         function paintVortex(ctx) {
             const w       = width,  h  = height
-            // Centre drifts on a Lissajous path driven by treble / bass
-            const driftScale = Math.min(w, h) * 0.10
-            const cx      = w / 2 + root.vortexDriftX * driftScale
-            const cy      = h / 2 + root.vortexDriftY * driftScale
+            // The vanishing point is fixed at the canvas centre.
+            // Only the outermost ring (depth=0, viewer side) drifts on a Lissajous
+            // path driven by treble/bass.  Each ring's centre is linearly
+            // interpolated so that innermost rings are nearly stationary, producing
+            // a genuine parallax / wormhole perspective rather than a flat shift.
+            const baseCx = w / 2,  baseCy = h / 2
+            const driftScale  = Math.min(w, h) * 0.12
+            const mouthDriftX = root.vortexDriftX * driftScale
+            const mouthDriftY = root.vortexDriftY * driftScale
             const N       = 16      // polygon vertices per ring
             const numRings = 10
             const maxR    = Math.min(w / 2, h / 2) * 0.92
@@ -577,6 +582,13 @@ Item {
                 const scaleR = 1.0 - depth * 0.92
                 const baseR  = maxR * scaleR
 
+                // Ring centre: full drift at depth=0, no drift at depth=1.
+                // The quadratic falloff (1-depth)² concentrates the motion in the
+                // outermost rings, accentuating the parallax cue.
+                const t    = (1 - depth) * (1 - depth)
+                const ringCx = baseCx + mouthDriftX * t
+                const ringCy = baseCy + mouthDriftY * t
+
                 // Alternating twist direction gives the tunnel a braided look.
                 const twist = root.vortexAngle * (ring % 2 === 0 ? 1 : -1.3)
                               + depth * 1.2   // extra angular offset per depth
@@ -588,8 +600,8 @@ Item {
                     // Vertices displaced outward by their matching spectral band.
                     const deform = (bands[idx] || 0) * 0.55 * (1 - depth * 0.4)
                     const r      = baseR * (1 + deform)
-                    const x      = cx + Math.cos(angle) * r
-                    const y      = cy + Math.sin(angle) * r
+                    const x      = ringCx + Math.cos(angle) * r
+                    const y      = ringCy + Math.sin(angle) * r
                     if (v === 0) ctx.moveTo(x, y)
                     else         ctx.lineTo(x, y)
                 }
@@ -602,12 +614,12 @@ Item {
                 ctx.stroke()
             }
 
-            // Vanishing-point glow pulsed by RMS
+            // Vanishing-point glow pulsed by RMS (always at fixed centre)
             if (root.rms > 0.04) {
                 const glowR = Math.max(1.5, root.rms * 5)
                 ctx.fillStyle = root.withAlpha(root.schemeColorCss(root.treble), 0.75)
                 ctx.beginPath()
-                ctx.arc(cx, cy, glowR, 0, 2 * Math.PI)
+                ctx.arc(baseCx, baseCy, glowR, 0, 2 * Math.PI)
                 ctx.fill()
             }
         }

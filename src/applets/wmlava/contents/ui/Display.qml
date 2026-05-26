@@ -7,21 +7,25 @@ import org.kde.plasma.private.wmdock 1.0
  * WMLava – Lava lamp simulation driven by system heat.
  *
  * Renders metaball-style blobs that flow inside a glass container.
- * The outer walls are modelled as colder, creating a convective circulation:
- * the central column rises while the wall columns sink, with horizontal return
- * flow at top and bottom – like a classic convection cell.
- * As CPU load rises, blobs move faster and more turbulently.
- * Nearby blobs merge (area-weighted, momentum-conserving); large blobs split.
+ * Physics model mirrors a real lava lamp:
+ *   • A heat source at the BOTTOM (intensity ∝ CPU load) warms blobs
+ *     that settle there, making them buoyant so they rise.
+ *   • Away from the bottom blobs radiate heat and cool, becoming denser
+ *     than the surrounding fluid and sinking back to the heat source.
+ *   • At idle the bottom heater is very weak: all blobs cool, sink, and
+ *     coalesce into a pool / landscape of dark cooled lava at the bottom.
+ *   • At high CPU load blobs heat quickly, rise vigorously, and can
+ *     stretch and split before sinking again.
  *
- * Algorithm:
- *   Each blob has a position (x, y), radius r, velocity (vx, vy) and a phase
- *   offset for organic wobble.  Every ~50 ms the canvas is redrawn by
- *   evaluating the metaball scalar field on a coarse 4×4 pixel grid.
- *   Forces applied each tick:
- *     • Convective vortex  – cold-wall driven circulation (dominant)
- *     • Residual buoyancy  – overall upward push scaled by heat
- *     • Organic wobble     – sinusoidal perturbation
- *     • Random turbulence  – small stochastic kick
+ * Each blob carries a temperature (0–1).  Colour intensity scales with
+ * temperature so cold pooled lava appears dark and hot rising lava glows.
+ *
+ * Forces per tick (50 ms / 20 fps):
+ *   • Gravity        – constant downward
+ *   • Thermal buoyancy – upward proportional to blob.temp
+ *   • Tiny organic wobble – amplitude gated by temperature
+ *   • Minute random turbulence – only when blob is warm
+ *   • Viscous drag   – strong enough to prevent jitter
  *
  * System heat source: SystemMonitor.cpuUsage (smoothed exponentially).
  * Configuration: color scheme, blob count.
@@ -34,18 +38,15 @@ Item {
 
     // ----- system heat (0 = idle, 1 = fully loaded) -------------------------
     // Smoothed exponentially so the lamp reacts gradually to load changes.
-    property real heat: 0.1
+    property real heat: 0.05
 
     Connections {
         target: SystemMonitor
         function onCpuUsageChanged() {
             const raw = Math.min(1.0, Math.max(0.0, SystemMonitor.cpuUsage / 100.0))
-            root.heat = root.heat * 0.85 + raw * 0.15
+            root.heat = root.heat * 0.92 + raw * 0.08
         }
     }
-
-    // Speed multiplier: 0.2 at idle → 3.0 at full load
-    readonly property real speedMult: 0.2 + root.heat * 2.8
 
     // ----- blob state -------------------------------------------------------
     property var blobs: []
@@ -105,88 +106,121 @@ Item {
         let bs = []
         for (let i = 0; i < root.blobCount; i++) {
             bs.push({
-                x:     w * (0.2 + Math.random() * 0.6),
-                y:     h * (0.55 + Math.random() * 0.35), // start in lower half
-                r:     Math.min(w, h) * (0.12 + Math.random() * 0.10),
-                vy:    -(Math.random() * 0.3),
-                vx:    (Math.random() - 0.5) * 0.2,
-                phase: Math.random() * Math.PI * 2
+                x:     w * (0.15 + Math.random() * 0.70),
+                y:     h * (0.65 + Math.random() * 0.30), // start cold at the bottom
+                r:     Math.min(w, h) * (0.10 + Math.random() * 0.10),
+                vy:    0,
+                vx:    (Math.random() - 0.5) * 0.1,
+                phase: Math.random() * Math.PI * 2,
+                temp:  0.0   // all blobs start cold; heat arrives from bottom over time
             })
         }
         root.blobs = bs
     }
 
     // ----- physics tick ----------------------------------------------------
+    //
+    // Real lava lamp model:
+    //   GRAVITY pulls every blob downward at a constant rate.
+    //   BUOYANCY pushes a blob upward in proportion to its temperature.
+    //   A blob at the BOTTOM of the container gains heat proportional to
+    //     the current CPU load (the "lamp bulb").
+    //   A blob anywhere else cools gradually.
+    //   At idle: all blobs stay cold, gravity wins, they pool at the bottom.
+    //   At high load: bottom blobs heat up, become buoyant, rise, cool at
+    //     the top, sink back – a true convective cycle.
+    //
+    // Tuning targets (50 ms tick / 20 fps, typical canvas ~60-100 px):
+    //   Terminal sink speed  ≈ 0.8 px/tick (≈ 2 s to cross canvas at idle)
+    //   Terminal rise speed  ≈ 1.0 px/tick (≈ 1.5 s at full load)
+    //   Heat-to-breakeven    ≈ 3 s at 50% CPU
+    //   Full cool-down       ≈ 6 s after CPU drops to idle
+    //
     function tickBlobs() {
         if (root.blobs.length === 0) { initBlobs(); return }
 
         const w  = canvas.width  > 4 ? canvas.width  : 64
         const h  = canvas.height > 4 ? canvas.height : 64
-        const cx = w / 2,  cy = h / 2
-        const sm = root.speedMult
-        const ht = root.heat
-        // Blob radius bounds (fraction of shorter side)
-        const minR = Math.min(w, h) * 0.08
+        const ht = root.heat   // 0 = idle, 1 = full load
+
+        const minR = Math.min(w, h) * 0.07
         const maxR = Math.min(w, h) * 0.30
 
-        // Physics tuning constants
-        // xn² > RISE_THRESHOLD → blob is in wall region and sinks; < threshold → rises
-        const RISE_THRESHOLD       = 0.28   // centre fraction² that rises (≈53% width)
-        const MERGE_THRESH_FACTOR  = 0.70   // merge when dist < factor * (r_a + r_b)
-        const SPLIT_POS_OFFSET     = 0.40   // daughter centre offset as fraction of new r
-        const SPLIT_VEL_KICK       = 0.35   // speed imparted to each daughter on split
+        // ── Physics constants ─────────────────────────────────────────────────
+        // Net force = BUOYANCY*temp - GRAVITY.  Breakeven temp = GRAVITY/BUOYANCY.
+        // At breakeven ≈ 0.44 the blob is neutrally buoyant.
+        const GRAVITY        = 0.08    // px/tick² downward
+        const BUOYANCY       = 0.18    // px/tick² upward at temp=1
+        // Blobs with y > HEAT_ZONE_Y * h are in the bottom heat zone (canvas y
+        // increases downward, so this selects the lower portion of the container).
+        const HEAT_ZONE_Y    = 0.68
+        const HEAT_RATE      = 0.022   // temp/tick gained in heat zone
+        const COOL_RATE      = 0.006   // temp/tick lost outside heat zone
+        // Drag coefficient (per tick, applied to velocity before integration)
+        const DRAG           = 0.91
+        // Merge threshold: merge when centre distance < factor * (ra+rb)
+        const MERGE_THRESH   = 0.70
+        const SPLIT_OFFSET   = 0.38
+        const SPLIT_KICK     = 0.22
 
         // Deep-copy so QML property binding fires on reassignment.
         let bs = root.blobs.map(b => Object.assign({}, b))
 
-        // ── 1. Forces ─────────────────────────────────────────────────────────
+        // ── 1. Temperature exchange & forces ─────────────────────────────────
         for (let i = 0; i < bs.length; i++) {
             const b = bs[i]
-            b.phase += 0.04 * sm
 
-            // Normalised position: -1 = left/top wall, +1 = right/bottom wall
-            const xn = (b.x - cx) / Math.max(1, cx)
-            const yn = (b.y - cy) / Math.max(1, cy)
+            // Slow phase advance for organic wobble (independent of heat)
+            b.phase += 0.020
 
-            // Convective circulation driven by cold outer walls:
-            //  • Vertical: central column rises (xn≈0 → up), wall columns sink (|xn|≈1 → down)
-            //  • Horizontal: outward near top (yn<0), inward near bottom (yn>0)
-            // heightZoneFactor clamps yn to [-1,1] with a 3× amplification so only
-            // the outer thirds of the vertical extent drive horizontal return flow.
-            const heightZoneFactor = Math.max(-1, Math.min(1, yn * 3))
-            b.vx -= 0.06 * ht * xn * heightZoneFactor          // horizontal return flow
-            b.vy += 0.06 * ht * (xn * xn - RISE_THRESHOLD)     // up at centre, down at walls
+            // ─ Heat exchange ─────────────────────────────────────────────────
+            if (b.y / h > HEAT_ZONE_Y) {
+                // Near the bottom heater: absorb heat proportional to CPU load.
+                b.temp = Math.min(1.0, b.temp + ht * HEAT_RATE)
+            } else {
+                // Away from heater: radiate heat. Cooling is slightly slowed
+                // when CPU is high (blob doesn't fully cool before returning).
+                b.temp = Math.max(0.0, b.temp - COOL_RATE * (1.0 - ht * 0.4))
+            }
 
-            // Residual heat buoyancy (all hot blobs want to rise a little)
-            b.vy -= ht * 0.003
+            // ─ Net vertical acceleration ──────────────────────────────────────
+            // Positive = downward.  Negative = upward (buoyancy > gravity).
+            const ay = GRAVITY - b.temp * BUOYANCY
 
-            // Organic wobble
-            b.vy += Math.sin(b.phase * 1.1) * 0.008 * sm
-            b.vx += Math.cos(b.phase * 0.7) * 0.005 * sm
+            // ─ Tiny organic wobble (scales with temperature to keep cold
+            //   pooled blobs still) ─────────────────────────────────────────
+            const wobble = b.temp * b.temp   // quadratic: very small when cold
+            b.vx += Math.cos(b.phase * 0.7) * 0.005 * wobble
+            b.vy += Math.sin(b.phase * 1.1) * 0.004 * wobble
 
-            // Small random turbulence
-            b.vx += (Math.random() - 0.5) * 0.004 * (1 + ht)
-            b.vy += (Math.random() - 0.5) * 0.003 * (1 + ht)
+            // ─ Minute random turbulence (only when warm) ──────────────────────
+            if (b.temp > 0.35) {
+                const t = b.temp - 0.35
+                b.vx += (Math.random() - 0.5) * 0.008 * t
+                b.vy += (Math.random() - 0.5) * 0.006 * t
+            }
 
-            // Velocity damping
-            b.vx *= 0.96
-            b.vy *= 0.96
+            // ─ Apply forces & drag ────────────────────────────────────────────
+            b.vy += ay
+            b.vx *= DRAG
+            b.vy *= DRAG
 
-            // Integrate position
-            b.x += b.vx * sm
-            b.y += b.vy * sm
+            // ─ Integrate position ─────────────────────────────────────────────
+            b.x += b.vx
+            b.y += b.vy
 
-            // Elastic bounce off container walls
-            const margin = b.r * 0.30
-            if (b.x < margin)     { b.x = margin;     b.vx =  Math.abs(b.vx) * 0.50 }
-            if (b.x > w - margin) { b.x = w - margin; b.vx = -Math.abs(b.vx) * 0.50 }
-            if (b.y < margin)     { b.y = margin;     b.vy =  Math.abs(b.vy) * 0.50 }
-            if (b.y > h - margin) { b.y = h - margin; b.vy = -Math.abs(b.vy) * 0.50 }
+            // ─ Elastic bounce off container walls ─────────────────────────────
+            const margin = b.r * 0.25
+            if (b.x < margin)     { b.x = margin;     b.vx =  Math.abs(b.vx) * 0.30 }
+            if (b.x > w - margin) { b.x = w - margin; b.vx = -Math.abs(b.vx) * 0.30 }
+            if (b.y < margin)     { b.y = margin;     b.vy =  Math.abs(b.vy) * 0.30 }
+            if (b.y > h - margin) { b.y = h - margin; b.vy = -Math.abs(b.vy) * 0.30 }
         }
 
         // ── 2. Merging ────────────────────────────────────────────────────────
-        // When two blob centres are within MERGE_THRESH_FACTOR*(r_a+r_b), absorb
+        // When two blob centres are within MERGE_THRESH*(r_a+r_b), absorb
         // the smaller into the larger (area-weighted, momentum-conserving).
+        // Temperature is also area-weighted so merged blobs inherit both temps.
         const absorbed = new Array(bs.length).fill(false)
         const postMerge = []
         for (let i = 0; i < bs.length; i++) {
@@ -197,17 +231,18 @@ Item {
                 const dx    = a.x - bs[j].x
                 const dy    = a.y - bs[j].y
                 const dist2 = dx * dx + dy * dy
-                const thresh = (a.r + bs[j].r) * MERGE_THRESH_FACTOR
+                const thresh = (a.r + bs[j].r) * MERGE_THRESH
                 if (dist2 < thresh * thresh) {
                     const ra2 = a.r * a.r,  rb2 = bs[j].r * bs[j].r
                     const tot = ra2 + rb2
                     a = {
-                        x:     (a.x  * ra2 + bs[j].x  * rb2) / tot,
-                        y:     (a.y  * ra2 + bs[j].y  * rb2) / tot,
-                        vx:    (a.vx * ra2 + bs[j].vx * rb2) / tot,
-                        vy:    (a.vy * ra2 + bs[j].vy * rb2) / tot,
+                        x:     (a.x    * ra2 + bs[j].x    * rb2) / tot,
+                        y:     (a.y    * ra2 + bs[j].y    * rb2) / tot,
+                        vx:    (a.vx   * ra2 + bs[j].vx   * rb2) / tot,
+                        vy:    (a.vy   * ra2 + bs[j].vy   * rb2) / tot,
                         r:     Math.min(maxR, Math.sqrt(tot)),
-                        phase: a.phase
+                        phase: a.phase,
+                        temp:  (a.temp * ra2 + bs[j].temp * rb2) / tot
                     }
                     absorbed[j] = true
                 }
@@ -218,28 +253,30 @@ Item {
 
         // ── 3. Splitting oversized blobs ──────────────────────────────────────
         // A blob that grew beyond maxR breaks into two equal-area daughters.
-        // Only split if total count is below twice the target (prevents explosions).
+        // Only hot (rising) blobs split – cold pooled lava stays merged.
         const canSplit = bs.length < root.blobCount * 2
         const postSplit = []
         for (let i = 0; i < bs.length; i++) {
             const b = bs[i]
-            if (canSplit && b.r > maxR) {
+            if (canSplit && b.r > maxR && b.temp > 0.55) {
                 const nr    = b.r / Math.SQRT2
                 const angle = Math.random() * Math.PI * 2
-                const off   = nr * SPLIT_POS_OFFSET
+                const off   = nr * SPLIT_OFFSET
                 postSplit.push(
                     { x: b.x + Math.cos(angle) * off,
                       y: b.y + Math.sin(angle) * off,
                       r: nr,
-                      vx: b.vx + Math.cos(angle) * SPLIT_VEL_KICK,
-                      vy: b.vy + Math.sin(angle) * SPLIT_VEL_KICK,
-                      phase: b.phase },
+                      vx: b.vx + Math.cos(angle) * SPLIT_KICK,
+                      vy: b.vy + Math.sin(angle) * SPLIT_KICK,
+                      phase: b.phase,
+                      temp: b.temp },
                     { x: b.x - Math.cos(angle) * off,
                       y: b.y - Math.sin(angle) * off,
                       r: nr,
-                      vx: b.vx - Math.cos(angle) * SPLIT_VEL_KICK,
-                      vy: b.vy - Math.sin(angle) * SPLIT_VEL_KICK,
-                      phase: b.phase + Math.PI }
+                      vx: b.vx - Math.cos(angle) * SPLIT_KICK,
+                      vy: b.vy - Math.sin(angle) * SPLIT_KICK,
+                      phase: b.phase + Math.PI,
+                      temp: b.temp }
                 )
             } else {
                 postSplit.push(b)
@@ -250,12 +287,14 @@ Item {
         // ── 4. Respawn when blobs are lost to repeated merging ─────────────────
         while (bs.length < root.blobCount) {
             bs.push({
-                x:     w * (0.25 + Math.random() * 0.50),
-                y:     h * (0.55 + Math.random() * 0.38),
-                r:     Math.max(minR, Math.min(maxR * 0.6, Math.min(w, h) * (0.09 + Math.random() * 0.09))),
-                vx:    (Math.random() - 0.5) * 0.20,
-                vy:   -(Math.random() * 0.25),
-                phase: Math.random() * Math.PI * 2
+                x:     w * (0.20 + Math.random() * 0.60),
+                y:     h * (0.70 + Math.random() * 0.25),  // spawn at bottom
+                r:     Math.max(minR, Math.min(maxR * 0.55,
+                                Math.min(w, h) * (0.08 + Math.random() * 0.09))),
+                vx:    (Math.random() - 0.5) * 0.12,
+                vy:    (Math.random() - 0.5) * 0.08,
+                phase: Math.random() * Math.PI * 2,
+                temp:  0.0   // cold; will heat if CPU is active
             })
         }
 
@@ -310,23 +349,36 @@ Item {
 
             for (let py = 0; py < h; py += step) {
                 for (let px = 0; px < w; px += step) {
-                    let field = 0
+                    let field  = 0
+                    let tfield = 0   // temperature-weighted field accumulator
                     for (let i = 0; i < blobs.length; i++) {
                         const dx = px - blobs[i].x
                         const dy = py - blobs[i].y
                         const r2 = blobs[i].r * blobs[i].r
                         const d2 = dx * dx + dy * dy
-                        if (d2 > 0) field += r2 / d2
+                        if (d2 > 0) {
+                            const contrib = r2 / d2
+                            field  += contrib
+                            tfield += contrib * blobs[i].temp
+                        }
                     }
+                    // Pixel temperature: weighted average of contributing blobs.
+                    // This makes cold pooled lava appear dark and hot rising
+                    // lava vivid, providing clear visual feedback of the cycle.
+                    // Only computed when field is high enough that we will render.
 
                     if (field >= 1.0) {
-                        // Inside a blob (or merged blobs)
-                        const intensity = Math.min(1, (field - 1.0) / 2.0)
+                        // Inside a blob.  Colour intensity scales with temperature
+                        // so cold lava is dark and hot lava is bright.
+                        const pixTemp = tfield / field
+                        const raw = Math.min(1, (field - 1.0) / 2.0)
+                        const intensity = raw * (0.15 + pixTemp * 0.85)
                         ctx.fillStyle = root.blobFillCss(intensity)
                         ctx.fillRect(px, py, step, step)
-                    } else {
-                        // Subtle surface glow
-                        const glow = Math.max(0, field - 0.5) * 2
+                    } else if (field > 0.5) {
+                        // Subtle surface glow – also temperature-modulated.
+                        const pixTemp = tfield / field
+                        const glow = (field - 0.5) * 2 * (0.08 + pixTemp * 0.92)
                         if (glow > 0.02) {
                             ctx.fillStyle = root.glowCss(glow)
                             ctx.fillRect(px, py, step, step)
