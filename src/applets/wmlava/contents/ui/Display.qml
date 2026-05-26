@@ -149,37 +149,30 @@ Item {
         const maxR = Math.min(w, h) * 0.30
 
         // ── Physics constants ─────────────────────────────────────────────────
+        // These are read from Plasmoid.configuration so users can tune them
+        // via the config dialog without needing to rebuild.
         // Net force = BUOYANCY*temp - GRAVITY.  Breakeven temp = GRAVITY/BUOYANCY.
-        // At breakeven ≈ 0.44 the blob is neutrally buoyant.
-        //
-        // Gravity and buoyancy are tuned so that a fully-heated blob rises at
-        // ~1 px/tick (terminal velocity = net_force / (1-DRAG) ≈ 1.1 px/tick),
-        // crossing a 60-pixel canvas in ~1 second.  This gives a convincing
-        // lava-lamp flow speed at the 20 fps canvas frame rate.
-        //
-        // The floor is a hard stop – cold lava rests at the bottom without
-        // bouncing.  A floor normal-force cancels downward gravity exactly so
-        // pooled blobs sit completely still until they heat past breakeven and
-        // lift off cleanly.
-        const GRAVITY        = 0.08    // px/tick² downward
-        const BUOYANCY       = 0.18    // px/tick² upward at temp=1
+        // At the default breakeven ≈ 0.44 the blob is neutrally buoyant.
+        const GRAVITY        = Plasmoid.configuration.gravity     // px/tick² downward
+        const BUOYANCY       = Plasmoid.configuration.buoyancy    // px/tick² upward at temp=1
         // Blobs with y > HEAT_ZONE_Y * h are in the bottom heat zone (canvas y
         // increases downward, so this selects the lower portion of the container).
-        const HEAT_ZONE_Y    = 0.60    // generous bottom zone so blobs heat reliably
-        const HEAT_RATE      = 0.030   // temp/tick gained in heat zone
-        const COOL_RATE      = 0.010   // temp/tick lost outside heat zone
+        const HEAT_ZONE_Y    = Plasmoid.configuration.heatZoneY   // generous bottom zone so blobs heat reliably
+        const HEAT_RATE      = Plasmoid.configuration.heatRate    // temp/tick gained in heat zone
+        const COOL_RATE      = Plasmoid.configuration.coolRate    // temp/tick lost outside heat zone
         // Viscous drag gives the lazy flow of real wax (terminal rise ≈ 1 px/tick).
-        const DRAG           = 0.91
+        const DRAG           = Plasmoid.configuration.drag
         // Merge threshold: merge when centre distance < factor * (ra+rb)
         const MERGE_THRESH   = 0.70
         const SPLIT_OFFSET   = 0.38
         const SPLIT_KICK     = 0.22
 
         // ── Effective heat: base minimum + CPU component ──────────────────────
-        // The lamp bulb always provides at least 40% heat so blobs cycle at any
-        // CPU load.  Higher CPU load makes the cycle faster and more vigorous.
-        // At idle: effectiveHeat ≈ 0.42; at full load: effectiveHeat = 1.0.
-        const effectiveHeat = 0.40 + ht * 0.60
+        // baseHeat sets how active the lamp is at zero CPU load.  At the
+        // default of 0.40 the lamp always cycles.  Setting it to 0.0 makes
+        // the lamp respond only to actual CPU load.
+        const baseHeat      = Plasmoid.configuration.baseHeat
+        const effectiveHeat = baseHeat + ht * (1.0 - baseHeat)
 
         // Deep-copy so QML property binding fires on reassignment.
         let bs = root.blobs.map(b => Object.assign({}, b))
