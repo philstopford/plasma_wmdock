@@ -105,12 +105,21 @@ Item {
         const w = canvas.width  > 4 ? canvas.width  : 64
         const h = canvas.height > 4 ? canvas.height : 64
 
+        // Scale the base radius so that fewer blobs are individually larger,
+        // keeping visual density roughly constant across blob-count settings.
+        // Reference count is 5; sqrt gives area-proportional scaling.
+        const countScale = Math.sqrt(5.0 / root.blobCount)
+        const minR   = Math.min(w, h) * 0.07
+        const maxR   = Math.min(w, h) * 0.30
+
         let bs = []
         for (let i = 0; i < root.blobCount; i++) {
+            const r = Math.max(minR, Math.min(maxR,
+                          Math.min(w, h) * (0.10 + Math.random() * 0.10) * countScale))
             bs.push({
                 x:     w * (0.15 + Math.random() * 0.70),
                 y:     h * (0.65 + Math.random() * 0.30), // start cold at the bottom
-                r:     Math.min(w, h) * (0.10 + Math.random() * 0.10),
+                r:     r,
                 vy:    0,
                 vx:    (Math.random() - 0.5) * 0.1,
                 phase: Math.random() * Math.PI * 2,
@@ -164,8 +173,14 @@ Item {
         const DRAG           = Plasmoid.configuration.drag
         // Merge threshold: merge when centre distance < factor * (ra+rb)
         const MERGE_THRESH   = 0.70
-        const SPLIT_OFFSET   = 0.38
-        const SPLIT_KICK     = 0.22
+        // SPLIT_OFFSET must be GREATER than MERGE_THRESH so that daughter blobs
+        // are placed OUTSIDE the merge threshold from the start.  If it were
+        // smaller the daughters would re-merge on the very next tick, injecting
+        // SPLIT_KICK energy every cycle and causing the "energised jump" artifact.
+        // Daughter separation = 2 * nr * SPLIT_OFFSET; merge threshold = 2 * nr * MERGE_THRESH.
+        // With SPLIT_OFFSET = 0.80 > 0.70 daughters start safely separated.
+        const SPLIT_OFFSET   = 0.80
+        const SPLIT_KICK     = 0.30
 
         // ── Effective heat: base minimum + CPU component ──────────────────────
         // baseHeat sets how active the lamp is at zero CPU load.  At the
@@ -208,7 +223,9 @@ Item {
             // keeps cold pooled lava perfectly still (no jiggling) until it
             // heats past breakeven and the net force turns upward, at which
             // point the blob lifts off naturally.
-            const onFloor = b.y >= h - margin - 1.0
+            // Note: threshold matches the position clamp below exactly so a
+            // blob can't hover just above the clamp zone and get gravity applied.
+            const onFloor = b.y >= h - margin
             const effectiveAy = (onFloor && ay > 0) ? 0.0 : ay
 
             // ─ Tiny organic wobble (scales with temperature to keep cold
@@ -268,7 +285,12 @@ Item {
                         y:     (a.y    * ra2 + bs[j].y    * rb2) / tot,
                         vx:    (a.vx   * ra2 + bs[j].vx   * rb2) / tot,
                         vy:    (a.vy   * ra2 + bs[j].vy   * rb2) / tot,
-                        r:     Math.min(maxR, Math.sqrt(tot)),
+                        // Do NOT cap radius here: if the merged blob exceeds maxR the
+                        // split logic (pass 3) fires on this same tick and breaks it back
+                        // into two daughters.  Capping at maxR would set r === maxR so the
+                        // condition `b.r > maxR` would never be true and the blob would
+                        // stay permanently oversized, creating a low-energy locked state.
+                        r:     Math.sqrt(tot),
                         phase: a.phase,
                         temp:  (a.temp * ra2 + bs[j].temp * rb2) / tot
                     }
@@ -313,16 +335,22 @@ Item {
         bs = postSplit
 
         // ── 4. Respawn when blobs are lost to repeated merging ─────────────────
+        // Scale the respawn radius the same way initBlobs does so the new blob
+        // is appropriately sized for the configured blob count.
+        const countScale = Math.sqrt(5.0 / root.blobCount)
         while (bs.length < root.blobCount) {
+            const rr = Math.max(minR, Math.min(maxR * 0.55,
+                            Math.min(w, h) * (0.08 + Math.random() * 0.09) * countScale))
             bs.push({
                 x:     w * (0.20 + Math.random() * 0.60),
                 y:     h * (0.70 + Math.random() * 0.25),  // spawn at bottom
-                r:     Math.max(minR, Math.min(maxR * 0.55,
-                                Math.min(w, h) * (0.08 + Math.random() * 0.09))),
-                vx:    (Math.random() - 0.5) * 0.12,
-                vy:    (Math.random() - 0.5) * 0.08,
+                r:     rr,
+                vx:    (Math.random() - 0.5) * 0.06,
+                vy:    0,
                 phase: Math.random() * Math.PI * 2,
-                temp:  0.0   // cold; will heat if CPU is active
+                // Start slightly warm so the blob sinks gently rather than
+                // appearing as a sudden cold "pop-in" at the bottom.
+                temp:  0.10
             })
         }
 
