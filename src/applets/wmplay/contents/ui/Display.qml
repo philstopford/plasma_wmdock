@@ -163,8 +163,8 @@ Item {
             return m + ":" + String(s % 60).padStart(2, "0")
         }
         text: fmt(player.position) + "/" + fmt(player.duration)
-        color: "#446688"
-        font { pixelSize: parent.height * 0.09; family: "monospace" }
+        color: "#88aadd"
+        font { pixelSize: parent.height * 0.12; family: "monospace" }
     }
 
     // ----- transport controls ----------------------------------------------

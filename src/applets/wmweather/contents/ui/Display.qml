@@ -105,7 +105,7 @@ Item {
         visible: !wp.loading && wp.error.length === 0
         text: wp.description
         color: "#888"
-        font { pixelSize: parent.height * 0.09; family: "monospace" }
+        font { pixelSize: parent.height * 0.12; family: "monospace" }
         elide: Text.ElideRight
         horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.NoWrap
@@ -126,12 +126,12 @@ Item {
         Text {
             text: "💨" + wp.windSpeed.toFixed(0) + "km/h"
             color: "#5588bb"
-            font { pixelSize: root.height * 0.09; family: "monospace" }
+            font { pixelSize: root.height * 0.11; family: "monospace" }
         }
         Text {
             text: "💧" + wp.humidity.toFixed(0) + "%"
             color: "#448888"
-            font { pixelSize: root.height * 0.09; family: "monospace" }
+            font { pixelSize: root.height * 0.11; family: "monospace" }
         }
     }
 

@@ -8,7 +8,7 @@ Item {
 
     readonly property string configuredGpu: Plasmoid.configuration.gpu || ""
     readonly property int cycleIntervalSec: Math.max(1, Plasmoid.configuration.cycleInterval || 4)
-    readonly property real barLabelScale: 0.52
+    readonly property real barLabelScale: 0.65
     readonly property bool showTitle: Plasmoid.configuration.showTitle ?? true
 
     property int gpuIndex: 0
@@ -89,7 +89,7 @@ Item {
         }
         text: root.activeGpu ? root.activeGpu.name : i18n("No GPU detected")
         color: "#888"
-        font { pixelSize: parent.height * 0.08; family: "monospace" }
+        font { pixelSize: parent.height * 0.10; family: "monospace" }
         horizontalAlignment: Text.AlignHCenter
         elide: Text.ElideRight
         height: visible ? implicitHeight : 0
@@ -106,7 +106,7 @@ Item {
             leftMargin: 5
             rightMargin: 5
         }
-        height: parent.height * 0.13
+        height: parent.height * 0.18
         color: "#0a1a0a"
         radius: 1
 
@@ -140,7 +140,7 @@ Item {
             leftMargin: 5
             rightMargin: 5
         }
-        height: parent.height * 0.13
+        height: parent.height * 0.18
         color: "#0a0f1a"
         radius: 1
 
@@ -178,7 +178,7 @@ Item {
         color: "#77aaff"
         horizontalAlignment: Text.AlignHCenter
         elide: Text.ElideRight
-        font { pixelSize: parent.height * 0.09; family: "monospace" }
+        font { pixelSize: parent.height * 0.12; family: "monospace" }
     }
 
     TapHandler {

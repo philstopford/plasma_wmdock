@@ -276,12 +276,12 @@ Item {
             Text {
                 text: "↓" + root.fmtRate(NetworkMonitor.rxBytesPerSec)
                 color: "#00aa44"
-                font { pixelSize: singleView.height * 0.10; family: "monospace" }
+                font { pixelSize: singleView.height * 0.13; family: "monospace" }
             }
             Text {
                 text: "↑" + root.fmtRate(NetworkMonitor.txBytesPerSec)
                 color: "#4488ff"
-                font { pixelSize: singleView.height * 0.10; family: "monospace" }
+                font { pixelSize: singleView.height * 0.13; family: "monospace" }
             }
         }
     }
@@ -330,7 +330,7 @@ Item {
                         width: parent.width
                         text: modelData
                         color: "#00aaff"
-                        font { pixelSize: root.height * 0.09; family: "monospace"; bold: true }
+                        font { pixelSize: root.height * 0.12; family: "monospace"; bold: true }
                         elide: Text.ElideRight
                     }
                     Row {
@@ -340,12 +340,12 @@ Item {
                         Text {
                             text: "↓" + root.fmtRate(ifaceRow.ifaceStat.rxRate)
                             color: "#00aa44"
-                            font { pixelSize: root.height * 0.09; family: "monospace" }
+                            font { pixelSize: root.height * 0.11; family: "monospace" }
                         }
                         Text {
                             text: "↑" + root.fmtRate(ifaceRow.ifaceStat.txRate)
                             color: "#4488ff"
-                            font { pixelSize: root.height * 0.09; family: "monospace" }
+                            font { pixelSize: root.height * 0.11; family: "monospace" }
                         }
                     }
                 }
