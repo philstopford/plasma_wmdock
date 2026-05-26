@@ -158,21 +158,28 @@ Item {
         // lava-lamp flow speed at the 20 fps canvas frame rate.
         //
         // The floor is a hard stop – cold lava rests at the bottom without
-        // bouncing.  Only downward velocity is cancelled; upward velocity (when
-        // a blob finally heats past breakeven) is left intact so it can rise.
+        // bouncing.  A floor normal-force cancels downward gravity exactly so
+        // pooled blobs sit completely still until they heat past breakeven and
+        // lift off cleanly.
         const GRAVITY        = 0.08    // px/tick² downward
         const BUOYANCY       = 0.18    // px/tick² upward at temp=1
         // Blobs with y > HEAT_ZONE_Y * h are in the bottom heat zone (canvas y
         // increases downward, so this selects the lower portion of the container).
         const HEAT_ZONE_Y    = 0.60    // generous bottom zone so blobs heat reliably
         const HEAT_RATE      = 0.030   // temp/tick gained in heat zone
-        const COOL_RATE      = 0.006   // temp/tick lost outside heat zone
+        const COOL_RATE      = 0.010   // temp/tick lost outside heat zone
         // Viscous drag gives the lazy flow of real wax (terminal rise ≈ 1 px/tick).
         const DRAG           = 0.91
         // Merge threshold: merge when centre distance < factor * (ra+rb)
         const MERGE_THRESH   = 0.70
         const SPLIT_OFFSET   = 0.38
         const SPLIT_KICK     = 0.22
+
+        // ── Effective heat: base minimum + CPU component ──────────────────────
+        // The lamp bulb always provides at least 40% heat so blobs cycle at any
+        // CPU load.  Higher CPU load makes the cycle faster and more vigorous.
+        // At idle: effectiveHeat ≈ 0.42; at full load: effectiveHeat = 1.0.
+        const effectiveHeat = 0.40 + ht * 0.60
 
         // Deep-copy so QML property binding fires on reassignment.
         let bs = root.blobs.map(b => Object.assign({}, b))
@@ -181,13 +188,17 @@ Item {
         for (let i = 0; i < bs.length; i++) {
             const b = bs[i]
 
+            // margin per blob (20% of radius keeps centre inside canvas).
+            const margin = b.r * 0.20
+
             // Slow phase advance for organic wobble (independent of heat)
             b.phase += 0.020
 
             // ─ Heat exchange ─────────────────────────────────────────────────
             if (b.y / h > HEAT_ZONE_Y) {
-                // Near the bottom heater: absorb heat proportional to CPU load.
-                b.temp = Math.min(1.0, b.temp + ht * HEAT_RATE)
+                // Near the bottom heater: absorb heat.  A base minimum ensures
+                // blobs always cycle; CPU load makes the cycle faster.
+                b.temp = Math.min(1.0, b.temp + effectiveHeat * HEAT_RATE)
             } else {
                 // Away from heater: radiate heat. Cooling is slightly slowed
                 // when CPU is high (blob doesn't fully cool before returning).
@@ -197,6 +208,15 @@ Item {
             // ─ Net vertical acceleration ──────────────────────────────────────
             // Positive = downward.  Negative = upward (buoyancy > gravity).
             const ay = GRAVITY - b.temp * BUOYANCY
+
+            // ─ Floor normal force ─────────────────────────────────────────────
+            // When a blob rests on the floor and net force is downward, the
+            // floor provides a normal force that exactly cancels gravity.  This
+            // keeps cold pooled lava perfectly still (no jiggling) until it
+            // heats past breakeven and the net force turns upward, at which
+            // point the blob lifts off naturally.
+            const onFloor = b.y >= h - margin - 1.0
+            const effectiveAy = (onFloor && ay > 0) ? 0.0 : ay
 
             // ─ Tiny organic wobble (scales with temperature to keep cold
             //   pooled blobs still) ─────────────────────────────────────────
@@ -212,7 +232,7 @@ Item {
             }
 
             // ─ Apply forces & drag ────────────────────────────────────────────
-            b.vy += ay
+            b.vy += effectiveAy
             b.vx *= DRAG
             b.vy *= DRAG
 
@@ -221,14 +241,11 @@ Item {
             b.y += b.vy
 
             // ─ Wall constraints ───────────────────────────────────────────────
-            // margin: 20% of blob radius so the visible edge of the blob stays
-            // clearly within the canvas boundary at all wall contacts.
             // Side walls: gentle elastic rebound.
             // Top wall: gentle rebound (blobs can reach it when very hot).
-            // Bottom floor: HARD STOP – cold lava rests on the floor without
-            //   bouncing.  Any downward velocity is simply cancelled so blobs
-            //   settle smoothly and don't jiggle.
-            const margin = b.r * 0.20
+            // Bottom floor: HARD STOP – any downward velocity is cancelled so
+            //   blobs settle smoothly.  The normal-force above prevents the
+            //   gravity/clamp oscillation that caused visible jiggling.
             if (b.x < margin)     { b.x = margin;     b.vx =  Math.abs(b.vx) * 0.20 }
             if (b.x > w - margin) { b.x = w - margin; b.vx = -Math.abs(b.vx) * 0.20 }
             if (b.y < margin)     { b.y = margin;     b.vy =  Math.abs(b.vy) * 0.15 }
