@@ -180,6 +180,7 @@ Item {
             bottomMargin: 2
         }
         width:  height
+        source: drawerIcon
         isMask: false
     }
 
