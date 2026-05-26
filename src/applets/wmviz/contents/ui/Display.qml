@@ -6,18 +6,24 @@ import org.kde.plasma.private.wmdock 1.0
 /**
  * WMViz – Audio spectrum visualizer backed by CAVA (via AudioSpectrum).
  *
- * Seven MilkDrop-inspired effects driven by real spectral data:
+ * Nine MilkDrop-inspired effects driven by real spectral data:
  *
  *   bars      – classic spectrum analyser with per-bar peak markers
  *   wave      – radial scope: 16 bands plotted as a rotating petal blob
  *   circles   – starfield: per-band particles fired in radial directions
  *   plasma    – tunnel:    concentric circles zooming from centre
  *   terrain   – pseudo-3D spectral landscape flyover scrolling toward viewer;
- *               each of the 16 bands drives a hill height with perspective
+ *               each of the 16 bands drives a hill height with perspective;
+ *               optional view rotation (speed: treble) and wireframe mode
  *   vortex    – spectrally-deformed spinning tunnel; each of 10 ring slices is
- *               a 16-vertex polygon whose vertices are pushed out by their band
+ *               a 16-vertex polygon whose vertices are pushed out by their band;
+ *               centre drifts on a Lissajous path driven by treble / bass
  *   warp      – 16 glowing radial beams (one per band) shooting from centre,
  *               triple-layer glow with beat bursts; hyperspace / warp effect
+ *   ripple    – concentric ripples fired on beats and bass transients, with a
+ *               background per-band bubble field
+ *   kaleid    – 6-fold kaleidoscope of radial spectrum wedges rotating at a
+ *               rate driven by RMS and beat transients
  *
  * All effects react to beat transients (white flash) detected by the
  * AudioSpectrumMonitor C++ singleton.
@@ -26,8 +32,10 @@ Item {
     id: root
 
     // ----- configuration ---------------------------------------------------
-    readonly property string effect:      Plasmoid.configuration.effect      || "bars"
-    readonly property string colorScheme: Plasmoid.configuration.colorScheme || "green"
+    readonly property string effect:           Plasmoid.configuration.effect      || "bars"
+    readonly property string colorScheme:      Plasmoid.configuration.colorScheme || "green"
+    readonly property bool   terrainRotate:    Plasmoid.configuration.terrainRotate    || false
+    readonly property bool   terrainWireframe: Plasmoid.configuration.terrainWireframe || false
 
     // ----- colour helpers (CSS strings – required for Canvas fillStyle) -----
     function schemeColorCss(t) {
@@ -88,12 +96,23 @@ Item {
     readonly property int terrainMaxRows: 24
 
     // ----- vortex state -----------------------------------------------------
-    property real vortexAngle: 0
+    property real vortexAngle:  0
+    property real vortexDriftX: 0   // centre offset fraction (−1..1)
+    property real vortexDriftY: 0
 
     // ----- warp state -------------------------------------------------------
     // Per-band beam length in 0-1; each beam immediately jumps up when its
     // band energy rises and then decays exponentially.
     property var warpLengths: []
+
+    // ----- terrain rotation state -------------------------------------------
+    property real terrainRotAngle: 0
+
+    // ----- ripple state -----------------------------------------------------
+    property var ripples: []
+
+    // ----- kaleidoscope state -----------------------------------------------
+    property real kaleidPhase: 0
 
     Component.onCompleted: {
         peakBands   = new Array(numBands).fill(0)
@@ -142,6 +161,8 @@ Item {
             case "terrain": tickTerrain(); break
             case "vortex":  tickVortex();  break
             case "warp":    tickWarp();    break
+            case "ripple":  tickRipple();  break
+            case "kaleid":  tickKaleid();  break
             default:        tickBars();    break
             }
 
@@ -243,12 +264,26 @@ Item {
         if (hist.length > root.terrainMaxRows)
             hist.pop()
         root.terrainHistory = hist
+
+        // Optional rotating viewpoint: speed proportional to treble + beat kick
+        if (root.terrainRotate) {
+            const rotSpeed = 0.003 + root.treble * 0.012 + (root.gotBeat ? 0.08 : 0)
+            root.terrainRotAngle = (root.terrainRotAngle + rotSpeed) % (2 * Math.PI)
+        }
     }
 
     // ----- vortex tick --------------------------------------------------------
     function tickVortex() {
         const rotSpeed = 0.018 + root.rms * 0.045 + (root.gotBeat ? 0.14 : 0)
         root.vortexAngle = (root.vortexAngle + rotSpeed) % (2 * Math.PI)
+
+        // Centre drifts on a Lissajous path whose amplitude is driven by
+        // treble (high-freq detail) and bass (sub-freq impulse).
+        const driftAmp = Math.min(0.28, root.treble * 0.32 + root.bass * 0.08)
+        root.vortexDriftX = root.vortexDriftX * 0.94
+                            + Math.sin(root.vortexAngle * 1.7) * driftAmp
+        root.vortexDriftY = root.vortexDriftY * 0.94
+                            + Math.cos(root.vortexAngle * 2.3) * driftAmp * 0.65
     }
 
     // ----- warp tick ----------------------------------------------------------
@@ -265,6 +300,38 @@ Item {
             lens[i] = Math.max(target, lens[i] * decayRate)
         }
         root.warpLengths = lens
+    }
+
+    // ----- ripple tick --------------------------------------------------------
+    function tickRipple() {
+        const maxR = Math.min(canvas.width, canvas.height) * 0.80
+        const speed = 0.9 + root.bass * 1.8
+
+        // Advance existing ripples
+        let active = []
+        for (let i = 0; i < root.ripples.length; i++) {
+            const rp = root.ripples[i]
+            const nr = rp.radius + speed
+            const ne = rp.energy * 0.96
+            if (nr < maxR && ne > 0.02)
+                active.push({ radius: nr, energy: ne, hue: rp.hue })
+        }
+
+        // Large ripple on beat or strong bass transient
+        if ((root.gotBeat || root.bass > 0.55) && active.length < 8)
+            active.push({ radius: 2, energy: 0.65 + root.bass * 0.35, hue: root.treble })
+
+        // Steady smaller ripples driven by RMS
+        if (root.rms > 0.08 && active.length < 6 && (root.tickCount % 6 === 0))
+            active.push({ radius: 2, energy: root.rms * 0.45, hue: root.treble * 0.6 })
+
+        root.ripples = active
+    }
+
+    // ----- kaleidoscope tick --------------------------------------------------
+    function tickKaleid() {
+        const rotSpeed = 0.007 + root.rms * 0.025 + (root.gotBeat ? 0.18 : 0)
+        root.kaleidPhase = (root.kaleidPhase + rotSpeed) % (2 * Math.PI)
     }
 
     // ----- background -------------------------------------------------------
@@ -314,6 +381,8 @@ Item {
             case "terrain": paintTerrain(ctx); break
             case "vortex":  paintVortex(ctx);  break
             case "warp":    paintWarp(ctx);    break
+            case "ripple":  paintRipple(ctx);  break
+            case "kaleid":  paintKaleid(ctx);  break
             default:        paintBars(ctx);    break
             }
 
@@ -435,6 +504,14 @@ Item {
 
             const horizonY = h * 0.30
 
+            // Optional rotation: spin the whole viewport around the canvas centre
+            if (root.terrainRotate && root.terrainRotAngle !== 0) {
+                ctx.save()
+                ctx.translate(w * 0.5, h * 0.5)
+                ctx.rotate(root.terrainRotAngle)
+                ctx.translate(-w * 0.5, -h * 0.5)
+            }
+
             // Draw from farthest row (near horizon) to nearest (bottom canvas).
             // In terrainHistory index 0 is NEWEST (nearest), numRows-1 is OLDEST.
             for (let r = numRows - 1; r >= 0; r--) {
@@ -457,13 +534,16 @@ Item {
 
                 const energy = row.reduce((s, v) => s + v, 0) / root.numBands
                 const alpha  = 0.12 + (1 - t) * 0.70
-                ctx.fillStyle   = root.withAlpha(
-                    root.schemeColorCss((1 - t) * 0.55 + energy * 0.45), alpha)
-                ctx.fill()
+
+                if (!root.terrainWireframe) {
+                    ctx.fillStyle = root.withAlpha(
+                        root.schemeColorCss((1 - t) * 0.55 + energy * 0.45), alpha)
+                    ctx.fill()
+                }
 
                 // Wireframe ridge line on top of each terrain slice
                 ctx.strokeStyle = root.withAlpha(root.schemeColorCss(1 - t), (1 - t) * 0.55)
-                ctx.lineWidth   = 0.6
+                ctx.lineWidth   = root.terrainWireframe ? 1.0 : 0.6
                 ctx.stroke()
             }
 
@@ -473,15 +553,21 @@ Item {
             ctx.beginPath()
             ctx.moveTo(0, horizonY); ctx.lineTo(w, horizonY)
             ctx.stroke()
+
+            if (root.terrainRotate && root.terrainRotAngle !== 0)
+                ctx.restore()
         }
 
         // ---- vortex (spectrally-deformed spinning tunnel) --------------------
         function paintVortex(ctx) {
             const w       = width,  h  = height
-            const cx      = w / 2,  cy = h / 2
+            // Centre drifts on a Lissajous path driven by treble / bass
+            const driftScale = Math.min(w, h) * 0.10
+            const cx      = w / 2 + root.vortexDriftX * driftScale
+            const cy      = h / 2 + root.vortexDriftY * driftScale
             const N       = 16      // polygon vertices per ring
             const numRings = 10
-            const maxR    = Math.min(cx, cy) * 0.92
+            const maxR    = Math.min(w / 2, h / 2) * 0.92
             const bands   = root.bandVals
 
             // Draw innermost (vanishing point) first, outermost last.
@@ -569,6 +655,107 @@ Item {
             ctx.beginPath()
             ctx.arc(cx, cy, coreR, 0, 2 * Math.PI)
             ctx.fill()
+        }
+
+        // ---- ripple (concentric pond ripples + band bubbles) -----------------
+        function paintRipple(ctx) {
+            const w      = width,  h  = height
+            const cx     = w / 2,  cy = h / 2
+            const bands  = root.bandVals
+
+            // Background: small per-band circles arranged radially
+            if (bands && bands.length >= root.numBands) {
+                for (let i = 0; i < root.numBands; i++) {
+                    const v     = bands[i] || 0
+                    if (v < 0.04) continue
+                    const angle = 2 * Math.PI * i / root.numBands
+                    const r     = Math.min(cx, cy) * (0.10 + v * 0.58)
+                    const bx    = cx + Math.cos(angle) * r
+                    const by    = cy + Math.sin(angle) * r
+                    const bSize = Math.max(1.2, v * 4.5)
+                    ctx.strokeStyle = root.withAlpha(root.schemeColorCss(i / root.numBands), v * 0.45)
+                    ctx.lineWidth   = 0.8
+                    ctx.beginPath()
+                    ctx.arc(bx, by, bSize, 0, 2 * Math.PI)
+                    ctx.stroke()
+                }
+            }
+
+            // Ripple rings
+            const ripples = root.ripples
+            for (let i = 0; i < ripples.length; i++) {
+                const rp    = ripples[i]
+                const alpha = rp.energy * 0.85
+                ctx.strokeStyle = root.withAlpha(root.schemeColorCss(rp.hue), alpha)
+                ctx.lineWidth   = Math.max(0.5, rp.energy * 2.5)
+                ctx.beginPath()
+                ctx.arc(cx, cy, rp.radius, 0, 2 * Math.PI)
+                ctx.stroke()
+            }
+
+            // Centre glow
+            if (root.rms > 0.04) {
+                const gr = Math.max(1.5, root.rms * 6)
+                ctx.fillStyle = root.withAlpha(root.schemeColorCss(root.treble), root.rms * 0.85)
+                ctx.beginPath()
+                ctx.arc(cx, cy, gr, 0, 2 * Math.PI)
+                ctx.fill()
+            }
+        }
+
+        // ---- kaleidoscope (6-fold mirrored spectrum wedges) -----------------
+        function paintKaleid(ctx) {
+            const w      = width,  h  = height
+            const cx     = w / 2,  cy = h / 2
+            const maxR   = Math.min(cx, cy) * 0.90
+            const bands  = root.bandVals
+            const folds  = 6
+            if (!bands || bands.length < root.numBands) return
+
+            const energy = bands.reduce((s, v) => s + v, 0) / root.numBands
+
+            for (let k = 0; k < folds; k++) {
+                // Each fold rotated by 60° + slow phase driven by RMS / beats
+                const foldAngle = k * 2 * Math.PI / folds + root.kaleidPhase
+
+                // Draw the wedge twice: once normal, once mirrored (scale Y =-1)
+                for (let mirror = 0; mirror < 2; mirror++) {
+                    ctx.save()
+                    ctx.translate(cx, cy)
+                    ctx.rotate(foldAngle)
+                    if (mirror === 1) ctx.scale(1, -1)  // mirror image
+
+                    ctx.beginPath()
+                    ctx.moveTo(0, 0)
+                    for (let i = 0; i < root.numBands; i++) {
+                        // Sweep band points through the half-wedge angle
+                        const sweep = Math.PI / folds
+                        const ang   = sweep * i / Math.max(1, root.numBands - 1) - sweep * 0.5
+                        const r     = maxR * (0.15 + (bands[i] || 0) * 0.85)
+                        ctx.lineTo(Math.cos(ang) * r, Math.sin(ang) * r)
+                    }
+                    ctx.closePath()
+
+                    ctx.fillStyle = root.withAlpha(
+                        root.schemeColorCss(k / folds + root.treble * 0.12),
+                        0.12 + energy * 0.30)
+                    ctx.fill()
+
+                    ctx.strokeStyle = root.schemeColorCss(k / folds + root.treble * 0.12)
+                    ctx.lineWidth   = 0.7 + root.rms * 1.2
+                    ctx.stroke()
+                    ctx.restore()
+                }
+            }
+
+            // Centre dot
+            if (root.rms > 0.03) {
+                const cr = Math.max(1.5, root.rms * 5)
+                ctx.fillStyle = root.schemeColorCss(0.9)
+                ctx.beginPath()
+                ctx.arc(cx, cy, cr, 0, 2 * Math.PI)
+                ctx.fill()
+            }
         }
     }
 }

@@ -20,8 +20,8 @@ Item {
     // Each instance creates its own WeatherProvider
     WeatherProvider {
         id: wp
-        latitude:  Plasmoid.configuration.latitude  || 51.5
-        longitude: Plasmoid.configuration.longitude || -0.12
+        latitude:  Plasmoid.configuration.latitude
+        longitude: Plasmoid.configuration.longitude
         tempUnit:  Plasmoid.configuration.tempUnit  || "celsius"
         updateIntervalMinutes: Math.max(1, Plasmoid.configuration.updateIntervalMinutes || 30)
     }

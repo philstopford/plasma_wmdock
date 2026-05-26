@@ -77,7 +77,8 @@ private Q_SLOTS:
 
 private:
     QNetworkAccessManager m_nam;
-    QTimer  m_timer;
+    QTimer  m_timer;         // periodic auto-refresh
+    QTimer  m_debounceTimer; // coalesces rapid property changes
     double  m_lat         = 51.5;   // default: London
     double  m_lon         = -0.12;
     QString m_locationName;
