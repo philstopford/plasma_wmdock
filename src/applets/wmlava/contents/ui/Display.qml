@@ -306,14 +306,31 @@ Item {
         }
         bs = postMerge
 
-        // ── 3. Splitting oversized blobs ──────────────────────────────────────
-        // A blob that grew beyond maxR breaks into two equal-area daughters.
-        // Only hot (rising) blobs split – cold pooled lava stays merged.
-        const canSplit = bs.length < root.blobCount * 2
+        // ── 3. Splitting ──────────────────────────────────────────────────────
+        // Two mechanisms, both area-conserving (total r² is invariant):
+        //
+        //  a) Hot split: a blob that grew beyond maxR while hot (temp > 0.55)
+        //     breaks symmetrically into two equal daughters.  This models the
+        //     necking of a rapidly-rising wax column.
+        //
+        //  b) Bottom fragmentation: a large blob sitting in the heat zone and
+        //     warm enough (temp > 0.25) sheds a small rising bubble with ~3 %
+        //     probability each tick.  This models non-uniform heating – part of
+        //     the pooled wax warms faster and detaches.  The daughter takes
+        //     FRAG_AREA_FRAC of the parent's area; the parent shrinks by the
+        //     same amount.  No volume is created or destroyed.
+        //
+        // The cap (blobCount × 3) bounds the maximum blob count so the pixel
+        // loop stays cheap while still allowing generous fragmentation.
+        const canSplit      = bs.length < root.blobCount * 3
+        // Fragmentation constants
+        const FRAG_AREA_FRAC = 0.15   // daughter takes 15 % of parent's area
+        const FRAG_KICK      = 0.25   // upward speed given to the rising bubble
         const postSplit = []
         for (let i = 0; i < bs.length; i++) {
             const b = bs[i]
             if (canSplit && b.r > maxR && b.temp > 0.55) {
+                // ── a) Hot split: symmetric, equal daughters ───────────────────
                 const nr    = b.r / Math.SQRT2
                 const angle = Math.random() * Math.PI * 2
                 const off   = nr * SPLIT_OFFSET
@@ -333,34 +350,47 @@ Item {
                       phase: b.phase + Math.PI,
                       temp: b.temp }
                 )
+            } else if (canSplit && b.r > minR * 2.0
+                       && b.y / h > HEAT_ZONE_Y
+                       && b.temp > 0.25
+                       && Math.random() < 0.03) {
+                // ── b) Bottom fragmentation: asymmetric bubble emission ────────
+                // Parent shrinks; daughter (the bubble) rises with an upward kick.
+                const parentR   = b.r * Math.sqrt(1.0 - FRAG_AREA_FRAC)
+                const daughterR = b.r * Math.sqrt(FRAG_AREA_FRAC)
+                // Daughter rises mostly upward with a slight random lateral spread.
+                const angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.8
+                // Separate centres so daughter starts outside the merge threshold.
+                const sep = parentR + daughterR
+                postSplit.push(
+                    // Shrunken parent stays in place
+                    { x:     b.x,
+                      y:     b.y,
+                      r:     parentR,
+                      vx:    b.vx,
+                      vy:    b.vy,
+                      phase: b.phase,
+                      temp:  b.temp * 0.92 },   // parent loses a little heat to the departing bubble
+                    // Rising daughter bubble
+                    { x:     b.x + Math.cos(angle) * sep,
+                      y:     b.y + Math.sin(angle) * sep,
+                      r:     daughterR,
+                      vx:    b.vx + Math.cos(angle) * FRAG_KICK,
+                      vy:    b.vy + Math.sin(angle) * FRAG_KICK,
+                      phase: b.phase + Math.PI,
+                      temp:  Math.min(1.0, b.temp * 1.12) }   // bubble is slightly warmer
+                )
             } else {
                 postSplit.push(b)
             }
         }
         bs = postSplit
 
-        // ── 4. Respawn when blobs are lost to repeated merging ─────────────────
-        // Scale the respawn radius the same way initBlobs does so the new blob
-        // is appropriately sized for the configured blob count.
-        const countScale = Math.sqrt(5.0 / root.blobCount)
-        while (bs.length < root.blobCount) {
-            const rr = Math.max(minR, Math.min(maxR * 0.55,
-                            Math.min(w, h) * (0.08 + Math.random() * 0.09) * countScale))
-            bs.push({
-                x:     w * (0.20 + Math.random() * 0.60),
-                y:     h * (0.70 + Math.random() * 0.25),  // spawn at bottom
-                r:     rr,
-                // Small lateral drift only; vy=0 so the blob sinks smoothly
-                // under gravity rather than popping in with a jarring random
-                // upward or downward kick.
-                vx:    (Math.random() - 0.5) * 0.06,
-                vy:    0,
-                phase: Math.random() * Math.PI * 2,
-                // Start slightly warm so the blob sinks gently rather than
-                // appearing as a sudden cold "pop-in" at the bottom.
-                temp:  0.10
-            })
-        }
+        // No respawn step: total lava volume is conserved across the simulation.
+        // Merge conserves area: √(ra²+rb²) gives one blob whose area equals the
+        // sum of the two originals.  Both split paths produce daughters whose
+        // combined area equals the parent's.  The dynamic blob count emerges
+        // from the heat/cool cycle naturally.
 
         root.blobs = bs
     }
