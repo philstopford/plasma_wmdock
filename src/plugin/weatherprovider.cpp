@@ -19,6 +19,9 @@ WeatherProvider::WeatherProvider(QObject *parent)
     m_timer.setInterval(30 * 60 * 1000); // 30 minutes
 
     // Coalesce rapid lat/lon/unit changes from QML property bindings.
+    // 400 ms is shorter than the startup delay intentionally: on startup we
+    // need the full 500 ms for QML to set all properties; for subsequent
+    // user-initiated changes (e.g. config page edits) 400 ms is enough.
     m_debounceTimer.setSingleShot(true);
     m_debounceTimer.setInterval(400);
     connect(&m_debounceTimer, &QTimer::timeout, this, &WeatherProvider::refresh);
