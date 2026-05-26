@@ -114,7 +114,7 @@ Item {
                 vy:    0,
                 vx:    (Math.random() - 0.5) * 0.1,
                 phase: Math.random() * Math.PI * 2,
-                temp:  0.0   // all blobs start cold; heat arrives from bottom over time
+                temp:  0.25  // start pre-warmed so blobs reach breakeven within ~3 s at moderate load
             })
         }
         root.blobs = bs
@@ -150,24 +150,29 @@ Item {
 
         // ── Physics constants ─────────────────────────────────────────────────
         // Net force = BUOYANCY*temp - GRAVITY.  Breakeven temp = GRAVITY/BUOYANCY.
-        // At breakeven ≈ 0.40 the blob is neutrally buoyant.
+        // At breakeven ≈ 0.44 the blob is neutrally buoyant.
         //
-        // Gravity is kept deliberately weak so that even cold blobs settle slowly
-        // and gently onto the floor instead of slamming into it and bouncing.
-        // The floor is a hard stop (not elastic) – cold lava rests, it doesn't bounce.
-        const GRAVITY        = 0.018   // px/tick² downward (slow gentle sink)
-        const BUOYANCY       = 0.045   // px/tick² upward at temp=1
+        // Gravity and buoyancy are tuned so that a fully-heated blob rises at
+        // ~1 px/tick (terminal velocity = net_force / (1-DRAG) ≈ 1.1 px/tick),
+        // crossing a 60-pixel canvas in ~1 second.  This gives a convincing
+        // lava-lamp flow speed at the 20 fps canvas frame rate.
+        //
+        // The floor is a hard stop – cold lava rests at the bottom without
+        // bouncing.  Only downward velocity is cancelled; upward velocity (when
+        // a blob finally heats past breakeven) is left intact so it can rise.
+        const GRAVITY        = 0.08    // px/tick² downward
+        const BUOYANCY       = 0.18    // px/tick² upward at temp=1
         // Blobs with y > HEAT_ZONE_Y * h are in the bottom heat zone (canvas y
         // increases downward, so this selects the lower portion of the container).
         const HEAT_ZONE_Y    = 0.60    // generous bottom zone so blobs heat reliably
         const HEAT_RATE      = 0.030   // temp/tick gained in heat zone
-        const COOL_RATE      = 0.006   // temp/tick lost outside heat zone (symmetric with heat)
-        // Strong viscous drag so blobs move with the lazy heaviness of real lava.
-        const DRAG           = 0.88
+        const COOL_RATE      = 0.006   // temp/tick lost outside heat zone
+        // Viscous drag gives the lazy flow of real wax (terminal rise ≈ 1 px/tick).
+        const DRAG           = 0.91
         // Merge threshold: merge when centre distance < factor * (ra+rb)
         const MERGE_THRESH   = 0.70
         const SPLIT_OFFSET   = 0.38
-        const SPLIT_KICK     = 0.10
+        const SPLIT_KICK     = 0.22
 
         // Deep-copy so QML property binding fires on reassignment.
         let bs = root.blobs.map(b => Object.assign({}, b))
