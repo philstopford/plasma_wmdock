@@ -25,23 +25,12 @@ Item {
     }
 
     // -----------------------------------------------------------------------
-    // Title
-    // -----------------------------------------------------------------------
-    Text {
-        id: titleText
-        anchors { top: parent.top; horizontalCenter: parent.horizontalCenter; topMargin: 2 }
-        text: "VOL"
-        color: AudioManager.available ? "#ffaa00" : "#444"
-        font { pixelSize: parent.height * 0.12; family: "monospace"; bold: true }
-    }
-
-    // -----------------------------------------------------------------------
     // LED bar (Canvas)
     // -----------------------------------------------------------------------
     Canvas {
         id: volCanvas
         anchors {
-            top:         titleText.bottom
+            top:         parent.top
             left:        parent.left
             right:       parent.right
             bottom:      muteLabel.top

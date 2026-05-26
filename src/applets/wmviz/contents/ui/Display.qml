@@ -280,11 +280,11 @@ Item {
     function tickVortex() {
         // Primary tunnel spin speed (drives twist / helix accumulation)
         const rotSpeed = 0.018 + root.rms * 0.045 + (root.gotBeat ? 0.14 : 0)
-        root.vortexAngle = (root.vortexAngle + rotSpeed) % (2 * Math.PI)
+        root.vortexAngle = root.vortexAngle + rotSpeed
 
         // Banking (camera roll): continuous slow roll, kicked by bass transients
         const rollSpeed = 0.003 + root.bass * 0.018 + (root.gotBeat ? 0.09 : 0)
-        root.vortexRoll = (root.vortexRoll + rollSpeed) % (2 * Math.PI)
+        root.vortexRoll = root.vortexRoll + rollSpeed
 
         // Forward travel through tunnel: advances all ring depths toward viewer
         const travelSpeed = 0.009 + root.rms * 0.014
@@ -355,24 +355,15 @@ Item {
         border.width: 1
     }
 
-    // ----- title ------------------------------------------------------------
-    Text {
-        id: titleText
-        anchors { top: parent.top; horizontalCenter: parent.horizontalCenter; topMargin: 1 }
-        text:  "VIZ"
-        color: root.schemeColorCss(0.8)
-        font { pixelSize: parent.height * 0.10; family: "monospace"; bold: true }
-    }
-
     // ----- main canvas ------------------------------------------------------
     Canvas {
         id: canvas
         anchors {
-            top:          titleText.bottom
+            top:          parent.top
             left:         parent.left
             right:        parent.right
             bottom:       parent.bottom
-            topMargin:    1
+            topMargin:    3
             leftMargin:   3
             rightMargin:  3
             bottomMargin: 3
@@ -513,6 +504,9 @@ Item {
             const history  = root.terrainHistory
             const numRows  = history.length
             if (numRows === 0) return
+
+            ctx.fillStyle = "#000"
+            ctx.fillRect(0, 0, w, h)
 
             const horizonY = h * 0.30
 

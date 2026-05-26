@@ -76,20 +76,12 @@ Item {
     }
 
     Text {
-        id: titleText
-        anchors { top: parent.top; horizontalCenter: parent.horizontalCenter; topMargin: 2 }
-        text: root.activeGpu ? ("GPU " + root.activeGpu.key) : "GPU"
-        color: "#00aaff"
-        font { pixelSize: parent.height * 0.11; family: "monospace"; bold: true }
-    }
-
-    Text {
         id: nameText
         anchors {
-            top: titleText.bottom
+            top: parent.top
             left: parent.left
             right: parent.right
-            topMargin: 1
+            topMargin: 2
             leftMargin: 3
             rightMargin: 3
         }

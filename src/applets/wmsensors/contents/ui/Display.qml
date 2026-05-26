@@ -92,20 +92,11 @@ Item {
         border.width: 1
     }
 
-    // ----- title -----------------------------------------------------------
-    Text {
-        id: titleText
-        anchors { top: parent.top; horizontalCenter: parent.horizontalCenter; topMargin: 2 }
-        text: "TEMP"
-        color: "#ffaa00"
-        font { pixelSize: parent.height * 0.11; family: "monospace"; bold: true }
-    }
-
     // ----- temperature bar -------------------------------------------------
     Item {
         id: barArea
         anchors {
-            top:        titleText.bottom; topMargin: 3
+            top:        parent.top; topMargin: 3
             left:       parent.left;  leftMargin: 5
             right:      parent.right; rightMargin: 5
         }

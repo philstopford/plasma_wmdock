@@ -182,21 +182,10 @@ Item {
         visible: root.useSingleDisplay
         anchors.fill: parent
 
-        Text {
-            id: titleText
-            anchors { top: parent.top; horizontalCenter: parent.horizontalCenter; topMargin: 1 }
-            text: "NET " + (NetworkMonitor.iface || "")
-            color: "#00aaff"
-            font { pixelSize: singleView.height * 0.11; family: "monospace"; bold: true }
-            elide: Text.ElideRight
-            width: parent.width - 4
-            horizontalAlignment: Text.AlignHCenter
-        }
-
         Canvas {
             id: graph
             anchors {
-                top:          titleText.bottom
+                top:          parent.top
                 left:         parent.left
                 right:        parent.right
                 bottom:       rateRow.top

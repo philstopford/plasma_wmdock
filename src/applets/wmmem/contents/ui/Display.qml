@@ -29,23 +29,12 @@ Item {
     }
 
     // -----------------------------------------------------------------------
-    // Title
-    // -----------------------------------------------------------------------
-    Text {
-        id: titleText
-        anchors { top: parent.top; horizontalCenter: parent.horizontalCenter; topMargin: 2 }
-        text: "MEM"
-        color: "#00aaff"
-        font { pixelSize: parent.height * 0.12; family: "monospace"; bold: true }
-    }
-
-    // -----------------------------------------------------------------------
     // RAM row
     // -----------------------------------------------------------------------
     Item {
         id: ramRow
         anchors {
-            top:        titleText.bottom
+            top:        parent.top
             topMargin:  parent.height * 0.04
             left:       parent.left
             right:      parent.right

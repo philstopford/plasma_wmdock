@@ -54,25 +54,15 @@ Item {
     }
 
     // -----------------------------------------------------------------------
-    // Header label
-    // -----------------------------------------------------------------------
-    Text {
-        id: titleText
-        anchors { top: parent.top; horizontalCenter: parent.horizontalCenter; topMargin: 2 }
-        text: "CPU"
-        color: "#00cc00"
-        font { pixelSize: parent.height * 0.12; family: "monospace"; bold: true }
-    }
-
-    // -----------------------------------------------------------------------
-    // Per-core bars (thin strip below title)
+    // Per-core bars (thin strip at top)
     // -----------------------------------------------------------------------
     Canvas {
         id: coreBar
         anchors {
-            top:        titleText.bottom
+            top:        parent.top
             left:       parent.left
             right:      parent.right
+            topMargin:  3
             leftMargin: 3
             rightMargin: 3
         }

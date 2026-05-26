@@ -81,20 +81,11 @@ Item {
         border.width: 1
     }
 
-    // ----- title bar -------------------------------------------------------
-    Text {
-        id: titleText
-        anchors { top: parent.top; horizontalCenter: parent.horizontalCenter; topMargin: 2 }
-        text: "PLAY"
-        color: "#00aaff"
-        font { pixelSize: parent.height * 0.11; family: "monospace"; bold: true }
-    }
-
     // ----- scrolling track name --------------------------------------------
     Item {
         id: trackRow
         anchors {
-            top: titleText.bottom; topMargin: 2
+            top: parent.top; topMargin: 2
             left: parent.left; right: parent.right
             leftMargin: 3; rightMargin: 3
         }

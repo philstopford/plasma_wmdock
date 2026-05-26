@@ -31,23 +31,12 @@ Item {
     }
 
     // -----------------------------------------------------------------------
-    // Title
-    // -----------------------------------------------------------------------
-    Text {
-        id: titleText
-        anchors { top: parent.top; horizontalCenter: parent.horizontalCenter; topMargin: 2 }
-        text: "LOAD"
-        color: "#cc8800"
-        font { pixelSize: parent.height * 0.12; family: "monospace"; bold: true }
-    }
-
-    // -----------------------------------------------------------------------
-    // Row-area container (fills space below title)
+    // Row-area container (fills full height)
     // -----------------------------------------------------------------------
     Item {
         id: rowArea
         anchors {
-            top:    titleText.bottom
+            top:    parent.top
             bottom: parent.bottom
             left:   parent.left
             right:  parent.right
