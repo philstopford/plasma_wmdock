@@ -61,6 +61,10 @@ Item {
         return (bytes / 1048576).toFixed(0) + " MiB"
     }
 
+    function fmtGiB(bytes) {
+        return (bytes / (1048576 * 1024)).toFixed(0) + "G"
+    }
+
     function barColor(pct) {
         if (pct >= 90) return "#dd2200"
         if (pct >= 70) return "#cc7700"
@@ -173,7 +177,7 @@ Item {
             rightMargin: 4
         }
         text: (root.activeGpu && root.activeGpu.hasVram)
-              ? (root.fmtMiB(root.activeGpu.vramUsedBytes) + " / " + root.fmtMiB(root.activeGpu.vramTotalBytes))
+              ? (root.fmtGiB(root.activeGpu.vramUsedBytes) + "/" + root.fmtGiB(root.activeGpu.vramTotalBytes))
               : ""
         color: "#77aaff"
         horizontalAlignment: Text.AlignHCenter
