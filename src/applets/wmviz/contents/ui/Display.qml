@@ -6,7 +6,7 @@ import org.kde.plasma.private.wmdock 1.0
 /**
  * WMViz – Audio spectrum visualizer backed by CAVA (via AudioSpectrum).
  *
- * Nine MilkDrop-inspired effects driven by real spectral data:
+ * Thirteen MilkDrop-inspired effects driven by real spectral data:
  *
  *   bars      – classic spectrum analyser with per-bar peak markers
  *   wave      – radial scope: 16 bands plotted as a rotating petal blob
@@ -26,6 +26,17 @@ import org.kde.plasma.private.wmdock 1.0
  *               background per-band bubble field
  *   kaleid    – 6-fold kaleidoscope of radial spectrum wedges rotating at a
  *               rate driven by RMS and beat transients
+ *   nova      – afterglow bloom: persistence-of-vision fade creates glowing
+ *               comet trails; beat bursts fire 130 particles with halos; steady
+ *               per-band emission weaves a swirling nebula
+ *   galaxy    – rotating logarithmic spiral galaxy: 700 stars distributed
+ *               across two arms react per-band; galactic core pulses with bass
+ *   aurora    – 8 flowing northern-lights curtains; each ribbon's amplitude
+ *               and brightness driven by a pair of adjacent bands, with
+ *               independent sinusoidal phase drift per ribbon
+ *   mandala   – 12/8/6-fold geometric mandala with three counter-rotating
+ *               petal layers; each layer's radii driven by a different subset
+ *               of bands, building dense jewel-like symmetry
  *
  * All effects react to beat transients (white flash) detected by the
  * AudioSpectrumMonitor C++ singleton.
@@ -118,10 +129,56 @@ Item {
     // ----- kaleidoscope state -----------------------------------------------
     property real kaleidPhase: 0
 
+    // ----- nova (afterglow bloom) state -------------------------------------
+    property var  novaParticles: []
+
+    // ----- galaxy (rotating spiral) state -----------------------------------
+    property real galaxyAngle: 0
+    property var  galaxyStars: []
+
+    // ----- aurora (northern lights) state -----------------------------------
+    property real auroraTime: 0
+
+    // ----- mandala (multi-layer geometric) state ----------------------------
+    property real mandalaPhase: 0
+
     Component.onCompleted: {
         peakBands   = new Array(numBands).fill(0)
         bandVals    = new Array(numBands).fill(0)
         warpLengths = new Array(numBands).fill(0)
+
+        // Build the galaxy star field once at startup so positions are fixed
+        // and per-frame rendering only needs to rotate and draw.
+        const ARMS          = 2
+        const STARS_PER_ARM = 280
+        const HALO_STARS    = 140
+        let gs = []
+        for (let arm = 0; arm < ARMS; arm++) {
+            for (let s = 0; s < STARS_PER_ARM; s++) {
+                const t = s / STARS_PER_ARM
+                const theta = t * 4.5 * Math.PI
+                // Scatter: more spread toward the outer rim
+                const scat = (Math.random() - 0.5) * 0.18 * Math.sqrt(t + 0.05)
+                gs.push({
+                    r:        Math.sqrt(t) * 0.88 + scat,
+                    theta:    theta + arm * Math.PI + (Math.random() - 0.5) * 0.38,
+                    hue:      t * 0.65 + Math.random() * 0.15,
+                    size:     0.6 + Math.random() * 1.2 * (1.0 - t * 0.55),
+                    bandBias: Math.floor(t * 16) % 16
+                })
+            }
+        }
+        // Scattered halo stars not on any arm
+        for (let i = 0; i < HALO_STARS; i++) {
+            gs.push({
+                r:        0.20 + Math.random() * 0.80,
+                theta:    Math.random() * 2 * Math.PI,
+                hue:      Math.random(),
+                size:     0.5,
+                bandBias: Math.floor(Math.random() * 16)
+            })
+        }
+        galaxyStars = gs
     }
 
     // ----- beat → flash ------------------------------------------------------
@@ -159,15 +216,19 @@ Item {
             root.beatFlash = Math.max(0, root.beatFlash - 0.12)
 
             switch (root.effect) {
-            case "wave":    tickScope();   break
-            case "circles": tickStars();   break
-            case "plasma":  tickTunnel();  break
-            case "terrain": tickTerrain(); break
-            case "vortex":  tickVortex();  break
-            case "warp":    tickWarp();    break
-            case "ripple":  tickRipple();  break
-            case "kaleid":  tickKaleid();  break
-            default:        tickBars();    break
+            case "wave":    tickScope();    break
+            case "circles": tickStars();    break
+            case "plasma":  tickTunnel();   break
+            case "terrain": tickTerrain();  break
+            case "vortex":  tickVortex();   break
+            case "warp":    tickWarp();     break
+            case "ripple":  tickRipple();   break
+            case "kaleid":  tickKaleid();   break
+            case "nova":    tickNova();     break
+            case "galaxy":  tickGalaxy();   break
+            case "aurora":  tickAurora();   break
+            case "mandala": tickMandala();  break
+            default:        tickBars();     break
             }
 
             root.gotBeat = false   // consumed by tick functions above
@@ -346,6 +407,82 @@ Item {
         root.kaleidPhase = (root.kaleidPhase + rotSpeed) % (2 * Math.PI)
     }
 
+    // ----- nova tick ----------------------------------------------------------
+    function tickNova() {
+        const cx       = canvas.width  / 2
+        const cy       = canvas.height / 2
+        const maxSpeed = Math.min(cx, cy) * 0.14
+        const bands    = root.bandVals
+
+        // Advance and decay existing particles
+        let alive = []
+        for (let i = 0; i < root.novaParticles.length; i++) {
+            const p  = root.novaParticles[i]
+            const nl = p.life - (p.tracer ? 0.009 : 0.021)
+            if (nl > 0)
+                alive.push({ x: p.x + p.vx, y: p.y + p.vy,
+                            vx: p.vx * 0.97, vy: p.vy * 0.97,
+                            life: nl, hue: p.hue, size: p.size, tracer: p.tracer })
+        }
+
+        // Continuous per-band emission in each band's radial direction
+        if (alive.length < 300) {
+            for (let i = 0; i < 16; i++) {
+                const v = bands[i] || 0
+                if (v > 0.08 && Math.random() < v * 0.55) {
+                    const angle = 2 * Math.PI * i / 16 + (Math.random() - 0.5) * 0.70
+                    const speed = v * maxSpeed * (0.4 + root.rms * 0.9)
+                    alive.push({ x: cx, y: cy,
+                                vx: Math.cos(angle) * speed,
+                                vy: Math.sin(angle) * speed,
+                                life: 0.6 + Math.random() * 0.4,
+                                hue: i / 16, size: 1.2 + v * 2.5, tracer: false })
+                }
+            }
+        }
+
+        // Beat burst: 130 particles, first 24 are slow long-lived "tracers"
+        if (root.gotBeat) {
+            for (let j = 0; j < 130; j++) {
+                const angle  = Math.random() * 2 * Math.PI
+                const tracer = j < 24
+                const speed  = (0.35 + root.bass * 0.75 + Math.random() * 0.30) * maxSpeed
+                               * (tracer ? 0.35 : 1.0)
+                alive.push({ x: cx, y: cy,
+                            vx: Math.cos(angle) * speed,
+                            vy: Math.sin(angle) * speed,
+                            life: tracer ? 1.0 : 0.70 + Math.random() * 0.30,
+                            hue:  root.treble * 0.4 + Math.random() * 0.6,
+                            size: tracer ? 2.5 + Math.random() * 1.5
+                                        : 1.2 + Math.random() * 2.2,
+                            tracer: tracer })
+            }
+        }
+
+        if (alive.length > 450)
+            alive = alive.slice(alive.length - 450)
+
+        root.novaParticles = alive
+    }
+
+    // ----- galaxy tick --------------------------------------------------------
+    function tickGalaxy() {
+        const speed = 0.003 + root.treble * 0.012 + (root.gotBeat ? 0.05 : 0)
+        root.galaxyAngle = (root.galaxyAngle + speed) % (2 * Math.PI)
+    }
+
+    // ----- aurora tick --------------------------------------------------------
+    function tickAurora() {
+        const speed = 0.010 + root.rms * 0.022 + (root.gotBeat ? 0.07 : 0)
+        root.auroraTime  = root.auroraTime + speed
+    }
+
+    // ----- mandala tick -------------------------------------------------------
+    function tickMandala() {
+        const speed = 0.006 + root.rms * 0.022 + (root.gotBeat ? 0.14 : 0)
+        root.mandalaPhase = (root.mandalaPhase + speed) % (2 * Math.PI)
+    }
+
     // ----- background -------------------------------------------------------
     Rectangle {
         anchors.fill: parent
@@ -369,18 +506,25 @@ Item {
         onPaint: {
             const ctx = getContext("2d")
             if (!ctx) return
-            ctx.clearRect(0, 0, width, height)
+            // Nova uses a persistence-fade overlay for comet trails; it clears itself.
+            // All other effects need a clean canvas each frame.
+            if (root.effect !== "nova")
+                ctx.clearRect(0, 0, width, height)
 
             switch (root.effect) {
-            case "wave":    paintScope(ctx);   break
-            case "circles": paintStars(ctx);   break
-            case "plasma":  paintTunnel(ctx);  break
-            case "terrain": paintTerrain(ctx); break
-            case "vortex":  paintVortex(ctx);  break
-            case "warp":    paintWarp(ctx);    break
-            case "ripple":  paintRipple(ctx);  break
-            case "kaleid":  paintKaleid(ctx);  break
-            default:        paintBars(ctx);    break
+            case "wave":    paintScope(ctx);    break
+            case "circles": paintStars(ctx);    break
+            case "plasma":  paintTunnel(ctx);   break
+            case "terrain": paintTerrain(ctx);  break
+            case "vortex":  paintVortex(ctx);   break
+            case "warp":    paintWarp(ctx);     break
+            case "ripple":  paintRipple(ctx);   break
+            case "kaleid":  paintKaleid(ctx);   break
+            case "nova":    paintNova(ctx);     break
+            case "galaxy":  paintGalaxy(ctx);   break
+            case "aurora":  paintAurora(ctx);   break
+            case "mandala": paintMandala(ctx);  break
+            default:        paintBars(ctx);     break
             }
 
             // Beat flash overlay (all effects)
@@ -849,6 +993,243 @@ Item {
                 ctx.arc(cx, cy, cr, 0, 2 * Math.PI)
                 ctx.fill()
             }
+        }
+
+        // ---- nova (afterglow bloom / comet-trail nebula) --------------------
+        function paintNova(ctx) {
+            const w   = width,  h  = height
+            const cx  = w / 2,  cy = h / 2
+            const R   = Math.min(cx, cy)
+
+            // Persistence fade: overwrite with near-black, not clearRect
+            ctx.fillStyle = "rgba(0,0,0,0.072)"
+            ctx.fillRect(0, 0, w, h)
+
+            const ps = root.novaParticles
+            for (let i = 0; i < ps.length; i++) {
+                const p     = ps[i]
+                const alpha = p.life * (p.tracer ? 0.70 : 0.82)
+                const r     = p.size * (0.5 + p.life * 0.5)
+
+                // Inner core
+                ctx.beginPath()
+                ctx.arc(p.x, p.y, Math.max(0.5, r), 0, 2 * Math.PI)
+                ctx.fillStyle = root.withAlpha(root.schemeColorCss(p.hue), alpha)
+                ctx.fill()
+
+                // Outer halo glow
+                if (p.size > 1.5) {
+                    const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 3.5)
+                    g.addColorStop(0, root.withAlpha(root.schemeColorCss(p.hue), alpha * 0.55))
+                    g.addColorStop(1, "rgba(0,0,0,0)")
+                    ctx.beginPath()
+                    ctx.arc(p.x, p.y, r * 3.5, 0, 2 * Math.PI)
+                    ctx.fillStyle = g
+                    ctx.fill()
+                }
+            }
+
+            // Pulsing central star – always rendered
+            const coreR = Math.max(1.5, root.rms * R * 0.22 + (root.gotBeat ? R * 0.065 : 0))
+            const cg    = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR * 3.5)
+            cg.addColorStop(0, root.withAlpha(root.schemeColorCss(root.treble * 0.55), 0.95))
+            cg.addColorStop(0.28, root.withAlpha(root.schemeColorCss(root.treble * 0.55 + 0.1), 0.35))
+            cg.addColorStop(1, "rgba(0,0,0,0)")
+            ctx.beginPath()
+            ctx.arc(cx, cy, coreR * 3.5, 0, 2 * Math.PI)
+            ctx.fillStyle = cg
+            ctx.fill()
+
+            // Bright inner dot
+            ctx.beginPath()
+            ctx.arc(cx, cy, coreR, 0, 2 * Math.PI)
+            ctx.fillStyle = root.schemeColorCss(root.treble * 0.3 + 0.75)
+            ctx.fill()
+        }
+
+        // ---- galaxy (rotating logarithmic spiral star field) ----------------
+        function paintGalaxy(ctx) {
+            const w      = width,  h  = height
+            const cx     = w / 2,  cy = h / 2
+            const R      = Math.min(cx, cy) * 0.90
+            const bands  = root.bandVals
+            const ang    = root.galaxyAngle
+            if (!bands || bands.length < root.numBands) return
+
+            ctx.fillStyle = "#000000"
+            ctx.fillRect(0, 0, w, h)
+
+            // Draw stars
+            const stars = root.galaxyStars
+            for (let i = 0; i < stars.length; i++) {
+                const s  = stars[i]
+                const a  = s.theta + ang * (1 + s.r * 0.9)
+                const px = cx + Math.cos(a) * s.r * R
+                const py = cy + Math.sin(a) * s.r * R * 0.52   // flatten: elliptical galaxy
+
+                const band  = bands[s.bandBias] || 0
+                const glow  = 0.55 + band * 0.85
+                const alpha = (0.4 + band * 0.7) * (1.0 - s.r * 0.45)
+                const sr    = s.size * glow * (1.0 + root.bass * 0.6)
+
+                ctx.beginPath()
+                ctx.arc(px, py, Math.max(0.4, sr), 0, 2 * Math.PI)
+                ctx.fillStyle = root.withAlpha(root.schemeColorCss(s.hue + root.treble * 0.08), alpha)
+                ctx.fill()
+            }
+
+            // Galactic core: layered radial glow
+            const coreR = R * (0.065 + root.bass * 0.095 + (root.gotBeat ? 0.04 : 0))
+            for (let layer = 3; layer >= 0; layer--) {
+                const lr   = coreR * (layer * 1.8 + 1)
+                const cg   = ctx.createRadialGradient(cx, cy, 0, cx, cy, lr)
+                const alpC = 0.85 - layer * 0.18
+                cg.addColorStop(0,    root.withAlpha(root.schemeColorCss(0.08), alpC))
+                cg.addColorStop(0.35, root.withAlpha(root.schemeColorCss(0.12), alpC * 0.45))
+                cg.addColorStop(1,    "rgba(0,0,0,0)")
+                ctx.beginPath()
+                ctx.arc(cx, cy, lr, 0, 2 * Math.PI)
+                ctx.fillStyle = cg
+                ctx.fill()
+            }
+        }
+
+        // ---- aurora (northern-lights flowing curtains) -----------------------
+        function paintAurora(ctx) {
+            const w     = width,  h  = height
+            const bands = root.bandVals
+            const t     = root.auroraTime
+            if (!bands || bands.length < root.numBands) return
+
+            ctx.fillStyle = "#000009"
+            ctx.fillRect(0, 0, w, h)
+
+            const NUM_RIBBONS = 8
+            for (let ri = 0; ri < NUM_RIBBONS; ri++) {
+                // Pair up 2 adjacent bands per ribbon
+                const b1    = bands[(ri * 2)     % 16] || 0
+                const b2    = bands[(ri * 2 + 1) % 16] || 0
+                const amp   = h * (0.07 + (b1 + b2) * 0.5 * 0.25)
+                const baseY = h * (0.15 + ri / NUM_RIBBONS * 0.60)
+                const phase = t * (0.6 + ri * 0.18) + ri * 1.4
+                const hue   = ri / NUM_RIBBONS + root.treble * 0.18
+
+                const STEPS = 80
+                ctx.beginPath()
+                for (let si = 0; si <= STEPS; si++) {
+                    const xf  = si / STEPS
+                    const px  = xf * w
+                    const py  = baseY + Math.sin(xf * 3.5 + phase) * amp
+                             + Math.sin(xf * 7.0 - phase * 0.7) * amp * 0.35
+                    if (si === 0) ctx.moveTo(px, py)
+                    else          ctx.lineTo(px, py)
+                }
+                // Ribbon bottom (near h)
+                for (let si = STEPS; si >= 0; si--) {
+                    const xf  = si / STEPS
+                    const px  = xf * w
+                    const py  = baseY + h * 0.085 + Math.sin(xf * 3.5 + phase + 0.5) * amp * 0.5
+                    ctx.lineTo(px, py)
+                }
+                ctx.closePath()
+
+                const alpha = 0.06 + (b1 + b2) * 0.5 * 0.32 + (root.gotBeat ? 0.10 : 0)
+                ctx.fillStyle = root.withAlpha(root.schemeColorCss(hue), alpha)
+                ctx.fill()
+
+                // Bright upper edge stroke
+                ctx.beginPath()
+                for (let si = 0; si <= STEPS; si++) {
+                    const xf  = si / STEPS
+                    const px  = xf * w
+                    const py  = baseY + Math.sin(xf * 3.5 + phase) * amp
+                             + Math.sin(xf * 7.0 - phase * 0.7) * amp * 0.35
+                    if (si === 0) ctx.moveTo(px, py)
+                    else          ctx.lineTo(px, py)
+                }
+                ctx.strokeStyle = root.withAlpha(root.schemeColorCss(hue + 0.06), 0.45 + b1 * 0.55)
+                ctx.lineWidth   = 0.9 + b2 * 1.8
+                ctx.stroke()
+            }
+        }
+
+        // ---- mandala (multi-layer geometric / jewel) ------------------------
+        function paintMandala(ctx) {
+            const w     = width,  h  = height
+            const cx    = w / 2,  cy = h / 2
+            const R     = Math.min(cx, cy) * 0.90
+            const bands = root.bandVals
+            const ph    = root.mandalaPhase
+            if (!bands || bands.length < root.numBands) return
+
+            ctx.fillStyle = "#000000"
+            ctx.fillRect(0, 0, w, h)
+
+            // Layer definitions: { folds, direction, hueOffset, bandRange }
+            const layers = [
+                { folds: 12, dir:  1, hueOff: 0.00, bands: [0,5]  },
+                { folds:  8, dir: -1, hueOff: 0.33, bands: [5,10] },
+                { folds:  6, dir:  1, hueOff: 0.66, bands: [10,16] }
+            ]
+
+            for (let li = 0; li < layers.length; li++) {
+                const L      = layers[li]
+                const folds  = L.folds
+                const bSlice = bands.slice(L.bands[0], L.bands[1])
+                const energy = bSlice.reduce((s, v) => s + v, 0) / bSlice.length
+                const rInner = R * (0.06 + energy * 0.08)
+                const rOuter = R * (0.22 + energy * 0.55 + root.rms * 0.12)
+                const layPh  = ph * L.dir * (1 + li * 0.35)
+
+                for (let k = 0; k < folds; k++) {
+                    const foldAngle = k * 2 * Math.PI / folds + layPh
+                    for (let mirror = 0; mirror < 2; mirror++) {
+                        ctx.save()
+                        ctx.translate(cx, cy)
+                        ctx.rotate(foldAngle)
+                        if (mirror === 1) ctx.scale(1, -1)
+
+                        // Petal shape: arc from rInner to rOuter using band values
+                        ctx.beginPath()
+                        ctx.moveTo(0, rInner)
+                        const SEGS = bSlice.length
+                        for (let si = 0; si <= SEGS; si++) {
+                            const t    = si / SEGS
+                            const bv   = bSlice[Math.min(si, SEGS - 1)] || 0
+                            const petalW = Math.PI * 0.72 / folds
+                            const ang  = (t - 0.5) * petalW
+                            const r    = rInner + (rOuter - rInner) * (0.2 + bv * 0.8)
+                            ctx.lineTo(Math.sin(ang) * r, Math.cos(ang) * r)
+                        }
+                        ctx.lineTo(0, rInner)
+                        ctx.closePath()
+
+                        const hue   = L.hueOff + root.treble * 0.18 + k / folds * 0.1
+                        const alpha = 0.08 + energy * 0.35
+                        ctx.fillStyle   = root.withAlpha(root.schemeColorCss(hue), alpha)
+                        ctx.strokeStyle = root.withAlpha(root.schemeColorCss(hue + 0.04), 0.55 + energy * 0.45)
+                        ctx.lineWidth   = 0.6
+                        ctx.fill()
+                        ctx.stroke()
+                        ctx.restore()
+                    }
+                }
+            }
+
+            // Central jewel – glowing disc
+            const jewR = R * (0.04 + root.rms * 0.08 + (root.gotBeat ? 0.03 : 0))
+            const jg   = ctx.createRadialGradient(cx, cy, 0, cx, cy, jewR * 3)
+            jg.addColorStop(0,   root.withAlpha(root.schemeColorCss(root.treble * 0.5 + 0.8), 1.0))
+            jg.addColorStop(0.4, root.withAlpha(root.schemeColorCss(root.treble * 0.5 + 0.6), 0.50))
+            jg.addColorStop(1,   "rgba(0,0,0,0)")
+            ctx.beginPath()
+            ctx.arc(cx, cy, jewR * 3, 0, 2 * Math.PI)
+            ctx.fillStyle = jg
+            ctx.fill()
+            ctx.beginPath()
+            ctx.arc(cx, cy, jewR, 0, 2 * Math.PI)
+            ctx.fillStyle = root.schemeColorCss(root.treble * 0.5 + 0.9)
+            ctx.fill()
         }
     }
 }

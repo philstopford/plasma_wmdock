@@ -28,6 +28,10 @@ Item {
                 { text: i18n("Warp"),           value: "warp"     },
                 { text: i18n("Ripple"),         value: "ripple"   },
                 { text: i18n("Kaleidoscope"),   value: "kaleid"   },
+                { text: i18n("Nova"),           value: "nova"     },
+                { text: i18n("Galaxy"),         value: "galaxy"   },
+                { text: i18n("Aurora"),         value: "aurora"   },
+                { text: i18n("Mandala"),        value: "mandala"  },
             ]
             textRole:  "text"
             valueRole: "value"
