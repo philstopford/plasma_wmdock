@@ -311,10 +311,9 @@ Item {
                     ctx.bezierCurveTo(X(-0.38), Y(0.46), X(-0.38), Y(-0.46), cx, Y(-0.46))
                     break
                 case '1':
-                    // Serif hook at top, then vertical stroke to bottom.
-                    ctx.moveTo(X(-0.14), Y(-0.36))
-                    ctx.bezierCurveTo(X(-0.10), Y(-0.48), X(0.10), Y(-0.48), X(0.12), Y(-0.38))
-                    ctx.lineTo(X(0.12), Y(0.46))
+                    // Simple vertical stroke — no serif.
+                    ctx.moveTo(cx, Y(-0.46))
+                    ctx.lineTo(cx, Y(0.46))
                     break
                 case '2':
                     // Top arc from lower-left, bowing to full height, sweeping right;
