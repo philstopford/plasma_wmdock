@@ -58,11 +58,11 @@ Item {
     }
 
     function fmtMiB(bytes) {
-        return (bytes / 1048576).toFixed(0) + " MiB"
+        return (bytes / 1048576).toFixed(1) + " MiB"
     }
 
     function fmtGiB(bytes) {
-        return (bytes / (1048576 * 1024)).toFixed(0) + "G"
+        return (bytes / (1048576 * 1024)).toFixed(1) + "G"
     }
 
     function barColor(pct) {
