@@ -37,6 +37,8 @@ Item {
         root.activeGpu = active[root.gpuIndex]
     }
 
+    // Cycle the active GPU by delta (-1 = previous, +1 = next).
+    // Returns true when a different GPU was selected.
     function cycleGpu(delta) {
         const active = root.filteredGpus()
         if (active.length <= 1)

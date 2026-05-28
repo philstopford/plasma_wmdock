@@ -84,6 +84,9 @@ Item {
         return b.toFixed(0) + "B/s"
     }
 
+    // Cycle the selected interface by delta (-1 = previous, +1 = next).
+    // Returns true when cycling occurred, and latches manualBrowse on for
+    // non-auto-cycling multi-interface setups so the single-interface view opens.
     function cycleIface(delta) {
         if (root.effectiveIfaces.length <= 1)
             return false
@@ -181,7 +184,7 @@ Item {
         anchors.fill: parent
         acceptedButtons: Qt.NoButton
         onWheel: function(wheelEvent) {
-            if (root.externalCycleMode || root.effectiveIfaces.length < 2) {
+            if (root.externalCycleMode || root.effectiveIfaces.length <= 1) {
                 wheelEvent.accepted = false
                 return
             }
