@@ -79,9 +79,8 @@ Item {
                 onMoved: page.cfg_resolution = Math.round(value)
             }
 
-            Text {
+            QQC2.Label {
                 text: i18n("%1×", Math.round(resolutionSlider.value))
-                color: Kirigami.Theme.textColor
                 Layout.preferredWidth: 28
             }
         }
