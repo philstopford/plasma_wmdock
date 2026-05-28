@@ -399,9 +399,12 @@ Item {
                 startX + 2 * (tubeW + gap) + sepW + gap,
                 startX + 3 * (tubeW + gap) + sepW + gap
             ]
-            const ledH   = Math.max(2, Math.floor(h * 0.055))
-            const ledY   = tubeY + tubeH + gap
-            const fontSz = Math.max(8, Math.floor(tubeH * 0.72))
+            const ledH         = Math.max(2, Math.floor(h * 0.055))
+            const ledY         = tubeY + tubeH + gap
+            const fontSz       = Math.max(8, Math.floor(tubeH * 0.72))
+            const ghostFontSz  = Math.round(fontSz * 0.90)
+            const highlightFontSz = Math.round(fontSz * 0.70)
+            const meshStep     = Math.max(3, Math.floor(tubeW * 0.30))
 
             // ---- Smooth wall-clock phase for pulsing --------------------------
             const phaseS = now * 0.001
@@ -468,7 +471,6 @@ Item {
                 ctx.clip()
                 ctx.strokeStyle = "rgba(90,55,10,0.22)"
                 ctx.lineWidth   = 0.5
-                const meshStep = Math.max(3, Math.floor(tW * 0.30))
                 // Horizontal wires
                 for (let row = 1; row * meshStep < tubeH; row++) {
                     const ry = tubeY + row * meshStep
@@ -508,7 +510,7 @@ Item {
                 ctx.textAlign    = "center"
                 ctx.textBaseline = "middle"
                 // Ghost font slightly smaller than active to hint at depth stacking
-                const ghostFontSz = Math.round(fontSz * 0.90)
+                const digitInt = parseInt(digit)
                 for (let d = 0; d < 10; d++) {
                     if (String(d) === digit) continue
                     // Each cathode is at a slightly different Z depth → tiny
@@ -516,8 +518,8 @@ Item {
                     const depthOff = ((d - 5) * 0.25)
                     // Digits closer to the active one are slightly brighter (less
                     // occluded by the glowing cathode in front)
-                    const dist = Math.min(Math.abs(d - parseInt(digit)),
-                                         10 - Math.abs(d - parseInt(digit)))
+                    const dist = Math.min(Math.abs(d - digitInt),
+                                         10 - Math.abs(d - digitInt))
                     const gAlpha = (0.045 + dist * 0.008) * fk
                     ctx.font      = "bold " + ghostFontSz + "px monospace"
                     ctx.fillStyle = "rgba(160,80,12," + gAlpha.toFixed(3) + ")"
@@ -575,7 +577,7 @@ Item {
                 // Bright core highlight (suppressed when flickering badly)
                 if (fk > 0.5) {
                     ctx.fillStyle = "rgba(255,215,130," + (0.60 * fk).toFixed(2) + ")"
-                    ctx.font      = "bold " + Math.round(fontSz * 0.70) + "px monospace"
+                    ctx.font      = "bold " + highlightFontSz + "px monospace"
                     ctx.fillText(digit, cx2, cy2 - 1)
                 }
                 ctx.restore()
