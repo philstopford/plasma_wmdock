@@ -290,7 +290,9 @@ Item {
         // drawNixieGlyph – renders a single digit '0'-'9' as stroked canvas paths
         // that mimic the wire-formed cathode shape of a real nixie tube.
         // (cx,cy) is the centre; (w,h) is the bounding cell for the digit.
-        // All digits use the same vertical span: cy ± h*0.46 (full cell height).
+        // All digit endpoints span cy ± h*0.46 (full cell height).
+        // Bezier CONTROL POINTS may extend beyond ±0.46 to correctly pull curve
+        // apices to the ±0.46 boundary — this is expected and correct for bezier curves.
         // Every digit is a SINGLE continuous sub-path (no moveTo break mid-digit,
         // except for the 4 which has two physically separate wires).
         // Caller must set ctx.strokeStyle, ctx.lineWidth, ctx.lineCap, ctx.lineJoin.
@@ -312,6 +314,7 @@ Item {
                 case '2':
                     // Top arc from lower-left, bowing to full height, sweeping right;
                     // diagonal down-left; horizontal base bar.
+                    // Control points use Y(-0.55) to pull the arc apex to ≈ Y(-0.46).
                     ctx.moveTo(X(-0.30), Y(-0.16))
                     ctx.bezierCurveTo(X(-0.36), Y(-0.55), X(0.34), Y(-0.55), X(0.34), Y(-0.14))
                     ctx.bezierCurveTo(X(0.34), Y(0.08), X(-0.26), Y(0.22), X(-0.36), Y(0.46))
@@ -354,8 +357,11 @@ Item {
                     ctx.bezierCurveTo(X(0.34), Y(-0.42), X(0.10), Y(-0.04), X(-0.12), Y(0.46))
                     break
                 case '8':
-                    // Single continuous figure-eight: upper oval then lower oval,
-                    // wire crosses itself at the waist (cx, cy) — authentic cathode shape.
+                    // Single continuous figure-eight: wire crosses itself at the waist (cx,cy).
+                    // Upper loop winds CW, lower loop winds CCW, so the path is self-consistent.
+                    // X control points use ±0.38/±0.40 (upper vs lower) because the lower
+                    // loop is deliberately wider — matching the asymmetric silhouette of
+                    // real in-18 cathode wires where the bottom lobe is slightly larger.
                     // Upper loop (CW): waist → right arc to top → left arc back to waist.
                     ctx.moveTo(cx, cy)
                     ctx.bezierCurveTo(X(0.38), Y(0.00), X(0.36), Y(-0.46), cx, Y(-0.46))
@@ -368,6 +374,7 @@ Item {
                     // Single continuous path: oval loop (traced as two bezier halves)
                     // then tail — no moveTo break, so the whole shape is one wire.
                     // The path crosses itself at the right-side junction (X(0.34), Y(-0.20)).
+                    // Control points use Y(-0.54) to pull the arc apex to ≈ Y(-0.46).
                     // Top arc CCW: right-junction → top → left.
                     ctx.moveTo(X(0.34), Y(-0.20))
                     ctx.bezierCurveTo(X(0.36), Y(-0.54), X(-0.36), Y(-0.54), X(-0.36), Y(-0.20))
