@@ -473,19 +473,35 @@ Item {
                     innerHalfW = tW * 0.5
                 }
 
+                // ---- Outer ambient glow (light escaping through the glass) -----
+                // Real nixie tubes cast a warm orange-amber halo onto their surroundings;
+                // visible in reference photos as a soft glow radiating past each tube edge.
+                const outerGlowCx = x + tW * 0.5
+                const outerGlowCy = tubeY + tubeH * 0.5
+                const outerGlowR  = tW * 1.15
+                const outerGrad   = ctx.createRadialGradient(
+                    outerGlowCx, outerGlowCy, tW * 0.35,
+                    outerGlowCx, outerGlowCy, outerGlowR)
+                outerGrad.addColorStop(0,   "rgba(200,85,15," + (0.22 * fk).toFixed(2) + ")")
+                outerGrad.addColorStop(0.55, "rgba(140,50,8," + (0.10 * fk).toFixed(2) + ")")
+                outerGrad.addColorStop(1,   "rgba(0,0,0,0)")
+                ctx.fillStyle = outerGrad
+                ctx.fillRect(x - tW * 0.45, tubeY - tW * 0.3, tW * 1.9, tubeH + tW * 0.6)
+
                 // ---- Glass tube body – outer border --------------------------
-                ctx.strokeStyle = "rgba(80,65,35,0.75)"
+                ctx.strokeStyle = "rgba(100,80,40,0.80)"
                 ctx.lineWidth   = 1
                 ctx.beginPath()
                 drawTubePath(ctx, x, tubeY, tW, tubeH, tubeStyle)
                 ctx.stroke()
 
-                // Dark glass interior fill (left-to-right gradient for cylinder illusion)
+                // Dark glass interior fill – warm amber tint from real tube glass.
+                // The cylinder illusion comes from a left-to-right gradient.
                 const glassGrad = ctx.createLinearGradient(x, tubeY, x + tW, tubeY)
-                glassGrad.addColorStop(0,    "rgba(28,20,8,0.70)")
-                glassGrad.addColorStop(0.20, "rgba(14,10,4,0.55)")
-                glassGrad.addColorStop(0.80, "rgba(14,10,4,0.55)")
-                glassGrad.addColorStop(1,    "rgba(28,20,8,0.70)")
+                glassGrad.addColorStop(0,    "rgba(38,24,8,0.78)")
+                glassGrad.addColorStop(0.20, "rgba(20,13,5,0.62)")
+                glassGrad.addColorStop(0.80, "rgba(20,13,5,0.62)")
+                glassGrad.addColorStop(1,    "rgba(38,24,8,0.78)")
                 ctx.fillStyle = glassGrad
                 ctx.beginPath()
                 drawTubePath(ctx, x, tubeY, tW, tubeH, tubeStyle)
@@ -517,10 +533,10 @@ Item {
                 const bGlow     = ctx.createLinearGradient(
                                       cx2, tubeY + tubeH,
                                       cx2, tubeY + tubeH - blueRiseH)
-                const bA0 = (0.28 * ledPulse * fk).toFixed(2)
-                const bA1 = (0.10 * ledPulse * fk).toFixed(2)
-                bGlow.addColorStop(0,   "rgba(20,55,240," + bA0 + ")")
-                bGlow.addColorStop(0.5, "rgba(20,80,220," + bA1 + ")")
+                const bA0 = (0.35 * ledPulse * fk).toFixed(2)
+                const bA1 = (0.14 * ledPulse * fk).toFixed(2)
+                bGlow.addColorStop(0,   "rgba(15,45,235," + bA0 + ")")
+                bGlow.addColorStop(0.4, "rgba(18,65,215," + bA1 + ")")
                 bGlow.addColorStop(1,   "rgba(0,0,0,0)")
                 ctx.fillStyle = bGlow
                 ctx.fillRect(x, tubeY + tubeH - blueRiseH, tW, blueRiseH)
@@ -592,10 +608,17 @@ Item {
                     ctx.fillText(digit, cx2, cy2 - 1)
                 }
 
+                // Thin wire-edge outline on the active digit –
+                // real cathodes are wire-formed shapes with bright edges.
+                ctx.strokeStyle = "rgba(255,190,70," + (0.28 * fk).toFixed(2) + ")"
+                ctx.lineWidth   = 0.7
+                ctx.font        = "bold " + fontSz + "px monospace"
+                ctx.strokeText(digit, cx2, cy2)
+
                 // ---- Anode mesh – drawn on top of the active digit -----------
                 // In a real tube the mesh anode surrounds all cathodes and is
                 // visible in front; draw it last inside the clip so it overlays.
-                ctx.strokeStyle = "rgba(90,55,10,0.40)"
+                ctx.strokeStyle = "rgba(70,45,8,0.52)"
                 ctx.lineWidth   = 0.5
                 for (let row = 1; row * meshStep < tubeH; row++) {
                     const ry = tubeY + row * meshStep
@@ -615,9 +638,10 @@ Item {
                 ctx.restore()   // end tube interior clip
 
                 // ---- Cylindrical glass overlay --------------------------------
+                // Left-side bright specular streak (strong) + right-side secondary.
                 const specGr = ctx.createLinearGradient(x, tubeY, x + Math.floor(tW * 0.35), tubeY)
-                specGr.addColorStop(0,   "rgba(255,240,200,0.13)")
-                specGr.addColorStop(0.5, "rgba(255,240,200,0.07)")
+                specGr.addColorStop(0,   "rgba(255,245,210,0.22)")
+                specGr.addColorStop(0.4, "rgba(255,240,200,0.11)")
                 specGr.addColorStop(1,   "rgba(255,240,200,0.0)")
                 ctx.save()
                 ctx.beginPath()
@@ -629,14 +653,47 @@ Item {
                 const specR  = ctx.createLinearGradient(x + Math.floor(tW * 0.70), tubeY,
                                                          x + tW, tubeY)
                 specR.addColorStop(0,   "rgba(255,240,200,0.0)")
-                specR.addColorStop(0.7, "rgba(255,240,200,0.06)")
-                specR.addColorStop(1,   "rgba(255,240,200,0.10)")
+                specR.addColorStop(0.7, "rgba(255,240,200,0.09)")
+                specR.addColorStop(1,   "rgba(255,240,200,0.14)")
                 ctx.save()
                 ctx.beginPath()
                 drawTubePath(ctx, x + Math.floor(tW * 0.70), tubeY + 1,
                              tW - Math.floor(tW * 0.70) - 1, tubeH - 2, tubeStyle)
                 ctx.fillStyle = specR
                 ctx.fill()
+                ctx.restore()
+
+                // ---- Top glass dome / getter cap --------------------------------
+                // Real nixie tubes are sealed with a rounded glass dome at the top
+                // and a small metallic getter disc that prevents gas contamination.
+                const domeCx = x + Math.floor(tW * 0.5)
+                const domeRx = Math.floor(tW * 0.42)
+                const domeRy = Math.max(3, Math.floor(tW * 0.20))
+                ctx.save()
+                // Dome body (flat bottom, rounded top — drawn as bottom-half ellipse rotated)
+                ctx.beginPath()
+                ctx.ellipse(domeCx, tubeY, domeRx, domeRy, 0, Math.PI, 2 * Math.PI)
+                ctx.fillStyle   = "rgba(55,45,25,0.72)"
+                ctx.fill()
+                ctx.strokeStyle = "rgba(110,88,42,0.85)"
+                ctx.lineWidth   = 0.6
+                ctx.stroke()
+                // Left specular on dome
+                ctx.beginPath()
+                ctx.ellipse(domeCx - Math.floor(domeRx * 0.35), tubeY - Math.floor(domeRy * 0.4),
+                            Math.floor(domeRx * 0.22), Math.floor(domeRy * 0.45), -0.4, 0, 2*Math.PI)
+                ctx.fillStyle = "rgba(255,245,210,0.14)"
+                ctx.fill()
+                // Getter disc at very top centre
+                const getterR = Math.max(2, Math.floor(tW * 0.15))
+                const getterY = tubeY - domeRy + 1
+                ctx.beginPath()
+                ctx.ellipse(domeCx, getterY, getterR, Math.max(1, Math.floor(getterR * 0.45)), 0, 0, 2*Math.PI)
+                ctx.fillStyle   = "rgba(28,25,22,0.88)"
+                ctx.fill()
+                ctx.strokeStyle = "rgba(130,105,55,0.65)"
+                ctx.lineWidth   = 0.5
+                ctx.stroke()
                 ctx.restore()
 
                 // ---- Lead pin wires at the bottom of the tube ----------------
@@ -654,19 +711,32 @@ Item {
                 }
 
                 // ---- Blue LED strip (1 Hz, synchronized across all tubes) ----
+                // Model each tube's LED as a small rectangular emitter with a
+                // radial glow halo spreading outward — matches reference photos.
                 const ledX = x + 1
                 const lW   = tW - 2
 
+                // Halo glow spreading beyond the LED pad
                 const lg = ctx.createRadialGradient(
                     x + tW / 2, ledY + ledH / 2, 0,
-                    x + tW / 2, ledY + ledH / 2, tW * 0.8)
-                lg.addColorStop(0, "rgba(30,60,230," + (ledPulse * fk * 0.55).toFixed(2) + ")")
+                    x + tW / 2, ledY + ledH / 2, tW * 0.95)
+                lg.addColorStop(0, "rgba(25,50,240," + (ledPulse * fk * 0.65).toFixed(2) + ")")
+                lg.addColorStop(0.5, "rgba(10,30,200," + (ledPulse * fk * 0.25).toFixed(2) + ")")
                 lg.addColorStop(1, "rgba(0,0,0,0)")
                 ctx.fillStyle = lg
-                ctx.fillRect(ledX - 2, ledY - 2, lW + 4, ledH + 6)
+                ctx.fillRect(ledX - 3, ledY - 3, lW + 6, ledH + 8)
 
-                ctx.fillStyle = "hsl(232,90%," + Math.round(25 + ledPulse * fk * 25) + "%)"
+                // LED pad itself
+                ctx.fillStyle = "hsl(232,90%," + Math.round(22 + ledPulse * fk * 30) + "%)"
                 ctx.fillRect(ledX, ledY, lW, ledH)
+                // Bright specular spot on the LED surface
+                if (ledPulse * fk > 0.3) {
+                    const ledSpecGr = ctx.createLinearGradient(ledX, ledY, ledX + lW * 0.5, ledY)
+                    ledSpecGr.addColorStop(0,   "rgba(180,200,255," + (ledPulse * fk * 0.35).toFixed(2) + ")")
+                    ledSpecGr.addColorStop(1,   "rgba(0,0,0,0)")
+                    ctx.fillStyle = ledSpecGr
+                    ctx.fillRect(ledX, ledY, lW * 0.5, ledH)
+                }
             }
 
             // ---- Date line at the bottom (optional) ---------------------------
