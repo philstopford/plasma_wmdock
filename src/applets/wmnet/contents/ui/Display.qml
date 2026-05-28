@@ -62,6 +62,9 @@ Item {
 
     // Current index into effectiveIfaces (incremented by cycle timer)
     property int cycleIndex: 0
+    // Latched on by mouse-wheel browsing when auto-cycle is off, so manually
+    // selected interfaces stay in the single-interface view until auto-cycle
+    // is re-enabled or the selection drops to one interface.
     property bool manualBrowse: false
 
     // Name of the interface currently shown in single/cycle mode
