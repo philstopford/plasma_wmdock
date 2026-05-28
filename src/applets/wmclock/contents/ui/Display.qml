@@ -290,6 +290,9 @@ Item {
         // drawNixieGlyph – renders a single digit '0'-'9' as stroked canvas paths
         // that mimic the wire-formed cathode shape of a real nixie tube.
         // (cx,cy) is the centre; (w,h) is the bounding cell for the digit.
+        // All digits use the same vertical span: cy ± h*0.46 (full cell height).
+        // Every digit is a SINGLE continuous sub-path (no moveTo break mid-digit,
+        // except for the 4 which has two physically separate wires).
         // Caller must set ctx.strokeStyle, ctx.lineWidth, ctx.lineCap, ctx.lineJoin.
         function drawNixieGlyph(ctx, ch, cx, cy, w, h) {
             const X = f => cx + f * w
@@ -297,68 +300,81 @@ Item {
             ctx.beginPath()
             switch (ch) {
                 case '0':
-                    // Tall, slightly narrow oval
-                    ctx.ellipse(cx, cy, w * 0.39, h * 0.46, 0, 0, Math.PI * 2)
+                    // Tall narrow oval spanning full cell height.
+                    ctx.ellipse(cx, cy, w * 0.36, h * 0.46, 0, 0, Math.PI * 2)
                     break
                 case '1':
-                    // Small serif hook at upper-left, then vertical stroke
-                    ctx.moveTo(X(-0.06), Y(-0.38))
-                    ctx.bezierCurveTo(X(-0.08), Y(-0.47), X(0.06), Y(-0.50), X(0.08), Y(-0.44))
-                    ctx.lineTo(X(0.08), Y(0.47))
+                    // Serif hook at top, then vertical stroke to bottom.
+                    ctx.moveTo(X(-0.14), Y(-0.36))
+                    ctx.bezierCurveTo(X(-0.10), Y(-0.48), X(0.10), Y(-0.48), X(0.12), Y(-0.38))
+                    ctx.lineTo(X(0.12), Y(0.46))
                     break
                 case '2':
-                    // Top arc sweeping to upper-right, diagonal sweep to lower-left, then base
-                    ctx.moveTo(X(-0.28), Y(-0.20))
-                    ctx.bezierCurveTo(X(-0.30), Y(-0.50), X(0.32), Y(-0.50), X(0.32), Y(-0.16))
-                    ctx.bezierCurveTo(X(0.32), Y(0.06), X(-0.26), Y(0.22), X(-0.36), Y(0.46))
+                    // Top arc from lower-left, bowing to full height, sweeping right;
+                    // diagonal down-left; horizontal base bar.
+                    ctx.moveTo(X(-0.30), Y(-0.16))
+                    ctx.bezierCurveTo(X(-0.36), Y(-0.55), X(0.34), Y(-0.55), X(0.34), Y(-0.14))
+                    ctx.bezierCurveTo(X(0.34), Y(0.08), X(-0.26), Y(0.22), X(-0.36), Y(0.46))
                     ctx.lineTo(X(0.36), Y(0.46))
                     break
                 case '3':
-                    // Two right-facing arcs joined at a centre nodule
-                    ctx.moveTo(X(-0.26), Y(-0.44))
-                    ctx.bezierCurveTo(X(0.34), Y(-0.46), X(0.34), Y(-0.04), X(0.02), Y(-0.02))
-                    ctx.bezierCurveTo(X(0.36), Y(0.00), X(0.36), Y(0.46), X(-0.28), Y(0.44))
+                    // Two right-facing arcs spanning full height.
+                    ctx.moveTo(X(-0.28), Y(-0.46))
+                    ctx.bezierCurveTo(X(0.36), Y(-0.46), X(0.36), Y(-0.04), X(0.02), Y(-0.02))
+                    ctx.bezierCurveTo(X(0.38), Y(0.00), X(0.38), Y(0.46), X(-0.28), Y(0.46))
                     break
                 case '4':
-                    // Angled left stroke down to crossbar, then right vertical full height
-                    ctx.moveTo(X(-0.24), Y(-0.44))
+                    // Angled left stroke down to crossbar (one wire).
+                    // Separate right vertical (physically distinct cathode wire).
+                    ctx.moveTo(X(-0.22), Y(-0.46))
                     ctx.lineTo(X(-0.30), Y(0.08))
                     ctx.lineTo(X(0.34), Y(0.08))
                     ctx.moveTo(X(0.16), Y(-0.46))
                     ctx.lineTo(X(0.16), Y(0.46))
                     break
                 case '5':
-                    // Top horizontal, left vertical half, lower right arc
+                    // Top bar, left vertical half, lower right arc to full height.
                     ctx.moveTo(X(0.32), Y(-0.46))
                     ctx.lineTo(X(-0.32), Y(-0.46))
                     ctx.lineTo(X(-0.32), Y(-0.04))
-                    ctx.bezierCurveTo(X(-0.30), Y(-0.04), X(0.34), Y(-0.08), X(0.34), Y(0.22))
-                    ctx.bezierCurveTo(X(0.34), Y(0.50), X(-0.34), Y(0.50), X(-0.34), Y(0.22))
+                    ctx.bezierCurveTo(X(-0.30), Y(-0.04), X(0.34), Y(-0.06), X(0.34), Y(0.20))
+                    ctx.bezierCurveTo(X(0.34), Y(0.46), X(-0.34), Y(0.46), X(-0.34), Y(0.20))
                     break
                 case '6':
-                    // Sweeping curve from upper-right down and around into closed lower loop
-                    ctx.moveTo(X(0.24), Y(-0.46))
-                    ctx.bezierCurveTo(X(-0.34), Y(-0.46), X(-0.36), Y(0.08), X(-0.36), Y(0.18))
-                    ctx.bezierCurveTo(X(-0.36), Y(0.50), X(0.36), Y(0.50), X(0.36), Y(0.18))
-                    ctx.bezierCurveTo(X(0.36), Y(-0.06), X(-0.32), Y(-0.08), X(-0.36), Y(0.18))
+                    // Tail from top-right down left side into closed lower loop.
+                    ctx.moveTo(X(0.26), Y(-0.46))
+                    ctx.bezierCurveTo(X(-0.36), Y(-0.46), X(-0.36), Y(0.06), X(-0.36), Y(0.18))
+                    ctx.bezierCurveTo(X(-0.36), Y(0.46), X(0.36), Y(0.46), X(0.36), Y(0.18))
+                    ctx.bezierCurveTo(X(0.36), Y(-0.06), X(-0.32), Y(-0.06), X(-0.36), Y(0.18))
                     break
                 case '7':
-                    // Horizontal top with slight interior angle, then diagonal stroke
+                    // Horizontal top bar, then diagonal stroke to bottom.
                     ctx.moveTo(X(-0.34), Y(-0.46))
                     ctx.lineTo(X(0.34), Y(-0.46))
-                    ctx.bezierCurveTo(X(0.34), Y(-0.44), X(0.10), Y(-0.06), X(-0.12), Y(0.46))
+                    ctx.bezierCurveTo(X(0.34), Y(-0.42), X(0.10), Y(-0.04), X(-0.12), Y(0.46))
                     break
                 case '8':
-                    // Figure-eight: smaller upper oval, wider lower oval
-                    ctx.ellipse(cx, Y(-0.23), w * 0.31, h * 0.22, 0, 0, Math.PI * 2)
-                    ctx.moveTo(cx + w * 0.35, cy + h * 0.24)
-                    ctx.ellipse(cx, Y(0.24), w * 0.35, h * 0.23, 0, 0, Math.PI * 2)
+                    // Single continuous figure-eight: upper oval then lower oval,
+                    // wire crosses itself at the waist (cx, cy) — authentic cathode shape.
+                    // Upper loop (CW): waist → right arc to top → left arc back to waist.
+                    ctx.moveTo(cx, cy)
+                    ctx.bezierCurveTo(X(0.38), Y(0.00), X(0.36), Y(-0.46), cx, Y(-0.46))
+                    ctx.bezierCurveTo(X(-0.36), Y(-0.46), X(-0.38), Y(0.00), cx, cy)
+                    // Lower loop (CCW): waist → left arc to bottom → right arc back to waist.
+                    ctx.bezierCurveTo(X(-0.40), Y(0.00), X(-0.38), Y(0.46), cx, Y(0.46))
+                    ctx.bezierCurveTo(X(0.38), Y(0.46), X(0.40), Y(0.00), cx, cy)
                     break
                 case '9':
-                    // Upper closed oval loop, then right-side descending tail
-                    ctx.ellipse(cx, Y(-0.20), w * 0.34, h * 0.26, 0, 0, Math.PI * 2)
-                    ctx.moveTo(cx + w * 0.34, Y(-0.20))
-                    ctx.bezierCurveTo(X(0.35), Y(0.18), X(0.28), Y(0.46), X(0.04), Y(0.46))
+                    // Single continuous path: oval loop (traced as two bezier halves)
+                    // then tail — no moveTo break, so the whole shape is one wire.
+                    // The path crosses itself at the right-side junction (X(0.34), Y(-0.20)).
+                    // Top arc CCW: right-junction → top → left.
+                    ctx.moveTo(X(0.34), Y(-0.20))
+                    ctx.bezierCurveTo(X(0.36), Y(-0.54), X(-0.36), Y(-0.54), X(-0.36), Y(-0.20))
+                    // Bottom arc: left → bottom → right-junction.
+                    ctx.bezierCurveTo(X(-0.36), Y(0.06), X(0.34), Y(0.06), X(0.34), Y(-0.20))
+                    // Tail: right-junction curves down to base.
+                    ctx.bezierCurveTo(X(0.36), Y(0.18), X(0.28), Y(0.46), X(0.04), Y(0.46))
                     break
                 default:
                     return
@@ -467,11 +483,11 @@ Item {
             nxLastFlick = lastFlick
 
             // ---- Layout -------------------------------------------------------
-            const tubeW  = Math.floor(w * 0.175)
-            const tubeH  = Math.floor(h * 0.52)
+            const tubeW  = Math.floor(w * 0.19)
+            const tubeH  = Math.floor(h * 0.58)
             const sepW   = Math.floor(w * 0.08)
             const gap    = Math.max(1, Math.floor(w * 0.025))
-            const tubeY  = Math.floor(h * 0.07)
+            const tubeY  = Math.floor(h * 0.05)
             const totalW = 4 * tubeW + sepW + 4 * gap
             const startX = Math.floor((w - totalW) / 2)
             const posX   = [
@@ -483,9 +499,6 @@ Item {
             ]
             const ledH         = Math.max(2, Math.floor(h * 0.055))
             const ledY         = tubeY + tubeH + gap
-            // Glyph cell dimensions: digits are taller than wide (wire-cathode style)
-            const glyphH       = Math.max(10, Math.floor(tubeH * 0.82))
-            const glyphW       = Math.max(6, Math.floor(glyphH * 0.68))
             const meshStep     = Math.max(3, Math.floor(tubeW * 0.30))
 
             // ---- Smooth wall-clock phase for pulsing --------------------------
@@ -552,17 +565,18 @@ Item {
                     innerHalfW = tW * 0.5
                 }
 
-                // ---- Effective glyph cell for this tube style ---------------
-                // For slim tubes the inner width is reduced; scale the glyph width
-                // so digits fit within the clipped interior rather than being cropped.
-                // Barrel is wider at centre (no scale needed); classic is reference (1.0).
-                const innerWidthFrac = (tubeStyle === "slim")
-                    ? Math.max(0.5, (tW - 2 * tubeEnvPx) / tW)
-                    : 1.0
-                const effGlyphW = Math.max(4, Math.floor(glyphW * innerWidthFrac))
-                const effGlyphH = glyphH
-                // Wire stroke width: ~8% of effective glyph width, min 1 px
-                const wireW     = Math.max(1.5, effGlyphH * 0.065)
+                // ---- Glyph dimensions: bounded by tube interior width -----------
+                // effGlyphW is derived from the tube's inner width, NOT from tubeH,
+                // so digits always fit inside the tube envelope without clipping.
+                const innerTubeW = (tubeStyle === "slim")
+                    ? Math.max(4, tW - 2 * tubeEnvPx)
+                    : tW
+                const effGlyphW  = Math.max(4, Math.floor(innerTubeW * 0.84))
+                // Aspect ratio ~2.2:1; cap at 86% of tube height so digits don't overflow top/bottom.
+                const effGlyphH  = Math.max(6, Math.min(Math.floor(tubeH * 0.86),
+                                                          Math.floor(effGlyphW * 2.2)))
+                // Wire stroke: 10% of glyph width for clear visibility, min 1.5 px.
+                const wireW      = Math.max(1.5, effGlyphW * 0.10)
 
                 // ---- Outer ambient glow (light escaping through the glass) -----
                 // Real nixie tubes cast a warm orange-amber halo onto their surroundings;
