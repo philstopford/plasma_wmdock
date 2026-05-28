@@ -1,45 +1,35 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 import QtQuick
+import QtQuick.Controls as QQC2
 import org.kde.plasma.plasmoid
 import org.kde.plasma.private.wmdock 1.0
 
 /**
  * WMViz – Audio spectrum visualizer backed by CAVA (via AudioSpectrum).
  *
- * Thirteen MilkDrop-inspired effects driven by real spectral data:
+ * Eighteen MilkDrop-inspired effects driven by real spectral data:
  *
  *   bars      – classic spectrum analyser with per-bar peak markers
  *   wave      – radial scope: 16 bands plotted as a rotating petal blob
  *   circles   – starfield: per-band particles fired in radial directions
  *   plasma    – tunnel:    concentric circles zooming from centre
- *   terrain   – pseudo-3D spectral landscape flyover scrolling toward viewer;
- *               each of the 16 bands drives a hill height with perspective;
- *               optional view rotation (speed: treble) and wireframe mode
- *   vortex    – wormhole fly-through: first-person tunnel with 30 perspective
- *               rings (32 vertices each) zooming toward viewer, 8 longitudinal
- *               rib lines forming the tunnel walls, helix centreline driven by
- *               treble/bass Lissajous (pitch/yaw turns), and continuous camera
- *               roll (banking) accelerated by bass transients
- *   warp      – 16 glowing radial beams (one per band) shooting from centre,
- *               triple-layer glow with beat bursts; hyperspace / warp effect
- *   ripple    – concentric ripples fired on beats and bass transients, with a
- *               background per-band bubble field
- *   kaleid    – 6-fold kaleidoscope of radial spectrum wedges rotating at a
- *               rate driven by RMS and beat transients
- *   nova      – afterglow bloom: persistence-of-vision fade creates glowing
- *               comet trails; beat bursts fire 130 particles with halos; steady
- *               per-band emission weaves a swirling nebula
- *   galaxy    – rotating logarithmic spiral galaxy: 700 stars distributed
- *               across two arms react per-band; galactic core pulses with bass
- *   aurora    – 8 flowing northern-lights curtains; each ribbon's amplitude
- *               and brightness driven by a pair of adjacent bands, with
- *               independent sinusoidal phase drift per ribbon
- *   mandala   – 12/8/6-fold geometric mandala with three counter-rotating
- *               petal layers; each layer's radii driven by a different subset
- *               of bands, building dense jewel-like symmetry
+ *   terrain   – pseudo-3D spectral landscape flyover scrolling toward viewer
+ *   vortex    – wormhole fly-through: first-person tunnel with perspective rings
+ *   warp      – 16 glowing radial beams (one per band) shooting from centre
+ *   ripple    – concentric ripples fired on beats and bass transients
+ *   kaleid    – 6-fold kaleidoscope of radial spectrum wedges
+ *   nova      – afterglow bloom: persistence-of-vision comet trails
+ *   galaxy    – rotating logarithmic spiral galaxy
+ *   aurora    – 8 flowing northern-lights curtains
+ *   mandala   – 12/8/6-fold geometric mandala with counter-rotating petal layers
+ *   led       – retro LED segment VU meter: stacked dot columns, green→red
+ *   discharge – plasma discharge tubes: glowing branching arcs between nodes
+ *   lightning – branching storm bolts from the top, recursive fractal tree
+ *   concert   – sweeping spotlight beams from the floor, coloured by band
+ *   pyro      – fireworks: shells rise then burst into radial particle sprays
  *
- * All effects react to beat transients (white flash) detected by the
- * AudioSpectrumMonitor C++ singleton.
+ * Effects can be cycled with the mouse wheel or selected from a right-click
+ * context menu.  All effects react to beat transients (white flash).
  */
 Item {
     id: root
@@ -142,6 +132,37 @@ Item {
     // ----- mandala (multi-layer geometric) state ----------------------------
     property real mandalaPhase: 0
 
+    // ----- LED meter state --------------------------------------------------
+    // (reuses peakBands from bars effect — no extra state needed)
+
+    // ----- discharge state --------------------------------------------------
+    // Each arc: { x1,y1, x2,y2, jitter:[], energy, hue }
+    property var dischargeArcs: []
+    property real dischargeTime: 0
+
+    // ----- lightning state --------------------------------------------------
+    // Each bolt: { segs:[{x1,y1,x2,y2}], flash, hue }
+    property var lightningBolts: []
+    property real lightningCooldown: 0
+
+    // ----- concert state ----------------------------------------------------
+    // Each beam: { angle, speed, hue, width, energy }
+    property var concertBeams: []
+    property real concertTime: 0
+
+    // ----- pyro state -------------------------------------------------------
+    // Shells: { x, y, vy, hue, phase } — rise until vy>0 (gravity)
+    // Particles: { x, y, vx, vy, life, hue, size }
+    property var pyroShells: []
+    property var pyroParticles: []
+
+    // ----- ordered effects list (for wheel cycling) -------------------------
+    readonly property var effectOrder: [
+        "bars","wave","circles","plasma","terrain","vortex","warp",
+        "ripple","kaleid","nova","galaxy","aurora","mandala",
+        "led","discharge","lightning","concert","pyro"
+    ]
+
     Component.onCompleted: {
         peakBands   = new Array(numBands).fill(0)
         bandVals    = new Array(numBands).fill(0)
@@ -216,19 +237,24 @@ Item {
             root.beatFlash = Math.max(0, root.beatFlash - 0.12)
 
             switch (root.effect) {
-            case "wave":    tickScope();    break
-            case "circles": tickStars();    break
-            case "plasma":  tickTunnel();   break
-            case "terrain": tickTerrain();  break
-            case "vortex":  tickVortex();   break
-            case "warp":    tickWarp();     break
-            case "ripple":  tickRipple();   break
-            case "kaleid":  tickKaleid();   break
-            case "nova":    tickNova();     break
-            case "galaxy":  tickGalaxy();   break
-            case "aurora":  tickAurora();   break
-            case "mandala": tickMandala();  break
-            default:        tickBars();     break
+            case "wave":      tickScope();      break
+            case "circles":   tickStars();      break
+            case "plasma":    tickTunnel();     break
+            case "terrain":   tickTerrain();    break
+            case "vortex":    tickVortex();     break
+            case "warp":      tickWarp();       break
+            case "ripple":    tickRipple();     break
+            case "kaleid":    tickKaleid();     break
+            case "nova":      tickNova();       break
+            case "galaxy":    tickGalaxy();     break
+            case "aurora":    tickAurora();     break
+            case "mandala":   tickMandala();    break
+            case "led":       tickLed();        break
+            case "discharge": tickDischarge();  break
+            case "lightning": tickLightning();  break
+            case "concert":   tickConcert();    break
+            case "pyro":      tickPyro();       break
+            default:          tickBars();       break
             }
 
             root.gotBeat = false   // consumed by tick functions above
@@ -483,6 +509,182 @@ Item {
         root.mandalaPhase = (root.mandalaPhase + speed) % (2 * Math.PI)
     }
 
+    // ----- LED meter tick ---------------------------------------------------
+    // LED meter is bars with peak hold — tick is identical to tickBars.
+    function tickLed() { tickBars() }
+
+    // ----- discharge tick ---------------------------------------------------
+    function tickDischarge() {
+        const w = canvas.width  > 4 ? canvas.width  : 64
+        const h = canvas.height > 4 ? canvas.height : 64
+        root.dischargeTime += 0.07 + root.rms * 0.12
+        const N = 6  // simultaneous arcs
+        let arcs = root.dischargeArcs.length === N ? root.dischargeArcs.slice() : []
+
+        // Fixed anchor points: top/bottom nodes spaced across canvas
+        const nodes = []
+        for (let i = 0; i < 3; i++) {
+            nodes.push({ x: (i + 0.5) * w / 3, y: h * 0.05 })  // top row
+            nodes.push({ x: (i + 0.5) * w / 3, y: h * 0.95 })  // bottom row
+        }
+
+        while (arcs.length < N) {
+            const n1 = Math.floor(Math.random() * nodes.length)
+            let   n2 = Math.floor(Math.random() * nodes.length)
+            if (n2 === n1) n2 = (n1 + 1) % nodes.length
+            const SEGS = 8 + Math.floor(Math.random() * 6)
+            const jitter = []
+            for (let s = 0; s <= SEGS; s++) jitter.push((Math.random() - 0.5) * w * 0.22)
+            const bandIdx = Math.floor(Math.random() * 16)
+            arcs.push({ x1: nodes[n1].x, y1: nodes[n1].y,
+                        x2: nodes[n2].x, y2: nodes[n2].y,
+                        jitter: jitter, segs: SEGS,
+                        energy: 0.4 + (root.bandVals[bandIdx] || 0) * 0.6,
+                        hue: 0.55 + Math.random() * 0.25,
+                        life: 0.6 + Math.random() * 0.8 })
+        }
+
+        // Age arcs; rejitter active ones on every tick for the flickering look
+        let live = []
+        for (let i = 0; i < arcs.length; i++) {
+            const a = Object.assign({}, arcs[i])
+            a.life -= 0.055 + root.rms * 0.04
+            if (a.life <= 0) continue
+            const bandIdx = Math.floor(Math.random() * 16)
+            a.energy = Math.max(0.2, 0.4 + (root.bandVals[bandIdx] || 0) * 0.6)
+            // Re-jitter the mid-points each tick
+            for (let s = 1; s < a.segs; s++)
+                a.jitter[s] += (Math.random() - 0.5) * w * 0.08
+            live.push(a)
+        }
+        root.dischargeArcs = live
+    }
+
+    // ----- lightning tick ---------------------------------------------------
+    // Spawns a new fractal bolt on strong bass beats; bolts decay quickly.
+    function tickLightning() {
+        const w = canvas.width  > 4 ? canvas.width  : 64
+        const h = canvas.height > 4 ? canvas.height : 64
+        root.lightningCooldown = Math.max(0, root.lightningCooldown - 1)
+
+        // Decay existing bolts
+        let bolts = root.lightningBolts.map(b => Object.assign({}, b))
+        bolts = bolts.filter(b => { b.flash -= 0.08; return b.flash > 0 })
+
+        // Spawn on bass beat
+        if (root.gotBeat && root.bass > 0.4 && root.lightningCooldown === 0) {
+            root.lightningCooldown = 6
+            const startX = w * (0.25 + Math.random() * 0.5)
+            const segs = []
+            // Build the bolt via recursive subdivision
+            function subdivide(x1, y1, x2, y2, depth, maxOffset) {
+                if (depth === 0) { segs.push({ x1, y1, x2, y2 }); return }
+                const mx = (x1 + x2) / 2 + (Math.random() - 0.5) * maxOffset
+                const my = (y1 + y2) / 2 + (Math.random() - 0.5) * maxOffset * 0.4
+                subdivide(x1, y1, mx, my, depth - 1, maxOffset * 0.55)
+                subdivide(mx, my, x2, y2, depth - 1, maxOffset * 0.55)
+                // Branch
+                if (depth >= 2 && Math.random() < 0.45) {
+                    const bx = mx + (Math.random() - 0.5) * w * 0.3
+                    const by = my + h * (0.15 + Math.random() * 0.15)
+                    subdivide(mx, my, bx, by, depth - 2, maxOffset * 0.4)
+                }
+            }
+            subdivide(startX, 0, startX + (Math.random() - 0.5) * w * 0.5, h, 4, w * 0.28)
+            bolts.push({ segs: segs, flash: 1.0 + root.bass * 0.5,
+                         hue: 0.60 + root.treble * 0.15 })
+        }
+
+        root.lightningBolts = bolts
+    }
+
+    // ----- concert tick -----------------------------------------------------
+    function tickConcert() {
+        root.concertTime += 0.025 + root.rms * 0.06
+        const N = 8  // number of spotlight beams
+        let beams = root.concertBeams
+
+        // Initialise beams
+        if (beams.length !== N) {
+            beams = []
+            for (let i = 0; i < N; i++) {
+                beams.push({ angle: -1.2 + (i / (N - 1)) * 2.4,
+                             speed: (Math.random() < 0.5 ? 1 : -1) * (0.008 + Math.random() * 0.016),
+                             hue:   i / N,
+                             width: 0.10 + Math.random() * 0.08,
+                             energy: 0 })
+            }
+        }
+
+        beams = beams.map((b, i) => {
+            const bb = Object.assign({}, b)
+            const bandIdx = (i * 2) % 16
+            bb.energy = (root.bandVals[bandIdx] || 0) * 0.6 + bb.energy * 0.4
+            bb.angle  += bb.speed * (1 + root.bass * 1.5)
+            if (bb.angle > 1.5 || bb.angle < -1.5) bb.speed = -bb.speed
+            return bb
+        })
+
+        root.concertBeams = beams
+    }
+
+    // ----- pyro tick --------------------------------------------------------
+    function tickPyro() {
+        const w = canvas.width  > 4 ? canvas.width  : 64
+        const h = canvas.height > 4 ? canvas.height : 64
+        const GRAVITY = 0.045
+
+        // Age particles
+        let parts = root.pyroParticles.map(p => {
+            const pp = Object.assign({}, p)
+            pp.x    += pp.vx
+            pp.y    += pp.vy
+            pp.vy   += GRAVITY
+            pp.life -= 0.022 + Math.random() * 0.008
+            return pp
+        }).filter(p => p.life > 0)
+
+        // Age shells; burst when rising velocity reverses (apex)
+        let shells = root.pyroShells.map(s => {
+            const ss = Object.assign({}, s)
+            ss.x  += ss.vx
+            ss.y  += ss.vy
+            ss.vy += GRAVITY
+            return ss
+        }).filter(s => {
+            if (s.vy >= 0) {
+                // Burst at apex
+                const N = 28 + Math.floor(Math.random() * 20)
+                for (let i = 0; i < N; i++) {
+                    const ang   = (i / N) * 2 * Math.PI + (Math.random() - 0.5) * 0.3
+                    const speed = 0.8 + Math.random() * 0.8
+                    parts.push({ x: s.x, y: s.y,
+                                 vx: Math.cos(ang) * speed,
+                                 vy: Math.sin(ang) * speed - 0.5,
+                                 life: 0.7 + Math.random() * 0.5,
+                                 hue: s.hue + (Math.random() - 0.5) * 0.08,
+                                 size: 1.0 + Math.random() })
+                }
+                return false
+            }
+            return s.y > -h * 0.1 // discard off-canvas
+        })
+
+        // Spawn new shells
+        const launchProb = 0.05 + root.bass * 0.25 + (root.gotBeat ? 0.5 : 0)
+        if (Math.random() < launchProb && shells.length < 8) {
+            shells.push({ x: w * (0.15 + Math.random() * 0.70),
+                          y: h,
+                          vx: (Math.random() - 0.5) * 0.8,
+                          vy: -(2.2 + Math.random() * 1.8 + root.bass * 1.5),
+                          hue: Math.random() })
+        }
+
+        if (parts.length  > 500) parts  = parts.slice(parts.length  - 500)
+        root.pyroShells    = shells
+        root.pyroParticles = parts
+    }
+
     // ----- background -------------------------------------------------------
     Rectangle {
         anchors.fill: parent
@@ -512,19 +714,24 @@ Item {
                 ctx.clearRect(0, 0, width, height)
 
             switch (root.effect) {
-            case "wave":    paintScope(ctx);    break
-            case "circles": paintStars(ctx);    break
-            case "plasma":  paintTunnel(ctx);   break
-            case "terrain": paintTerrain(ctx);  break
-            case "vortex":  paintVortex(ctx);   break
-            case "warp":    paintWarp(ctx);     break
-            case "ripple":  paintRipple(ctx);   break
-            case "kaleid":  paintKaleid(ctx);   break
-            case "nova":    paintNova(ctx);     break
-            case "galaxy":  paintGalaxy(ctx);   break
-            case "aurora":  paintAurora(ctx);   break
-            case "mandala": paintMandala(ctx);  break
-            default:        paintBars(ctx);     break
+            case "wave":      paintScope(ctx);      break
+            case "circles":   paintStars(ctx);      break
+            case "plasma":    paintTunnel(ctx);     break
+            case "terrain":   paintTerrain(ctx);    break
+            case "vortex":    paintVortex(ctx);     break
+            case "warp":      paintWarp(ctx);       break
+            case "ripple":    paintRipple(ctx);     break
+            case "kaleid":    paintKaleid(ctx);     break
+            case "nova":      paintNova(ctx);       break
+            case "galaxy":    paintGalaxy(ctx);     break
+            case "aurora":    paintAurora(ctx);     break
+            case "mandala":   paintMandala(ctx);    break
+            case "led":       paintLed(ctx);        break
+            case "discharge": paintDischarge(ctx);  break
+            case "lightning": paintLightning(ctx);  break
+            case "concert":   paintConcert(ctx);    break
+            case "pyro":      paintPyro(ctx);       break
+            default:          paintBars(ctx);       break
             }
 
             // Beat flash overlay (all effects)
@@ -1231,6 +1438,287 @@ Item {
             ctx.fillStyle = root.schemeColorCss(root.treble * 0.5 + 0.9)
             ctx.fill()
         }
+
+        // ---- LED segment meter ----------------------------------------------
+        // Stacked dot columns styled after old Hi-Fi peak meters.
+        function paintLed(ctx) {
+            const w = width, h = height
+            const N = 16
+            const bands = root.bandVals
+            const peaks = root.peakBands
+            if (!bands || bands.length < N) return
+
+            const ROWS   = 14   // number of LED segments per column
+            const gap    = 1    // gap between dots
+            const colW   = (w - N + 1) / N
+            const dotH   = (h - (ROWS - 1) * gap) / ROWS
+            const dotW   = Math.max(1, Math.floor(colW) - 1)
+
+            for (let i = 0; i < N; i++) {
+                const frac   = bands[i] || 0
+                const litN   = Math.round(frac * ROWS)
+                const peakRow= Math.round((peaks[i] || 0) * ROWS)
+                const cx     = Math.round(i * (colW + 1))
+
+                for (let row = 0; row < ROWS; row++) {
+                    const rowFromTop = ROWS - 1 - row
+                    const y = rowFromTop * (dotH + gap)
+                    // Colour zone: red (top 2), amber (next 3), green (rest)
+                    let hue
+                    if (rowFromTop < 2)      hue = 0.00   // red
+                    else if (rowFromTop < 5) hue = 0.10   // amber
+                    else                     hue = 0.33   // green
+
+                    const lit = row < litN
+                    const isPeak = row === peakRow && peakRow > 0
+                    if (lit || isPeak) {
+                        // Bright dot
+                        ctx.fillStyle = isPeak && !lit
+                            ? "#ffffff"
+                            : "hsl(" + Math.round(hue * 360) + ",100%," + (lit ? "55%" : "25%") + ")"
+                        ctx.fillRect(cx, Math.round(y), dotW, Math.max(1, Math.floor(dotH)))
+                    } else {
+                        // Dim unlit segment
+                        ctx.fillStyle = "hsl(" + Math.round(hue * 360) + ",40%,12%)"
+                        ctx.fillRect(cx, Math.round(y), dotW, Math.max(1, Math.floor(dotH)))
+                    }
+                }
+            }
+        }
+
+        // ---- plasma discharge -----------------------------------------------
+        // Simulates plasma discharge tubes and Jacob's ladder arcs.
+        function paintDischarge(ctx) {
+            const w = width, h = height
+            const arcs = root.dischargeArcs
+            if (!arcs || arcs.length === 0) return
+
+            // Dark background with slight blue tint
+            ctx.fillStyle = "rgba(0,0,12,0.55)"
+            ctx.fillRect(0, 0, w, h)
+
+            for (let ai = 0; ai < arcs.length; ai++) {
+                const a = arcs[ai]
+                const alpha = Math.min(1.0, a.life) * a.energy
+
+                // Draw three passes: wide glow, mid, bright core
+                const passes = [
+                    { lw: 6.0, alpha: alpha * 0.12 },
+                    { lw: 2.5, alpha: alpha * 0.35 },
+                    { lw: 0.8, alpha: Math.min(1, alpha * 0.9) }
+                ]
+                for (const pass of passes) {
+                    ctx.beginPath()
+                    const dx = a.x2 - a.x1
+                    const dy = a.y2 - a.y1
+                    const len = Math.sqrt(dx * dx + dy * dy) || 1
+                    const nx = -dy / len   // perpendicular
+                    const ny =  dx / len
+
+                    for (let s = 0; s <= a.segs; s++) {
+                        const t  = s / a.segs
+                        const bx = a.x1 + dx * t + nx * (a.jitter[s] || 0)
+                        const by = a.y1 + dy * t + ny * (a.jitter[s] || 0) * 0.3
+                        if (s === 0) ctx.moveTo(bx, by)
+                        else         ctx.lineTo(bx, by)
+                    }
+                    ctx.strokeStyle = "hsla(" + Math.round(a.hue * 360) + ",100%,72%," + pass.alpha.toFixed(2) + ")"
+                    ctx.lineWidth   = pass.lw
+                    ctx.stroke()
+                }
+
+                // Node corona
+                for (const pt of [{ x: a.x1, y: a.y1 }, { x: a.x2, y: a.y2 }]) {
+                    const rg = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, 7)
+                    rg.addColorStop(0, "hsla(" + Math.round(a.hue * 360) + ",100%,90%," + (alpha * 0.8).toFixed(2) + ")")
+                    rg.addColorStop(1, "rgba(0,0,0,0)")
+                    ctx.beginPath()
+                    ctx.arc(pt.x, pt.y, 7, 0, 2 * Math.PI)
+                    ctx.fillStyle = rg
+                    ctx.fill()
+                }
+            }
+        }
+
+        // ---- lightning ------------------------------------------------------
+        // Branching storm bolt from the top, fading quickly.
+        function paintLightning(ctx) {
+            const w = width, h = height
+
+            // Slow ambient glow wash
+            ctx.fillStyle = "rgba(0,0,20," + (0.08 + root.rms * 0.12).toFixed(2) + ")"
+            ctx.fillRect(0, 0, w, h)
+
+            const bolts = root.lightningBolts
+            for (let bi = 0; bi < bolts.length; bi++) {
+                const bolt = bolts[bi]
+                const f    = Math.min(1, bolt.flash)
+                const hDeg = Math.round(bolt.hue * 360)
+
+                // Wide purple glow pass
+                ctx.strokeStyle = "hsla(" + hDeg + ",80%,50%," + (f * 0.20).toFixed(2) + ")"
+                ctx.lineWidth   = 5.0
+                for (const seg of bolt.segs) {
+                    ctx.beginPath()
+                    ctx.moveTo(seg.x1, seg.y1)
+                    ctx.lineTo(seg.x2, seg.y2)
+                    ctx.stroke()
+                }
+                // Bright white/blue core
+                ctx.strokeStyle = "hsla(" + hDeg + ",70%,90%," + (f * 0.85).toFixed(2) + ")"
+                ctx.lineWidth   = 0.9
+                for (const seg of bolt.segs) {
+                    ctx.beginPath()
+                    ctx.moveTo(seg.x1, seg.y1)
+                    ctx.lineTo(seg.x2, seg.y2)
+                    ctx.stroke()
+                }
+            }
+        }
+
+        // ---- concert spotlight beams ----------------------------------------
+        // Sweeping floor spotlights with coloured beams, beat-driven intensity.
+        function paintConcert(ctx) {
+            const w = width, h = height
+            const beams = root.concertBeams
+            if (!beams || beams.length === 0) return
+
+            // Haze floor gradient
+            const haze = ctx.createLinearGradient(0, h * 0.6, 0, h)
+            haze.addColorStop(0, "rgba(0,0,0,0)")
+            haze.addColorStop(1, "rgba(10,10,18,0.65)")
+            ctx.fillStyle = haze
+            ctx.fillRect(0, 0, w, h)
+
+            const BEAM_LEN = Math.sqrt(w * w + h * h)
+
+            for (let i = 0; i < beams.length; i++) {
+                const b     = beams[i]
+                const en    = b.energy
+                const alpha = 0.06 + en * 0.28 + (root.gotBeat ? 0.10 : 0)
+                const hDeg  = Math.round(b.hue * 360)
+
+                // Each beam is a thin wedge (triangle) from source at bottom
+                const srcX  = w * (0.1 + (i / (beams.length - 1)) * 0.8)
+                const srcY  = h
+                const ang   = -Math.PI / 2 + b.angle
+                const hw    = b.width / 2 + en * 0.06
+
+                const lx = srcX + Math.cos(ang - hw) * BEAM_LEN
+                const ly = srcY + Math.sin(ang - hw) * BEAM_LEN
+                const rx = srcX + Math.cos(ang + hw) * BEAM_LEN
+                const ry = srcY + Math.sin(ang + hw) * BEAM_LEN
+
+                const grad = ctx.createLinearGradient(srcX, srcY,
+                    srcX + Math.cos(ang) * BEAM_LEN,
+                    srcY + Math.sin(ang) * BEAM_LEN)
+                grad.addColorStop(0,   "hsla(" + hDeg + ",100%,70%," + (alpha * 0.9).toFixed(2) + ")")
+                grad.addColorStop(0.4, "hsla(" + hDeg + ",80%,55%,"  + (alpha * 0.5).toFixed(2) + ")")
+                grad.addColorStop(1,   "hsla(" + hDeg + ",60%,40%,"  + "0)")
+
+                ctx.beginPath()
+                ctx.moveTo(srcX, srcY)
+                ctx.lineTo(lx, ly)
+                ctx.lineTo(rx, ry)
+                ctx.closePath()
+                ctx.fillStyle = grad
+                ctx.fill()
+            }
+
+            // Floor reflection line
+            ctx.fillStyle = "rgba(255,255,255,0.04)"
+            ctx.fillRect(0, h - 2, w, 2)
+        }
+
+        // ---- pyrotechnics ---------------------------------------------------
+        // Firework shells rise and burst; gravity arcs the particle sprays.
+        function paintPyro(ctx) {
+            const w = width, h = height
+
+            // Faint smoke/trail fade instead of full clear
+            ctx.fillStyle = "rgba(0,0,4,0.35)"
+            ctx.fillRect(0, 0, w, h)
+
+            // Rising shells
+            const shells = root.pyroShells
+            for (let i = 0; i < shells.length; i++) {
+                const s = shells[i]
+                const hDeg = Math.round(s.hue * 360)
+                ctx.beginPath()
+                ctx.arc(s.x, s.y, 1.5, 0, 2 * Math.PI)
+                ctx.fillStyle = "hsl(" + hDeg + ",100%,90%)"
+                ctx.fill()
+                // Trail
+                ctx.beginPath()
+                ctx.moveTo(s.x, s.y)
+                ctx.lineTo(s.x - s.vx * 4, s.y - s.vy * 4)
+                ctx.strokeStyle = "hsla(" + hDeg + ",80%,70%,0.4)"
+                ctx.lineWidth = 1.0
+                ctx.stroke()
+            }
+
+            // Burst particles
+            const parts = root.pyroParticles
+            for (let i = 0; i < parts.length; i++) {
+                const p    = parts[i]
+                const hDeg = Math.round(p.hue * 360)
+                const a    = p.life
+                ctx.beginPath()
+                ctx.arc(p.x, p.y, p.size * 0.7 * a, 0, 2 * Math.PI)
+                ctx.fillStyle = "hsla(" + hDeg + ",100%,70%," + (a * 0.9).toFixed(2) + ")"
+                ctx.fill()
+                // Trail line
+                ctx.beginPath()
+                ctx.moveTo(p.x, p.y)
+                ctx.lineTo(p.x - p.vx * 3, p.y - p.vy * 3)
+                ctx.strokeStyle = "hsla(" + hDeg + ",80%,85%," + (a * 0.5).toFixed(2) + ")"
+                ctx.lineWidth = 0.8
+                ctx.stroke()
+            }
+        }
+    }
+
+    // ----- mouse wheel: cycle effects ----------------------------------------
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.RightButton
+        onWheel: whe => {
+            const order = root.effectOrder
+            const cur   = order.indexOf(root.effect)
+            const next  = (cur + (whe.angleDelta.y > 0 ? -1 : 1) + order.length) % order.length
+            Plasmoid.configuration.effect = order[next]
+            whe.accepted = true
+        }
+        onClicked: mouse => {
+            if (mouse.button === Qt.RightButton)
+                effectMenu.popup()
+        }
+    }
+
+    // ----- right-click context menu ------------------------------------------
+    QQC2.Menu {
+        id: effectMenu
+        title: i18n("Visualization")
+
+        QQC2.MenuItem { text: i18n("Bars");          onTriggered: Plasmoid.configuration.effect = "bars"      }
+        QQC2.MenuItem { text: i18n("Scope");         onTriggered: Plasmoid.configuration.effect = "wave"      }
+        QQC2.MenuItem { text: i18n("Starfield");     onTriggered: Plasmoid.configuration.effect = "circles"   }
+        QQC2.MenuItem { text: i18n("Tunnel");        onTriggered: Plasmoid.configuration.effect = "plasma"    }
+        QQC2.MenuItem { text: i18n("Terrain");       onTriggered: Plasmoid.configuration.effect = "terrain"   }
+        QQC2.MenuItem { text: i18n("Vortex");        onTriggered: Plasmoid.configuration.effect = "vortex"    }
+        QQC2.MenuItem { text: i18n("Warp");          onTriggered: Plasmoid.configuration.effect = "warp"      }
+        QQC2.MenuItem { text: i18n("Ripple");        onTriggered: Plasmoid.configuration.effect = "ripple"    }
+        QQC2.MenuItem { text: i18n("Kaleidoscope");  onTriggered: Plasmoid.configuration.effect = "kaleid"    }
+        QQC2.MenuItem { text: i18n("Nova");          onTriggered: Plasmoid.configuration.effect = "nova"      }
+        QQC2.MenuItem { text: i18n("Galaxy");        onTriggered: Plasmoid.configuration.effect = "galaxy"    }
+        QQC2.MenuItem { text: i18n("Aurora");        onTriggered: Plasmoid.configuration.effect = "aurora"    }
+        QQC2.MenuItem { text: i18n("Mandala");       onTriggered: Plasmoid.configuration.effect = "mandala"   }
+        QQC2.MenuSeparator {}
+        QQC2.MenuItem { text: i18n("LED Meter");     onTriggered: Plasmoid.configuration.effect = "led"       }
+        QQC2.MenuItem { text: i18n("Discharge");     onTriggered: Plasmoid.configuration.effect = "discharge" }
+        QQC2.MenuItem { text: i18n("Lightning");     onTriggered: Plasmoid.configuration.effect = "lightning" }
+        QQC2.MenuItem { text: i18n("Concert");       onTriggered: Plasmoid.configuration.effect = "concert"   }
+        QQC2.MenuItem { text: i18n("Pyrotechnics");  onTriggered: Plasmoid.configuration.effect = "pyro"      }
     }
 }
 
