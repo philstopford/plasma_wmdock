@@ -484,8 +484,8 @@ Item {
             const ledH         = Math.max(2, Math.floor(h * 0.055))
             const ledY         = tubeY + tubeH + gap
             // Glyph cell dimensions: digits are taller than wide (wire-cathode style)
-            const glyphH       = Math.max(10, Math.floor(tubeH * 0.80))
-            const glyphW       = Math.max(6, Math.floor(glyphH * 0.60))
+            const glyphH       = Math.max(10, Math.floor(tubeH * 0.82))
+            const glyphW       = Math.max(6, Math.floor(glyphH * 0.68))
             const meshStep     = Math.max(3, Math.floor(tubeW * 0.30))
 
             // ---- Smooth wall-clock phase for pulsing --------------------------
@@ -562,7 +562,7 @@ Item {
                 const effGlyphW = Math.max(4, Math.floor(glyphW * innerWidthFrac))
                 const effGlyphH = glyphH
                 // Wire stroke width: ~8% of effective glyph width, min 1 px
-                const wireW     = Math.max(1.0, effGlyphW * 0.08)
+                const wireW     = Math.max(1.5, effGlyphH * 0.065)
 
                 // ---- Outer ambient glow (light escaping through the glass) -----
                 // Real nixie tubes cast a warm orange-amber halo onto their surroundings;
@@ -634,8 +634,31 @@ Item {
                 ctx.fillStyle = bGlow
                 ctx.fillRect(x, tubeY + tubeH - blueRiseH, tW, blueRiseH)
 
+                // ---- Anode mesh – drawn before the active discharge so the
+                // glowing digit renders over it (in a real tube the discharge glow
+                // is far brighter than the mesh and visually dominates).
+                ctx.lineCap     = "butt"
+                ctx.strokeStyle = "rgba(70,45,8,0.12)"
+                ctx.lineWidth   = 0.5
+                for (let row = 1; row * meshStep < tubeH; row++) {
+                    const ry = tubeY + row * meshStep
+                    ctx.beginPath()
+                    ctx.moveTo(x + 1, ry)
+                    ctx.lineTo(x + tW - 1, ry)
+                    ctx.stroke()
+                }
+                for (let col = 1; col * meshStep < tW; col++) {
+                    const cx3 = x + col * meshStep
+                    ctx.beginPath()
+                    ctx.moveTo(cx3, tubeY + 1)
+                    ctx.lineTo(cx3, tubeY + tubeH - 1)
+                    ctx.stroke()
+                }
+                ctx.lineCap  = "round"
+                ctx.lineJoin = "round"
+
                 // Ghost cathodes – inactive stacked digit wire frames.
-                // Draw first so plasma cloud and active digit glow over them.
+                // Draw second so plasma cloud and active digit glow over them.
                 const ghostWireScale = 0.7   // inactive digits use 70% of main wire width
                 for (let d = 0; d < 10; d++) {
                     if (String(d) === digit) continue
@@ -692,13 +715,13 @@ Item {
                 drawNixieGlyph(ctx, digit, cx2 + 1, cy2 + 1, effGlyphW, effGlyphH)
 
                 // Main orange discharge wire
-                ctx.strokeStyle = "hsl(22,100%," + Math.round(50 + fk * 14) + "%)"
+                ctx.strokeStyle = "hsl(22,100%," + Math.round(62 + fk * 12) + "%)"
                 ctx.lineWidth   = wireW
                 drawNixieGlyph(ctx, digit, cx2, cy2, effGlyphW, effGlyphH)
 
                 // Bright core highlight – thinner stroke (45%), slightly smaller glyph
                 // (88%) offset 0.5 px upward to simulate cathode wire inner luminosity
-                if (fk > 0.5) {
+                if (fk > 0.4) {
                     const highlightWireScale  = 0.45
                     const highlightGlyphScale = 0.88
                     const highlightYOffset    = 0.5
@@ -706,27 +729,6 @@ Item {
                     ctx.lineWidth   = wireW * highlightWireScale
                     drawNixieGlyph(ctx, digit, cx2, cy2 - highlightYOffset,
                                    effGlyphW * highlightGlyphScale, effGlyphH * highlightGlyphScale)
-                }
-
-                // ---- Anode mesh – drawn on top of the active digit -----------
-                // In a real tube the mesh anode surrounds all cathodes and is
-                // visible in front; draw it last inside the clip so it overlays.
-                ctx.lineCap     = "butt"
-                ctx.strokeStyle = "rgba(70,45,8,0.52)"
-                ctx.lineWidth   = 0.5
-                for (let row = 1; row * meshStep < tubeH; row++) {
-                    const ry = tubeY + row * meshStep
-                    ctx.beginPath()
-                    ctx.moveTo(x + 1, ry)
-                    ctx.lineTo(x + tW - 1, ry)
-                    ctx.stroke()
-                }
-                for (let col = 1; col * meshStep < tW; col++) {
-                    const cx3 = x + col * meshStep
-                    ctx.beginPath()
-                    ctx.moveTo(cx3, tubeY + 1)
-                    ctx.lineTo(cx3, tubeY + tubeH - 1)
-                    ctx.stroke()
                 }
 
                 ctx.restore()   // end tube interior clip
