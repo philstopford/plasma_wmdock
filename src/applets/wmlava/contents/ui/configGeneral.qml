@@ -12,6 +12,8 @@ Item {
     property string cfg_blobColorDefault:   "red"
     property int    cfg_blobCount:          0
     property int    cfg_blobCountDefault:   5
+    property int    cfg_resolution:         1
+    property int    cfg_resolutionDefault:  1
 
     // Physics parameters (Double in kcfg → real in QML)
     property real   cfg_gravity:            0.08
@@ -63,6 +65,25 @@ Item {
             from: 2; to: 10; stepSize: 1
             value: page.cfg_blobCount
             onValueChanged: page.cfg_blobCount = value
+        }
+
+        RowLayout {
+            Kirigami.FormData.label: i18n("Resolution:")
+            spacing: 8
+
+            QQC2.Slider {
+                id: resolutionSlider
+                Layout.preferredWidth: 140
+                from: 1; to: 4; stepSize: 1
+                value: page.cfg_resolution
+                onMoved: page.cfg_resolution = Math.round(value)
+            }
+
+            Text {
+                text: i18n("%1×", Math.round(resolutionSlider.value))
+                color: Kirigami.Theme.textColor
+                Layout.preferredWidth: 28
+            }
         }
 
         // ── Physics parameters ────────────────────────────────────────────────

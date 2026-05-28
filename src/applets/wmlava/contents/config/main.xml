@@ -13,6 +13,10 @@
       <label>Number of blobs</label>
       <default>5</default>
     </entry>
+    <entry name="resolution" type="Int">
+      <label>Render resolution (higher = smoother)</label>
+      <default>1</default>
+    </entry>
     <entry name="gravity" type="Double">
       <label>Gravitational acceleration (px/tick²)</label>
       <default>0.08</default>

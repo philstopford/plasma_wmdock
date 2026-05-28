@@ -35,6 +35,7 @@ Item {
 
     readonly property string blobColor: Plasmoid.configuration.blobColor || "red"
     readonly property int    blobCount: Math.max(2, Math.min(10, Plasmoid.configuration.blobCount || 5))
+    readonly property int    renderResolution: Math.max(1, Math.min(4, Plasmoid.configuration.resolution || 1))
 
     // ----- system heat (0 = idle, 1 = fully loaded) -------------------------
     // Smoothed exponentially so the lamp reacts gradually to load changes.
@@ -473,8 +474,8 @@ Item {
             ctx.clearRect(0, 0, w, h)
             if (!blobs || blobs.length === 0) return
 
-            // Coarse pixel grid – each "pixel" is step×step
-            const step = 4
+            // Coarse pixel grid – higher resolution reduces the cell size.
+            const step = Math.max(1, 5 - root.renderResolution)
 
             for (let py = 0; py < h; py += step) {
                 for (let px = 0; px < w; px += step) {
