@@ -23,7 +23,7 @@ Item {
     readonly property string nixieTransition:  Plasmoid.configuration.nixieTransition || "slot"
     readonly property string nixieTubeStyle:   Plasmoid.configuration.nixieTubeStyle  || "classic"
     readonly property real   nixieGlowRadius:  Plasmoid.configuration.nixieGlowRadius > 0
-                                               ? Plasmoid.configuration.nixieGlowRadius : 0.55
+                                               ? Plasmoid.configuration.nixieGlowRadius : 0.35
 
     // Repaint triggers
     onUse24HourChanged:       faceCanvas.requestPaint()
@@ -538,11 +538,16 @@ Item {
                 ctx.fillStyle = dg
                 ctx.fill()
 
-                // Fuzzy discharge glow: 4 offset passes at low alpha
-                const glowA = (0.15 * fk).toFixed(2)
+                // Fuzzy discharge glow: 4 offset passes at low alpha.
+                // Both the offset distance and the per-pass font expansion are
+                // scaled by nixieGlowRadius so the slider controls ALL sources
+                // of haze, not just the radial gradient circle.
+                const glowScale = root.nixieGlowRadius
+                const glowA = (0.15 * fk * glowScale).toFixed(2)
                 for (let pass = 1; pass <= 4; pass++) {
-                    const blur = pass * 1.2
-                    ctx.font      = "bold " + (fontSz + pass * 2) + "px monospace"
+                    const blur = pass * 1.2 * glowScale
+                    const extraSz = Math.round(pass * 2 * glowScale)
+                    ctx.font      = "bold " + (fontSz + extraSz) + "px monospace"
                     ctx.fillStyle = "rgba(255,130,15," + glowA + ")"
                     ctx.fillText(digit, cx2 - blur, cy2)
                     ctx.fillText(digit, cx2 + blur, cy2)

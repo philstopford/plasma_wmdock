@@ -20,7 +20,7 @@ Item {
     property string cfg_nixieTubeStyle:          ""
     property string cfg_nixieTubeStyleDefault:   "classic"
     property real   cfg_nixieGlowRadius:         0
-    property real   cfg_nixieGlowRadiusDefault:  0.55
+    property real   cfg_nixieGlowRadiusDefault:  0.35
 
     Kirigami.FormLayout {
         anchors.left:  parent.left
@@ -121,7 +121,7 @@ Item {
             from:     0.10
             to:       1.00
             stepSize: 0.05
-            value:    page.cfg_nixieGlowRadius || 0.55
+            value:    page.cfg_nixieGlowRadius || 0.35
             onMoved: page.cfg_nixieGlowRadius = value
         }
     }
