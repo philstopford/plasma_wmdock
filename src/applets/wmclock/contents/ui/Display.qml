@@ -636,6 +636,7 @@ Item {
 
                 // Ghost cathodes – inactive stacked digit wire frames.
                 // Draw first so plasma cloud and active digit glow over them.
+                const ghostWireScale = 0.7   // inactive digits use 70% of main wire width
                 for (let d = 0; d < 10; d++) {
                     if (String(d) === digit) continue
                     const depthOff = ((d - 5) * 0.25)
@@ -643,7 +644,7 @@ Item {
                                          10 - Math.abs(d - digitInt))
                     const gAlpha = (0.10 + dist * 0.015) * fk
                     ctx.strokeStyle = "rgba(160,80,12," + gAlpha.toFixed(3) + ")"
-                    ctx.lineWidth   = wireW * 0.7
+                    ctx.lineWidth   = wireW * ghostWireScale
                     drawNixieGlyph(ctx, String(d), cx2 + depthOff, cy2, effGlyphW, effGlyphH)
                 }
 
@@ -664,11 +665,15 @@ Item {
                 // nixieGlowRadius so the slider controls ALL sources of haze.
                 const glowScale = root.nixieGlowRadius
                 const glowA = (0.15 * fk * glowScale).toFixed(2)
+                // glyphExpansionPerPass: each glow pass is 12% larger per pass (×radius)
+                // wireWidthExpansionPerPass: each glow pass adds 25% to wire width
+                const glyphExpansionPerPass  = 0.12
+                const wireWidthExpansionPerPass = 0.25
                 for (let pass = 1; pass <= 4; pass++) {
                     const blur = pass * 1.2 * glowScale
-                    const gs   = 1.0 + pass * 0.12 * glowScale
+                    const gs   = 1.0 + pass * glyphExpansionPerPass * glowScale
                     ctx.strokeStyle = "rgba(255,130,15," + glowA + ")"
-                    ctx.lineWidth   = wireW * (1.0 + pass * 0.25)
+                    ctx.lineWidth   = wireW * (1.0 + pass * wireWidthExpansionPerPass)
                     const gw = effGlyphW * gs, gh = effGlyphH * gs
                     drawNixieGlyph(ctx, digit, cx2 - blur, cy2, gw, gh)
                     drawNixieGlyph(ctx, digit, cx2 + blur, cy2, gw, gh)
@@ -691,11 +696,16 @@ Item {
                 ctx.lineWidth   = wireW
                 drawNixieGlyph(ctx, digit, cx2, cy2, effGlyphW, effGlyphH)
 
-                // Bright core highlight – thinner, slightly smaller glyph
+                // Bright core highlight – thinner stroke (45%), slightly smaller glyph
+                // (88%) offset 0.5 px upward to simulate cathode wire inner luminosity
                 if (fk > 0.5) {
+                    const highlightWireScale  = 0.45
+                    const highlightGlyphScale = 0.88
+                    const highlightYOffset    = 0.5
                     ctx.strokeStyle = "rgba(255,215,130," + (0.60 * fk).toFixed(2) + ")"
-                    ctx.lineWidth   = wireW * 0.45
-                    drawNixieGlyph(ctx, digit, cx2, cy2 - 0.5, effGlyphW * 0.88, effGlyphH * 0.88)
+                    ctx.lineWidth   = wireW * highlightWireScale
+                    drawNixieGlyph(ctx, digit, cx2, cy2 - highlightYOffset,
+                                   effGlyphW * highlightGlyphScale, effGlyphH * highlightGlyphScale)
                 }
 
                 // ---- Anode mesh – drawn on top of the active digit -----------
