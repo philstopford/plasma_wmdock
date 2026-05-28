@@ -8,7 +8,8 @@ Item {
 
     readonly property string configuredGpu: Plasmoid.configuration.gpu || ""
     readonly property int cycleIntervalSec: Math.max(1, Plasmoid.configuration.cycleInterval || 4)
-    readonly property bool cycleMode: Plasmoid.configuration.cycleMode ?? true
+    readonly property bool cycleMode:
+        Plasmoid.configuration.cycleMode !== undefined ? Plasmoid.configuration.cycleMode : true
     readonly property real barLabelScale: 0.65
     readonly property bool showTitle: Plasmoid.configuration.showTitle ?? true
 

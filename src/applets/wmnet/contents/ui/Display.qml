@@ -110,6 +110,11 @@ Item {
         graph.requestPaint()
     }
 
+    onExternalCycleModeChanged: {
+        if (root.externalCycleMode)
+            root.manualBrowse = false
+    }
+
     onEffectiveIfacesChanged: {
         if (root.effectiveIfaces.length <= 1)
             root.manualBrowse = false
