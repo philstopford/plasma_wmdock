@@ -58,10 +58,11 @@ Item {
 
     // true = show scrolling graph for one interface; false = multi-interface list
     readonly property bool useSingleDisplay:
-        root.effectiveIfaces.length <= 1 || root.externalCycleMode
+        root.effectiveIfaces.length <= 1 || root.externalCycleMode || root.manualBrowse
 
     // Current index into effectiveIfaces (incremented by cycle timer)
     property int cycleIndex: 0
+    property bool manualBrowse: false
 
     // Name of the interface currently shown in single/cycle mode
     property string activeIface: {
@@ -83,6 +84,15 @@ Item {
         return b.toFixed(0) + "B/s"
     }
 
+    function cycleIface(delta) {
+        if (root.effectiveIfaces.length <= 1)
+            return false
+        root.manualBrowse = root.manualBrowse || !root.externalCycleMode
+        root.cycleIndex = (root.cycleIndex + delta + root.effectiveIfaces.length)
+                          % root.effectiveIfaces.length
+        return true
+    }
+
     // -----------------------------------------------------------------------
     // React to active-interface changes (switch or initial load)
     // -----------------------------------------------------------------------
@@ -98,6 +108,16 @@ Item {
         if (root.useSingleDisplay)
             NetworkMonitor.setIface(root.activeIface)
         graph.requestPaint()
+    }
+
+    onEffectiveIfacesChanged: {
+        if (root.effectiveIfaces.length <= 1)
+            root.manualBrowse = false
+        if (root.effectiveIfaces.length === 0) {
+            root.cycleIndex = 0
+            return
+        }
+        root.cycleIndex = root.cycleIndex % root.effectiveIfaces.length
     }
 
     Component.onCompleted: {
@@ -155,14 +175,12 @@ Item {
         anchors.fill: parent
         acceptedButtons: Qt.NoButton
         onWheel: function(wheelEvent) {
-            if (root.effectiveIfaces.length < 2) {
+            if (root.externalCycleMode || root.effectiveIfaces.length < 2) {
                 wheelEvent.accepted = false
                 return
             }
             const delta = wheelEvent.angleDelta.y < 0 ? 1 : -1
-            root.cycleIndex = (root.cycleIndex + delta + root.effectiveIfaces.length)
-                              % root.effectiveIfaces.length
-            wheelEvent.accepted = true
+            wheelEvent.accepted = root.cycleIface(delta)
         }
     }
 

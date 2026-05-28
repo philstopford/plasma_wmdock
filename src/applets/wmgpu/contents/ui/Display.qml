@@ -8,6 +8,7 @@ Item {
 
     readonly property string configuredGpu: Plasmoid.configuration.gpu || ""
     readonly property int cycleIntervalSec: Math.max(1, Plasmoid.configuration.cycleInterval || 4)
+    readonly property bool cycleMode: Plasmoid.configuration.cycleMode ?? true
     readonly property real barLabelScale: 0.65
     readonly property bool showTitle: Plasmoid.configuration.showTitle ?? true
 
@@ -35,7 +36,17 @@ Item {
         root.activeGpu = active[root.gpuIndex]
     }
 
+    function cycleGpu(delta) {
+        const active = root.filteredGpus()
+        if (active.length <= 1)
+            return false
+        root.gpuIndex = (root.gpuIndex + delta + active.length) % active.length
+        root.activeGpu = active[root.gpuIndex]
+        return true
+    }
+
     Component.onCompleted: root.refreshActiveGpu()
+    onConfiguredGpuChanged: root.refreshActiveGpu()
 
     Connections {
         target: GpuMonitor
@@ -47,13 +58,9 @@ Item {
     Timer {
         interval: root.cycleIntervalSec * 1000
         repeat: true
-        running: root.configuredGpu === "" && root.filteredGpus().length > 1
+        running: root.cycleMode && root.configuredGpu === "" && root.filteredGpus().length > 1
         onTriggered: {
-            const active = root.filteredGpus()
-            if (active.length <= 1)
-                return
-            root.gpuIndex = (root.gpuIndex + 1) % active.length
-            root.activeGpu = active[root.gpuIndex]
+            root.cycleGpu(1)
         }
     }
 
@@ -185,13 +192,22 @@ Item {
         font { pixelSize: parent.height * 0.12; family: "monospace" }
     }
 
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.NoButton
+        onWheel: function(wheelEvent) {
+            if (root.cycleMode || root.configuredGpu !== "") {
+                wheelEvent.accepted = false
+                return
+            }
+            const delta = wheelEvent.angleDelta.y < 0 ? 1 : -1
+            wheelEvent.accepted = root.cycleGpu(delta)
+        }
+    }
+
     TapHandler {
         onTapped: {
-            const active = root.filteredGpus()
-            if (active.length <= 1)
-                return
-            root.gpuIndex = (root.gpuIndex + 1) % active.length
-            root.activeGpu = active[root.gpuIndex]
+            root.cycleGpu(1)
         }
     }
 }

@@ -11,6 +11,10 @@
     <entry name="cycleInterval" type="Int">
       <default>4</default>
     </entry>
+    <entry name="cycleMode" type="Bool">
+      <label>Automatically cycle between GPUs in auto mode</label>
+      <default>true</default>
+    </entry>
     <entry name="showTitle" type="Bool">
       <label>Show GPU name title</label>
       <default>true</default>

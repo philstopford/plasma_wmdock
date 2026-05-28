@@ -12,6 +12,8 @@ Item {
     property string cfg_gpuDefault:           ""
     property int    cfg_cycleInterval:        0
     property int    cfg_cycleIntervalDefault: 4
+    property bool   cfg_cycleMode:            true
+    property bool   cfg_cycleModeDefault:     true
     property bool   cfg_showTitle:            true
     property bool   cfg_showTitleDefault:     true
 
@@ -48,8 +50,17 @@ Item {
             onActivated: page.cfg_gpu = currentValue
         }
 
+        QQC2.CheckBox {
+            id: cycleModeCheck
+            Kirigami.FormData.label: i18n("Auto cycle GPUs:")
+            enabled: page.cfg_gpu === ""
+            checked: page.cfg_cycleMode
+            onToggled: page.cfg_cycleMode = checked
+        }
+
         QQC2.SpinBox {
             Kirigami.FormData.label: i18n("Auto cycle interval (seconds):")
+            enabled: page.cfg_gpu === "" && cycleModeCheck.checked
             from: 1
             to: 30
             stepSize: 1
