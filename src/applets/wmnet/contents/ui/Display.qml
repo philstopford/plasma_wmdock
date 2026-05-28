@@ -87,7 +87,8 @@ Item {
     function cycleIface(delta) {
         if (root.effectiveIfaces.length <= 1)
             return false
-        root.manualBrowse = root.manualBrowse || !root.externalCycleMode
+        if (!root.externalCycleMode)
+            root.manualBrowse = true
         root.cycleIndex = (root.cycleIndex + delta + root.effectiveIfaces.length)
                           % root.effectiveIfaces.length
         return true

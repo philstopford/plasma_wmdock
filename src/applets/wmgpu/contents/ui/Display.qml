@@ -197,7 +197,8 @@ Item {
         anchors.fill: parent
         acceptedButtons: Qt.NoButton
         onWheel: function(wheelEvent) {
-            if (root.cycleMode || root.configuredGpu !== "") {
+            const canManualCycle = !root.cycleMode && root.configuredGpu === ""
+            if (!canManualCycle) {
                 wheelEvent.accepted = false
                 return
             }
