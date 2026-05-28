@@ -215,6 +215,23 @@ Item {
         //   Each digit tube: tubeW wide, tubeH tall, starting at tubeY
         //   Blue LED strip below each digit tube
         //   Red pulsing dot at the separator position
+        //
+        // roundRectPath: ctx.roundRect() was added in Qt 6.8 / Chrome 99.
+        // Polyfill using arcTo() so the nixie mode works on Qt 6.5–6.7.
+        function roundRectPath(ctx, x, y, w, h, r) {
+            r = Math.min(r, w / 2, h / 2)
+            ctx.moveTo(x + r, y)
+            ctx.lineTo(x + w - r, y)
+            ctx.arcTo(x + w, y,     x + w, y + r,     r)
+            ctx.lineTo(x + w, y + h - r)
+            ctx.arcTo(x + w, y + h, x + w - r, y + h, r)
+            ctx.lineTo(x + r, y + h)
+            ctx.arcTo(x,      y + h, x,      y + h - r, r)
+            ctx.lineTo(x,     y + r)
+            ctx.arcTo(x,      y,     x + r,  y,         r)
+            ctx.closePath()
+        }
+
         function paintNixie() {
             const ctx = getContext("2d")
             const w = width, h = height
@@ -297,7 +314,7 @@ Item {
                 ctx.strokeStyle = "#2a2520"
                 ctx.lineWidth   = 1
                 ctx.beginPath()
-                ctx.roundRect(x, tubeY, tW, tubeH, 3)
+                roundRectPath(ctx, x, tubeY, tW, tubeH, 3)
                 ctx.stroke()
 
                 // Inner glass (subtle warm tint)
@@ -307,7 +324,7 @@ Item {
                 glassGrad.addColorStop(1,    "rgba(40,28,12,0.55)")
                 ctx.fillStyle = glassGrad
                 ctx.beginPath()
-                ctx.roundRect(x, tubeY, tW, tubeH, 3)
+                roundRectPath(ctx, x, tubeY, tW, tubeH, 3)
                 ctx.fill()
 
                 // Cathode grid lines (faint horizontal bands in the glass)
@@ -339,7 +356,7 @@ Item {
                 // Shadow layer (depth / shadow digit under glow)
                 ctx.save()
                 ctx.beginPath()
-                ctx.roundRect(x + 1, tubeY + 1, tW - 2, tubeH - 2, 2)
+                roundRectPath(ctx, x + 1, tubeY + 1, tW - 2, tubeH - 2, 2)
                 ctx.clip()
 
                 ctx.textAlign    = "center"
