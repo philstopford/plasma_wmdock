@@ -473,6 +473,18 @@ Item {
                     innerHalfW = tW * 0.5
                 }
 
+                // ---- Scale fonts to fit inside this tube's inner width --------
+                // For slim tubes the inner width is reduced; digits must be scaled
+                // down so they fit within the clipped interior rather than being
+                // cropped at the tube walls.  Barrel is wider at centre (no scale
+                // needed); Classic is the full-width reference (scale = 1.0).
+                const innerWidthFrac = (tubeStyle === "slim")
+                    ? Math.max(0.5, (tW - 2 * tubeEnvPx) / tW)
+                    : 1.0
+                const effFontSz          = Math.max(6, Math.floor(fontSz * innerWidthFrac))
+                const effGhostFontSz     = Math.round(effFontSz * 0.90)
+                const effHighlightFontSz = Math.round(effFontSz * 0.70)
+
                 // ---- Outer ambient glow (light escaping through the glass) -----
                 // Real nixie tubes cast a warm orange-amber halo onto their surroundings;
                 // visible in reference photos as a soft glow radiating past each tube edge.
@@ -489,19 +501,20 @@ Item {
                 ctx.fillRect(x - tW * 0.45, tubeY - tW * 0.3, tW * 1.9, tubeH + tW * 0.6)
 
                 // ---- Glass tube body – outer border --------------------------
-                ctx.strokeStyle = "rgba(100,80,40,0.80)"
+                ctx.strokeStyle = "rgba(120,115,105,0.80)"
                 ctx.lineWidth   = 1
                 ctx.beginPath()
                 drawTubePath(ctx, x, tubeY, tW, tubeH, tubeStyle)
                 ctx.stroke()
 
-                // Dark glass interior fill – warm amber tint from real tube glass.
-                // The cylinder illusion comes from a left-to-right gradient.
+                // Dark glass interior fill – neutral dark grey matching real tube glass.
+                // Real nixie glass is clear/neutral, not amber-tinted; the warm colour
+                // is entirely from the discharge.  Left-to-right gradient for cylinder illusion.
                 const glassGrad = ctx.createLinearGradient(x, tubeY, x + tW, tubeY)
-                glassGrad.addColorStop(0,    "rgba(38,24,8,0.78)")
-                glassGrad.addColorStop(0.20, "rgba(20,13,5,0.62)")
-                glassGrad.addColorStop(0.80, "rgba(20,13,5,0.62)")
-                glassGrad.addColorStop(1,    "rgba(38,24,8,0.78)")
+                glassGrad.addColorStop(0,    "rgba(30,28,25,0.80)")
+                glassGrad.addColorStop(0.20, "rgba(15,14,12,0.60)")
+                glassGrad.addColorStop(0.80, "rgba(15,14,12,0.60)")
+                glassGrad.addColorStop(1,    "rgba(30,28,25,0.80)")
                 ctx.fillStyle = glassGrad
                 ctx.beginPath()
                 drawTubePath(ctx, x, tubeY, tW, tubeH, tubeStyle)
@@ -543,13 +556,14 @@ Item {
 
                 // Ghost cathodes – inactive stacked digit wire frames.
                 // Draw first so plasma cloud and active digit glow over them.
+                // Use effGhostFontSz so they scale with the tube inner width.
                 for (let d = 0; d < 10; d++) {
                     if (String(d) === digit) continue
                     const depthOff = ((d - 5) * 0.25)
                     const dist = Math.min(Math.abs(d - digitInt),
                                          10 - Math.abs(d - digitInt))
-                    const gAlpha = (0.08 + dist * 0.012) * fk
-                    ctx.font      = "bold " + ghostFontSz + "px monospace"
+                    const gAlpha = (0.10 + dist * 0.015) * fk
+                    ctx.font      = "bold " + effGhostFontSz + "px monospace"
                     ctx.fillStyle = "rgba(160,80,12," + gAlpha.toFixed(3) + ")"
                     ctx.fillText(String(d), cx2 + depthOff, cy2)
                 }
@@ -573,12 +587,13 @@ Item {
                 // Both the offset distance and the per-pass font expansion are
                 // scaled by nixieGlowRadius so the slider controls ALL sources
                 // of haze, not just the radial gradient circle.
+                // effFontSz ensures the glow haze scales with the tube inner width.
                 const glowScale = root.nixieGlowRadius
                 const glowA = (0.15 * fk * glowScale).toFixed(2)
                 for (let pass = 1; pass <= 4; pass++) {
                     const blur = pass * 1.2 * glowScale
                     const extraSz = Math.round(pass * 2 * glowScale)
-                    ctx.font      = "bold " + (fontSz + extraSz) + "px monospace"
+                    ctx.font      = "bold " + (effFontSz + extraSz) + "px monospace"
                     ctx.fillStyle = "rgba(255,130,15," + glowA + ")"
                     ctx.fillText(digit, cx2 - blur, cy2)
                     ctx.fillText(digit, cx2 + blur, cy2)
@@ -591,7 +606,7 @@ Item {
                     ctx.fillText(digit, cx2 + db, cy2 + db)
                 }
 
-                ctx.font = "bold " + fontSz + "px monospace"
+                ctx.font = "bold " + effFontSz + "px monospace"
 
                 // Depth shadow
                 ctx.fillStyle = "rgba(160,40,0,0.22)"
@@ -604,7 +619,7 @@ Item {
                 // Bright core highlight
                 if (fk > 0.5) {
                     ctx.fillStyle = "rgba(255,215,130," + (0.60 * fk).toFixed(2) + ")"
-                    ctx.font      = "bold " + highlightFontSz + "px monospace"
+                    ctx.font      = "bold " + effHighlightFontSz + "px monospace"
                     ctx.fillText(digit, cx2, cy2 - 1)
                 }
 
@@ -612,7 +627,7 @@ Item {
                 // real cathodes are wire-formed shapes with bright edges.
                 ctx.strokeStyle = "rgba(255,190,70," + (0.28 * fk).toFixed(2) + ")"
                 ctx.lineWidth   = 0.7
-                ctx.font        = "bold " + fontSz + "px monospace"
+                ctx.font        = "bold " + effFontSz + "px monospace"
                 ctx.strokeText(digit, cx2, cy2)
 
                 // ---- Anode mesh – drawn on top of the active digit -----------
@@ -639,10 +654,11 @@ Item {
 
                 // ---- Cylindrical glass overlay --------------------------------
                 // Left-side bright specular streak (strong) + right-side secondary.
+                // Use cooler, more neutral white (not warm amber) to match real glass.
                 const specGr = ctx.createLinearGradient(x, tubeY, x + Math.floor(tW * 0.35), tubeY)
-                specGr.addColorStop(0,   "rgba(255,245,210,0.22)")
-                specGr.addColorStop(0.4, "rgba(255,240,200,0.11)")
-                specGr.addColorStop(1,   "rgba(255,240,200,0.0)")
+                specGr.addColorStop(0,   "rgba(240,242,245,0.28)")
+                specGr.addColorStop(0.4, "rgba(220,225,230,0.14)")
+                specGr.addColorStop(1,   "rgba(0,0,0,0.0)")
                 ctx.save()
                 ctx.beginPath()
                 drawTubePath(ctx, x + 1, tubeY + 1, Math.floor(tW * 0.35), tubeH - 2, tubeStyle)
@@ -652,9 +668,9 @@ Item {
 
                 const specR  = ctx.createLinearGradient(x + Math.floor(tW * 0.70), tubeY,
                                                          x + tW, tubeY)
-                specR.addColorStop(0,   "rgba(255,240,200,0.0)")
-                specR.addColorStop(0.7, "rgba(255,240,200,0.09)")
-                specR.addColorStop(1,   "rgba(255,240,200,0.14)")
+                specR.addColorStop(0,   "rgba(0,0,0,0.0)")
+                specR.addColorStop(0.7, "rgba(200,205,210,0.08)")
+                specR.addColorStop(1,   "rgba(210,215,220,0.16)")
                 ctx.save()
                 ctx.beginPath()
                 drawTubePath(ctx, x + Math.floor(tW * 0.70), tubeY + 1,
@@ -664,34 +680,36 @@ Item {
                 ctx.restore()
 
                 // ---- Top glass dome / getter cap --------------------------------
-                // Real nixie tubes are sealed with a rounded glass dome at the top
-                // and a small metallic getter disc that prevents gas contamination.
+                // Real nixie tubes are sealed with a rounded glass dome at the top.
+                // In the reference photo the dome is roughly 25% of tube height.
+                // domeRy uses tubeH so it scales with the tube proportions rather
+                // than just the tube width (which produced a too-flat cap before).
                 const domeCx = x + Math.floor(tW * 0.5)
-                const domeRx = Math.floor(tW * 0.42)
-                const domeRy = Math.max(3, Math.floor(tW * 0.20))
+                const domeRx = Math.floor(tW * 0.46)
+                const domeRy = Math.max(4, Math.floor(tubeH * 0.18))
                 ctx.save()
-                // Dome body (flat bottom, rounded top — drawn as bottom-half ellipse rotated)
+                // Dome body: top-half ellipse (upper arc of the sealed glass top)
                 ctx.beginPath()
                 ctx.ellipse(domeCx, tubeY, domeRx, domeRy, 0, Math.PI, 2 * Math.PI)
-                ctx.fillStyle   = "rgba(55,45,25,0.72)"
+                ctx.fillStyle   = "rgba(50,48,44,0.75)"
                 ctx.fill()
-                ctx.strokeStyle = "rgba(110,88,42,0.85)"
+                ctx.strokeStyle = "rgba(140,135,122,0.88)"
                 ctx.lineWidth   = 0.6
                 ctx.stroke()
-                // Left specular on dome
+                // Left specular on dome – bright streak like glass cylinder highlight
                 ctx.beginPath()
-                ctx.ellipse(domeCx - Math.floor(domeRx * 0.35), tubeY - Math.floor(domeRy * 0.4),
-                            Math.floor(domeRx * 0.22), Math.floor(domeRy * 0.45), -0.4, 0, 2*Math.PI)
-                ctx.fillStyle = "rgba(255,245,210,0.14)"
+                ctx.ellipse(domeCx - Math.floor(domeRx * 0.32), tubeY - Math.floor(domeRy * 0.35),
+                            Math.floor(domeRx * 0.20), Math.floor(domeRy * 0.42), -0.4, 0, 2*Math.PI)
+                ctx.fillStyle = "rgba(255,252,245,0.22)"
                 ctx.fill()
-                // Getter disc at very top centre
-                const getterR = Math.max(2, Math.floor(tW * 0.15))
-                const getterY = tubeY - domeRy + 1
+                // Getter disc at very top centre (darker metallic spot)
+                const getterR = Math.max(2, Math.floor(tW * 0.14))
+                const getterY = tubeY - domeRy + 2
                 ctx.beginPath()
-                ctx.ellipse(domeCx, getterY, getterR, Math.max(1, Math.floor(getterR * 0.45)), 0, 0, 2*Math.PI)
-                ctx.fillStyle   = "rgba(28,25,22,0.88)"
+                ctx.ellipse(domeCx, getterY, getterR, Math.max(1, Math.floor(getterR * 0.42)), 0, 0, 2*Math.PI)
+                ctx.fillStyle   = "rgba(35,33,30,0.90)"
                 ctx.fill()
-                ctx.strokeStyle = "rgba(130,105,55,0.65)"
+                ctx.strokeStyle = "rgba(150,140,120,0.65)"
                 ctx.lineWidth   = 0.5
                 ctx.stroke()
                 ctx.restore()
