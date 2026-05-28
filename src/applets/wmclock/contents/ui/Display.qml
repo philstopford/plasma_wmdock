@@ -419,8 +419,9 @@ Item {
 
             // Separator dot: exponential-decay flash at each second boundary
             // (mimics a red LED that fires briefly as each second ticks over)
-            const fracSec = (now % 1000) / 1000
-            const dotBright = Math.exp(-fracSec * 9.0)   // 1.0 at t=0, ~0.01 at t=500ms
+            const LED_DECAY_RATE = 9.0   // 1.0 at t=0ms, ~0.01 at t=500ms
+            const fracSec   = (now % 1000) / 1000
+            const dotBright = Math.exp(-fracSec * LED_DECAY_RATE)
 
             // ---- Dark background ----------------------------------------------
             ctx.fillStyle = "#060508"
@@ -458,11 +459,19 @@ Item {
 
                 // ---- Effective inner half-width for this tube style ----------
                 // Used to scale the discharge cloud so it fits inside the envelope.
-                const bx  = Math.max(2, Math.ceil(tW * 0.12))  // barrel bulge px
-                const ins = Math.max(1, Math.ceil(tW * 0.12))  // slim inset px
-                const innerHalfW = tubeStyle === "slim"   ? (tW - 2 * ins) * 0.5
-                                 : tubeStyle === "barrel" ? tW * 0.5 + bx * 0.5
-                                 : tW * 0.5
+                // TUBE_ENVELOPE_SCALE: fraction of tube width used for barrel/slim shaping.
+                const TUBE_ENVELOPE_SCALE = 0.12
+                const tubeEnvPx = Math.max(2, Math.ceil(tW * TUBE_ENVELOPE_SCALE))
+                let innerHalfW
+                if (tubeStyle === "slim") {
+                    // IN-18: narrower on each side by TUBE_ENVELOPE_SCALE
+                    innerHalfW = (tW - 2 * tubeEnvPx) * 0.5
+                } else if (tubeStyle === "barrel") {
+                    // IN-14: sides bow outward; effective width slightly wider at centre
+                    innerHalfW = tW * 0.5 + tubeEnvPx * 0.5
+                } else {
+                    innerHalfW = tW * 0.5
+                }
 
                 // ---- Glass tube body – outer border --------------------------
                 ctx.strokeStyle = "rgba(80,65,35,0.75)"
