@@ -510,6 +510,21 @@ Item {
                 ctx.textAlign    = "center"
                 ctx.textBaseline = "middle"
 
+                // Blue LED emissive – vertical gradient rising from tube bottom.
+                // Simulates the cool-blue cathode glow seen at the base of real
+                // nixie tubes; the orange discharge overlays it in the digit region.
+                const blueRiseH = tubeH * 0.45
+                const bGlow     = ctx.createLinearGradient(
+                                      cx2, tubeY + tubeH,
+                                      cx2, tubeY + tubeH - blueRiseH)
+                const bA0 = (0.28 * ledPulse * fk).toFixed(2)
+                const bA1 = (0.10 * ledPulse * fk).toFixed(2)
+                bGlow.addColorStop(0,   "rgba(20,55,240," + bA0 + ")")
+                bGlow.addColorStop(0.5, "rgba(20,80,220," + bA1 + ")")
+                bGlow.addColorStop(1,   "rgba(0,0,0,0)")
+                ctx.fillStyle = bGlow
+                ctx.fillRect(x, tubeY + tubeH - blueRiseH, tW, blueRiseH)
+
                 // Ghost cathodes – inactive stacked digit wire frames.
                 // Draw first so plasma cloud and active digit glow over them.
                 for (let d = 0; d < 10; d++) {
@@ -663,10 +678,14 @@ Item {
                               + String(t.getDate()).padStart(2, "0") + " "
                               + months[t.getMonth()]
                 const dateY = ledY + ledH + Math.floor(h * 0.06)
-                ctx.font         = Math.max(6, Math.floor(h * 0.10)) + "px monospace"
+                ctx.font         = Math.max(8, Math.floor(h * 0.12)) + "px monospace"
                 ctx.textAlign    = "center"
                 ctx.textBaseline = "top"
-                ctx.fillStyle    = "#443322"
+                // Dark shadow pass for contrast against the black background
+                ctx.fillStyle    = "rgba(0,0,0,0.75)"
+                ctx.fillText(dateStr, w / 2 + 1, dateY + 1)
+                // Bright warm amber, matching the nixie tube discharge colour
+                ctx.fillStyle    = "rgba(210,145,55,0.95)"
                 ctx.fillText(dateStr, w / 2, dateY)
             }
         }
