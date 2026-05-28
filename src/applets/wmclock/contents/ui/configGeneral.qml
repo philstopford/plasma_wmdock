@@ -112,13 +112,13 @@ Item {
         QQC2.Label {
             visible: page.cfg_clockStyle === "nixie"
             Kirigami.FormData.label: i18n("Discharge glow radius:")
-            text: Math.round(glowSlider.value * 100) + "%"
+            text: Math.round(glowSlider.value * 100) + "% of tube radius"
         }
 
         QQC2.Slider {
             id: glowSlider
             visible: page.cfg_clockStyle === "nixie"
-            from:     0.20
+            from:     0.10
             to:       1.00
             stepSize: 0.05
             value:    page.cfg_nixieGlowRadius || 0.55

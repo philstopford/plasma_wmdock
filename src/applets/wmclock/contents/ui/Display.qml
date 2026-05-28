@@ -524,8 +524,11 @@ Item {
                 }
 
                 // Plasma cloud (discharge glow background) – clipped to tube interior.
-                // Radius is based on the tube's effective inner half-width × user setting.
-                const glowR = innerHalfW * 2.0 * root.nixieGlowRadius
+                // nixieGlowRadius is a fraction of the inner half-width (tube radius).
+                // Removing the former ×2 multiplier so the full slider range 0.20–1.00
+                // maps to 20%–100% of the tube radius, giving a visible effect across
+                // the entire range rather than being clipped above ~50%.
+                const glowR = innerHalfW * root.nixieGlowRadius
                 const dg = ctx.createRadialGradient(cx2, cy2, 0, cx2, cy2, glowR)
                 dg.addColorStop(0,   "rgba(220,95,5,"  + (0.40 * fk).toFixed(2) + ")")
                 dg.addColorStop(0.4, "rgba(180,60,5,"  + (0.20 * fk).toFixed(2) + ")")
