@@ -16,11 +16,17 @@ import org.kde.kirigami as Kirigami
 Item {
     id: page
 
-    property int    cfg_slotSize:          0
-    property int    cfg_slotSpacing:       0
-    property bool   cfg_showBackground:    false
-    property real   cfg_backgroundOpacity: 0.0
-    property var    cfg_appletList:        []
+    property string title:                          ""
+    property int    cfg_slotSize:                   0
+    property int    cfg_slotSizeDefault:            64
+    property int    cfg_slotSpacing:                0
+    property int    cfg_slotSpacingDefault:         2
+    property bool   cfg_showBackground:             false
+    property bool   cfg_showBackgroundDefault:      true
+    property real   cfg_backgroundOpacity:          0.0
+    property real   cfg_backgroundOpacityDefault:   0.85
+    property var    cfg_appletList:                 []
+    property var    cfg_appletListDefault:          []
 
     ColumnLayout {
         anchors.left:  parent.left

@@ -6,10 +6,15 @@ import org.kde.kirigami as Kirigami
 Item {
     id: page
 
-    property bool   cfg_use24Hour:   false
-    property bool   cfg_showSeconds: false
-    property bool   cfg_showDate:    false
-    property string cfg_clockStyle:  ""
+    property string title:                   ""
+    property bool   cfg_use24Hour:           false
+    property bool   cfg_use24HourDefault:    true
+    property bool   cfg_showSeconds:         false
+    property bool   cfg_showSecondsDefault:  true
+    property bool   cfg_showDate:            false
+    property bool   cfg_showDateDefault:     true
+    property string cfg_clockStyle:          ""
+    property string cfg_clockStyleDefault:   "analog"
 
     Kirigami.FormLayout {
         anchors.left:  parent.left

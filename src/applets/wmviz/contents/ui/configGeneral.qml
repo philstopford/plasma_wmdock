@@ -6,10 +6,15 @@ import org.kde.kirigami as Kirigami
 Item {
     id: page
 
-    property string cfg_effect:           ""
-    property string cfg_colorScheme:      ""
-    property bool   cfg_terrainRotate:    false
-    property bool   cfg_terrainWireframe: false
+    property string title:                        ""
+    property string cfg_effect:                   ""
+    property string cfg_effectDefault:            "bars"
+    property string cfg_colorScheme:              ""
+    property string cfg_colorSchemeDefault:       "green"
+    property bool   cfg_terrainRotate:            false
+    property bool   cfg_terrainRotateDefault:     false
+    property bool   cfg_terrainWireframe:         false
+    property bool   cfg_terrainWireframeDefault:  false
 
     Kirigami.FormLayout {
         anchors.left:  parent.left

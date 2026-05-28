@@ -7,17 +7,27 @@ import org.kde.kirigami as Kirigami
 Item {
     id: page
 
-    property string cfg_blobColor:  ""
-    property int    cfg_blobCount:  0
+    property string title:                  ""
+    property string cfg_blobColor:          ""
+    property string cfg_blobColorDefault:   "red"
+    property int    cfg_blobCount:          0
+    property int    cfg_blobCountDefault:   5
 
     // Physics parameters (Double in kcfg → real in QML)
-    property real   cfg_gravity:    0.08
-    property real   cfg_buoyancy:   0.18
-    property real   cfg_drag:       0.91
-    property real   cfg_baseHeat:   0.40
-    property real   cfg_heatRate:   0.030
-    property real   cfg_coolRate:   0.010
-    property real   cfg_heatZoneY:  0.60
+    property real   cfg_gravity:            0.08
+    property real   cfg_gravityDefault:     0.08
+    property real   cfg_buoyancy:           0.18
+    property real   cfg_buoyancyDefault:    0.18
+    property real   cfg_drag:              0.91
+    property real   cfg_dragDefault:       0.91
+    property real   cfg_baseHeat:           0.40
+    property real   cfg_baseHeatDefault:    0.40
+    property real   cfg_heatRate:           0.030
+    property real   cfg_heatRateDefault:    0.030
+    property real   cfg_coolRate:           0.010
+    property real   cfg_coolRateDefault:    0.010
+    property real   cfg_heatZoneY:          0.60
+    property real   cfg_heatZoneYDefault:   0.60
 
     Kirigami.FormLayout {
         anchors.left:  parent.left

@@ -7,10 +7,15 @@ import org.kde.kirigami as Kirigami
 Item {
     id: page
 
-    property real   cfg_latitude:  0
-    property real   cfg_longitude: 0
-    property string cfg_tempUnit:  ""
-    property int    cfg_updateIntervalMinutes: 0
+    property string title:                              ""
+    property real   cfg_latitude:                       0
+    property real   cfg_latitudeDefault:                51.5
+    property real   cfg_longitude:                      0
+    property real   cfg_longitudeDefault:               -0.12
+    property string cfg_tempUnit:                       ""
+    property string cfg_tempUnitDefault:                "celsius"
+    property int    cfg_updateIntervalMinutes:          0
+    property int    cfg_updateIntervalMinutesDefault:   30
 
     // Geocoding state (not persisted)
     property var    _geoResults:   []

@@ -13,10 +13,15 @@ import org.kde.kirigami as Kirigami
 Item {
     id: configPage
 
-    property string cfg_drawerIcon:    ""
-    property string cfg_drawerLabel:   ""
-    property string cfg_launchersJson: ""
-    property string cfg_openEffect:    ""
+    property string cfg_drawerIcon:          ""
+    property string cfg_drawerIconDefault:   "folder"
+    property string cfg_drawerLabel:         ""
+    property string cfg_drawerLabelDefault:  "Apps"
+    property string cfg_launchersJson:       ""
+    property string cfg_launchersJsonDefault: "[]"
+    property string cfg_openEffect:          ""
+    property string cfg_openEffectDefault:   "slide"
+    property string title:                   ""
 
     property int editIndex: -1
 

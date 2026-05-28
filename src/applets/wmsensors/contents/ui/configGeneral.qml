@@ -14,8 +14,11 @@ import org.kde.plasma.private.wmdock 1.0
 Item {
     id: page
 
-    property var    cfg_enabledSensors:  []
-    property int    cfg_displayInterval: 0
+    property string title:                       ""
+    property var    cfg_enabledSensors:          []
+    property var    cfg_enabledSensorsDefault:   []
+    property int    cfg_displayInterval:         0
+    property int    cfg_displayIntervalDefault:  3
 
     Kirigami.FormLayout {
         id: form
