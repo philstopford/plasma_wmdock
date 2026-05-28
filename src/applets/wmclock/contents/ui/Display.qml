@@ -287,6 +287,85 @@ Item {
             }
         }
 
+        // drawNixieGlyph – renders a single digit '0'-'9' as stroked canvas paths
+        // that mimic the wire-formed cathode shape of a real nixie tube.
+        // (cx,cy) is the centre; (w,h) is the bounding cell for the digit.
+        // Caller must set ctx.strokeStyle, ctx.lineWidth, ctx.lineCap, ctx.lineJoin.
+        function drawNixieGlyph(ctx, ch, cx, cy, w, h) {
+            const X = f => cx + f * w
+            const Y = f => cy + f * h
+            ctx.beginPath()
+            switch (ch) {
+                case '0':
+                    // Tall, slightly narrow oval
+                    ctx.ellipse(cx, cy, w * 0.39, h * 0.46, 0, 0, Math.PI * 2)
+                    break
+                case '1':
+                    // Small serif hook at upper-left, then vertical stroke
+                    ctx.moveTo(X(-0.06), Y(-0.38))
+                    ctx.bezierCurveTo(X(-0.08), Y(-0.47), X(0.06), Y(-0.50), X(0.08), Y(-0.44))
+                    ctx.lineTo(X(0.08), Y(0.47))
+                    break
+                case '2':
+                    // Top arc sweeping to upper-right, diagonal sweep to lower-left, then base
+                    ctx.moveTo(X(-0.28), Y(-0.20))
+                    ctx.bezierCurveTo(X(-0.30), Y(-0.50), X(0.32), Y(-0.50), X(0.32), Y(-0.16))
+                    ctx.bezierCurveTo(X(0.32), Y(0.06), X(-0.26), Y(0.22), X(-0.36), Y(0.46))
+                    ctx.lineTo(X(0.36), Y(0.46))
+                    break
+                case '3':
+                    // Two right-facing arcs joined at a centre nodule
+                    ctx.moveTo(X(-0.26), Y(-0.44))
+                    ctx.bezierCurveTo(X(0.34), Y(-0.46), X(0.34), Y(-0.04), X(0.02), Y(-0.02))
+                    ctx.bezierCurveTo(X(0.36), Y(0.00), X(0.36), Y(0.46), X(-0.28), Y(0.44))
+                    break
+                case '4':
+                    // Angled left stroke down to crossbar, then right vertical full height
+                    ctx.moveTo(X(-0.24), Y(-0.44))
+                    ctx.lineTo(X(-0.30), Y(0.08))
+                    ctx.lineTo(X(0.34), Y(0.08))
+                    ctx.moveTo(X(0.16), Y(-0.46))
+                    ctx.lineTo(X(0.16), Y(0.46))
+                    break
+                case '5':
+                    // Top horizontal, left vertical half, lower right arc
+                    ctx.moveTo(X(0.32), Y(-0.46))
+                    ctx.lineTo(X(-0.32), Y(-0.46))
+                    ctx.lineTo(X(-0.32), Y(-0.04))
+                    ctx.bezierCurveTo(X(-0.30), Y(-0.04), X(0.34), Y(-0.08), X(0.34), Y(0.22))
+                    ctx.bezierCurveTo(X(0.34), Y(0.50), X(-0.34), Y(0.50), X(-0.34), Y(0.22))
+                    break
+                case '6':
+                    // Sweeping curve from upper-right down and around into closed lower loop
+                    ctx.moveTo(X(0.24), Y(-0.46))
+                    ctx.bezierCurveTo(X(-0.34), Y(-0.46), X(-0.36), Y(0.08), X(-0.36), Y(0.18))
+                    ctx.bezierCurveTo(X(-0.36), Y(0.50), X(0.36), Y(0.50), X(0.36), Y(0.18))
+                    ctx.bezierCurveTo(X(0.36), Y(-0.06), X(-0.32), Y(-0.08), X(-0.36), Y(0.18))
+                    break
+                case '7':
+                    // Horizontal top with slight interior angle, then diagonal stroke
+                    ctx.moveTo(X(-0.34), Y(-0.46))
+                    ctx.lineTo(X(0.34), Y(-0.46))
+                    ctx.bezierCurveTo(X(0.34), Y(-0.44), X(0.10), Y(-0.06), X(-0.12), Y(0.46))
+                    break
+                case '8':
+                    // Figure-eight: smaller upper oval, wider lower oval
+                    ctx.ellipse(cx, Y(-0.23), w * 0.31, h * 0.22, 0, 0, Math.PI * 2)
+                    ctx.moveTo(cx + w * 0.35, cy + h * 0.24)
+                    ctx.ellipse(cx, Y(0.24), w * 0.35, h * 0.23, 0, 0, Math.PI * 2)
+                    break
+                case '9':
+                    // Upper closed oval loop, then right-side descending tail
+                    ctx.ellipse(cx, Y(-0.20), w * 0.34, h * 0.26, 0, 0, Math.PI * 2)
+                    ctx.moveTo(cx + w * 0.34, Y(-0.20))
+                    ctx.bezierCurveTo(X(0.35), Y(0.18), X(0.28), Y(0.46), X(0.04), Y(0.46))
+                    break
+                default:
+                    return
+            }
+            ctx.stroke()
+        }
+
         // nixieGetDigit – return the digit (0-9 integer) to display during a transition.
         function nixieGetDigit(idx, prevDig, tgtDig, elapsed, durMs, transition) {
             if (elapsed >= durMs) return tgtDig
@@ -404,9 +483,9 @@ Item {
             ]
             const ledH         = Math.max(2, Math.floor(h * 0.055))
             const ledY         = tubeY + tubeH + gap
-            const fontSz       = Math.max(8, Math.floor(tubeH * 0.72))
-            const ghostFontSz  = Math.round(fontSz * 0.90)
-            const highlightFontSz = Math.round(fontSz * 0.70)
+            // Glyph cell dimensions: digits are taller than wide (wire-cathode style)
+            const glyphH       = Math.max(10, Math.floor(tubeH * 0.80))
+            const glyphW       = Math.max(6, Math.floor(glyphH * 0.60))
             const meshStep     = Math.max(3, Math.floor(tubeW * 0.30))
 
             // ---- Smooth wall-clock phase for pulsing --------------------------
@@ -473,17 +552,17 @@ Item {
                     innerHalfW = tW * 0.5
                 }
 
-                // ---- Scale fonts to fit inside this tube's inner width --------
-                // For slim tubes the inner width is reduced; digits must be scaled
-                // down so they fit within the clipped interior rather than being
-                // cropped at the tube walls.  Barrel is wider at centre (no scale
-                // needed); Classic is the full-width reference (scale = 1.0).
+                // ---- Effective glyph cell for this tube style ---------------
+                // For slim tubes the inner width is reduced; scale the glyph width
+                // so digits fit within the clipped interior rather than being cropped.
+                // Barrel is wider at centre (no scale needed); classic is reference (1.0).
                 const innerWidthFrac = (tubeStyle === "slim")
                     ? Math.max(0.5, (tW - 2 * tubeEnvPx) / tW)
                     : 1.0
-                const effFontSz          = Math.max(6, Math.floor(fontSz * innerWidthFrac))
-                const effGhostFontSz     = Math.round(effFontSz * 0.90)
-                const effHighlightFontSz = Math.round(effFontSz * 0.70)
+                const effGlyphW = Math.max(4, Math.floor(glyphW * innerWidthFrac))
+                const effGlyphH = glyphH
+                // Wire stroke width: ~8% of effective glyph width, min 1 px
+                const wireW     = Math.max(1.0, effGlyphW * 0.08)
 
                 // ---- Outer ambient glow (light escaping through the glass) -----
                 // Real nixie tubes cast a warm orange-amber halo onto their surroundings;
@@ -536,8 +615,9 @@ Item {
                 ctx.beginPath()
                 drawTubePath(ctx, x + 1, tubeY + 1, tW - 2, tubeH - 2, tubeStyle)
                 ctx.clip()
-                ctx.textAlign    = "center"
-                ctx.textBaseline = "middle"
+                // Wire-cathode rendering uses stroked paths; round caps give smooth ends
+                ctx.lineCap  = "round"
+                ctx.lineJoin = "round"
 
                 // Blue LED emissive – vertical gradient rising from tube bottom.
                 // Simulates the cool-blue cathode glow seen at the base of real
@@ -556,23 +636,19 @@ Item {
 
                 // Ghost cathodes – inactive stacked digit wire frames.
                 // Draw first so plasma cloud and active digit glow over them.
-                // Use effGhostFontSz so they scale with the tube inner width.
                 for (let d = 0; d < 10; d++) {
                     if (String(d) === digit) continue
                     const depthOff = ((d - 5) * 0.25)
                     const dist = Math.min(Math.abs(d - digitInt),
                                          10 - Math.abs(d - digitInt))
                     const gAlpha = (0.10 + dist * 0.015) * fk
-                    ctx.font      = "bold " + effGhostFontSz + "px monospace"
-                    ctx.fillStyle = "rgba(160,80,12," + gAlpha.toFixed(3) + ")"
-                    ctx.fillText(String(d), cx2 + depthOff, cy2)
+                    ctx.strokeStyle = "rgba(160,80,12," + gAlpha.toFixed(3) + ")"
+                    ctx.lineWidth   = wireW * 0.7
+                    drawNixieGlyph(ctx, String(d), cx2 + depthOff, cy2, effGlyphW, effGlyphH)
                 }
 
                 // Plasma cloud (discharge glow background) – clipped to tube interior.
                 // nixieGlowRadius is a fraction of the inner half-width (tube radius).
-                // Removing the former ×2 multiplier so the full slider range 0.20–1.00
-                // maps to 20%–100% of the tube radius, giving a visible effect across
-                // the entire range rather than being clipped above ~50%.
                 const glowR = innerHalfW * root.nixieGlowRadius
                 const dg = ctx.createRadialGradient(cx2, cy2, 0, cx2, cy2, glowR)
                 dg.addColorStop(0,   "rgba(220,95,5,"  + (0.40 * fk).toFixed(2) + ")")
@@ -583,56 +659,49 @@ Item {
                 ctx.fillStyle = dg
                 ctx.fill()
 
-                // Fuzzy discharge glow: 4 offset passes at low alpha.
-                // Both the offset distance and the per-pass font expansion are
-                // scaled by nixieGlowRadius so the slider controls ALL sources
-                // of haze, not just the radial gradient circle.
-                // effFontSz ensures the glow haze scales with the tube inner width.
+                // Fuzzy discharge glow: 4 offset passes at low alpha using the wire
+                // glyph path. Both offset distance and glyph expansion scale with
+                // nixieGlowRadius so the slider controls ALL sources of haze.
                 const glowScale = root.nixieGlowRadius
                 const glowA = (0.15 * fk * glowScale).toFixed(2)
                 for (let pass = 1; pass <= 4; pass++) {
                     const blur = pass * 1.2 * glowScale
-                    const extraSz = Math.round(pass * 2 * glowScale)
-                    ctx.font      = "bold " + (effFontSz + extraSz) + "px monospace"
-                    ctx.fillStyle = "rgba(255,130,15," + glowA + ")"
-                    ctx.fillText(digit, cx2 - blur, cy2)
-                    ctx.fillText(digit, cx2 + blur, cy2)
-                    ctx.fillText(digit, cx2, cy2 - blur)
-                    ctx.fillText(digit, cx2, cy2 + blur)
+                    const gs   = 1.0 + pass * 0.12 * glowScale
+                    ctx.strokeStyle = "rgba(255,130,15," + glowA + ")"
+                    ctx.lineWidth   = wireW * (1.0 + pass * 0.25)
+                    const gw = effGlyphW * gs, gh = effGlyphH * gs
+                    drawNixieGlyph(ctx, digit, cx2 - blur, cy2, gw, gh)
+                    drawNixieGlyph(ctx, digit, cx2 + blur, cy2, gw, gh)
+                    drawNixieGlyph(ctx, digit, cx2, cy2 - blur, gw, gh)
+                    drawNixieGlyph(ctx, digit, cx2, cy2 + blur, gw, gh)
                     const db = blur * 0.7
-                    ctx.fillText(digit, cx2 - db, cy2 - db)
-                    ctx.fillText(digit, cx2 + db, cy2 - db)
-                    ctx.fillText(digit, cx2 - db, cy2 + db)
-                    ctx.fillText(digit, cx2 + db, cy2 + db)
+                    drawNixieGlyph(ctx, digit, cx2 - db, cy2 - db, gw, gh)
+                    drawNixieGlyph(ctx, digit, cx2 + db, cy2 - db, gw, gh)
+                    drawNixieGlyph(ctx, digit, cx2 - db, cy2 + db, gw, gh)
+                    drawNixieGlyph(ctx, digit, cx2 + db, cy2 + db, gw, gh)
                 }
-
-                ctx.font = "bold " + effFontSz + "px monospace"
 
                 // Depth shadow
-                ctx.fillStyle = "rgba(160,40,0,0.22)"
-                ctx.fillText(digit, cx2 + 1, cy2 + 1)
+                ctx.strokeStyle = "rgba(160,40,0,0.22)"
+                ctx.lineWidth   = wireW
+                drawNixieGlyph(ctx, digit, cx2 + 1, cy2 + 1, effGlyphW, effGlyphH)
 
-                // Main orange discharge
-                ctx.fillStyle = "hsl(22,100%," + Math.round(50 + fk * 14) + "%)"
-                ctx.fillText(digit, cx2, cy2)
+                // Main orange discharge wire
+                ctx.strokeStyle = "hsl(22,100%," + Math.round(50 + fk * 14) + "%)"
+                ctx.lineWidth   = wireW
+                drawNixieGlyph(ctx, digit, cx2, cy2, effGlyphW, effGlyphH)
 
-                // Bright core highlight
+                // Bright core highlight – thinner, slightly smaller glyph
                 if (fk > 0.5) {
-                    ctx.fillStyle = "rgba(255,215,130," + (0.60 * fk).toFixed(2) + ")"
-                    ctx.font      = "bold " + effHighlightFontSz + "px monospace"
-                    ctx.fillText(digit, cx2, cy2 - 1)
+                    ctx.strokeStyle = "rgba(255,215,130," + (0.60 * fk).toFixed(2) + ")"
+                    ctx.lineWidth   = wireW * 0.45
+                    drawNixieGlyph(ctx, digit, cx2, cy2 - 0.5, effGlyphW * 0.88, effGlyphH * 0.88)
                 }
-
-                // Thin wire-edge outline on the active digit –
-                // real cathodes are wire-formed shapes with bright edges.
-                ctx.strokeStyle = "rgba(255,190,70," + (0.28 * fk).toFixed(2) + ")"
-                ctx.lineWidth   = 0.7
-                ctx.font        = "bold " + effFontSz + "px monospace"
-                ctx.strokeText(digit, cx2, cy2)
 
                 // ---- Anode mesh – drawn on top of the active digit -----------
                 // In a real tube the mesh anode surrounds all cathodes and is
                 // visible in front; draw it last inside the clip so it overlays.
+                ctx.lineCap     = "butt"
                 ctx.strokeStyle = "rgba(70,45,8,0.52)"
                 ctx.lineWidth   = 0.5
                 for (let row = 1; row * meshStep < tubeH; row++) {
