@@ -13,8 +13,12 @@ Item {
     property bool   cfg_showSecondsDefault:  true
     property bool   cfg_showDate:            false
     property bool   cfg_showDateDefault:     true
-    property string cfg_clockStyle:          ""
-    property string cfg_clockStyleDefault:   "analog"
+    property string cfg_clockStyle:              ""
+    property string cfg_clockStyleDefault:       "analog"
+    property string cfg_nixieTransition:         ""
+    property string cfg_nixieTransitionDefault:  "slot"
+    property string cfg_nixieTubeStyle:          ""
+    property string cfg_nixieTubeStyleDefault:   "classic"
 
     Kirigami.FormLayout {
         anchors.left:  parent.left
@@ -58,6 +62,49 @@ Item {
             Kirigami.FormData.label: i18n("Show date line:")
             checked: page.cfg_showDate
             onCheckedChanged: page.cfg_showDate = checked
+        }
+
+        QQC2.ComboBox {
+            id: nixieTransitionCombo
+            visible: page.cfg_clockStyle === "nixie"
+            Kirigami.FormData.label: i18n("Digit transition:")
+            model: [
+                { text: i18n("Slot-machine (spin)"),     value: "slot"    },
+                { text: i18n("Cascade left-to-right"),   value: "cascade" },
+                { text: i18n("Count up to value"),       value: "count"   },
+                { text: i18n("Instant (no animation)"),  value: "none"    },
+            ]
+            textRole:  "text"
+            valueRole: "value"
+            Component.onCompleted: {
+                const v = page.cfg_nixieTransition || "slot"
+                for (let i = 0; i < count; ++i) {
+                    if (model[i].value === v) { currentIndex = i; return }
+                }
+                currentIndex = 0
+            }
+            onActivated: page.cfg_nixieTransition = currentValue
+        }
+
+        QQC2.ComboBox {
+            id: nixieTubeStyleCombo
+            visible: page.cfg_clockStyle === "nixie"
+            Kirigami.FormData.label: i18n("Tube style:")
+            model: [
+                { text: i18n("Classic (rectangular)"),  value: "classic" },
+                { text: i18n("Barrel (IN-14 bulge)"),   value: "barrel"  },
+                { text: i18n("Slim (IN-18 narrow)"),    value: "slim"    },
+            ]
+            textRole:  "text"
+            valueRole: "value"
+            Component.onCompleted: {
+                const v = page.cfg_nixieTubeStyle || "classic"
+                for (let i = 0; i < count; ++i) {
+                    if (model[i].value === v) { currentIndex = i; return }
+                }
+                currentIndex = 0
+            }
+            onActivated: page.cfg_nixieTubeStyle = currentValue
         }
     }
 }

@@ -16,16 +16,20 @@ Item {
     id: root
 
     // Configuration bindings
-    readonly property bool   use24Hour:   Plasmoid.configuration.use24Hour   ?? true
-    readonly property bool   showSeconds: Plasmoid.configuration.showSeconds ?? true
-    readonly property bool   showDate:    Plasmoid.configuration.showDate    ?? true
-    readonly property string clockStyle:  Plasmoid.configuration.clockStyle  || "analog"
+    readonly property bool   use24Hour:       Plasmoid.configuration.use24Hour       ?? true
+    readonly property bool   showSeconds:     Plasmoid.configuration.showSeconds     ?? true
+    readonly property bool   showDate:        Plasmoid.configuration.showDate        ?? true
+    readonly property string clockStyle:      Plasmoid.configuration.clockStyle      || "analog"
+    readonly property string nixieTransition: Plasmoid.configuration.nixieTransition || "slot"
+    readonly property string nixieTubeStyle:  Plasmoid.configuration.nixieTubeStyle  || "classic"
 
     // Repaint triggers
-    onUse24HourChanged:   faceCanvas.requestPaint()
-    onShowSecondsChanged: faceCanvas.requestPaint()
-    onShowDateChanged:    faceCanvas.requestPaint()
-    onClockStyleChanged:  faceCanvas.requestPaint()
+    onUse24HourChanged:       faceCanvas.requestPaint()
+    onShowSecondsChanged:     faceCanvas.requestPaint()
+    onShowDateChanged:        faceCanvas.requestPaint()
+    onClockStyleChanged:      faceCanvas.requestPaint()
+    onNixieTransitionChanged: faceCanvas.requestPaint()
+    onNixieTubeStyleChanged:  faceCanvas.requestPaint()
 
     // -----------------------------------------------------------------------
     // Background
@@ -50,6 +54,26 @@ Item {
             repeat:   true
             onTriggered: faceCanvas.requestPaint()
         }
+
+        // 20 fps animation timer – only active in nixie mode for smooth pulsing
+        // and digit transition animations.
+        Timer {
+            id: nixieAnimTimer
+            interval: 50
+            running:  root.clockStyle === "nixie"
+            repeat:   true
+            onTriggered: faceCanvas.requestPaint()
+        }
+
+        // ---- Nixie animation state (persists across paint calls) -------------
+        property var  nxCurDig:    [-1,-1,-1,-1,-1]  // current digits (-1 = unset)
+        property var  nxPrevDig:   [0,0,0,0,0]       // digits before last change
+        property var  nxTgtDig:    [0,0,0,0,0]       // target digits
+        property real nxAnimStart: 0                  // Date.now() at anim start
+        property real nxAnimDurMs: 600               // anim duration ms
+        property bool nxInAnim:    false             // animation in progress
+        property var  nxFlicker:   [1.0,1.0,1.0,1.0,1.0]  // per-tube brightness
+        property var  nxLastFlick: [0,0,0,0,0]      // per-tube last flicker ms
 
         Component.onCompleted: requestPaint()
 
@@ -213,8 +237,11 @@ Item {
         // Layout (W×H widget, typically 64×64):
         //   Five positions: H1 · H2 · [sep] · M1 · M2
         //   Each digit tube: tubeW wide, tubeH tall, starting at tubeY
-        //   Blue LED strip below each digit tube
-        //   Red pulsing dot at the separator position
+        //   Blue LED strip below each digit tube (pulsing at 0.7 Hz, per-tube phase)
+        //   Red pulsing separator dot (1 Hz sine, tracks wall-clock phase)
+        //
+        // Tube styles: classic (rounded rect), barrel (IN-14 bulge), slim (IN-18 narrow)
+        // Transitions: slot (spin through extra steps), cascade, count, none
         //
         // roundRectPath: ctx.roundRect() was added in Qt 6.8 / Chrome 99.
         // Polyfill using arcTo() so the nixie mode works on Qt 6.5–6.7.
@@ -232,65 +259,170 @@ Item {
             ctx.closePath()
         }
 
+        // drawTubePath – lays out the outer glass-envelope path for the given style.
+        function drawTubePath(ctx, x, y, tW, tH, style) {
+            if (style === "barrel") {
+                // IN-14 style: sides bow outward ~12% using quadratic bezier
+                const bx = Math.max(2, Math.ceil(tW * 0.12))
+                ctx.moveTo(x + 3, y)
+                ctx.lineTo(x + tW - 3, y)
+                ctx.arcTo (x + tW, y,         x + tW, y + 3,       3)
+                ctx.quadraticCurveTo(x + tW + bx, y + tH / 2, x + tW, y + tH - 3)
+                ctx.arcTo (x + tW, y + tH,    x + tW - 3, y + tH,  3)
+                ctx.lineTo(x + 3, y + tH)
+                ctx.arcTo (x,     y + tH,     x, y + tH - 3,       3)
+                ctx.quadraticCurveTo(x - bx,  y + tH / 2, x, y + 3)
+                ctx.arcTo (x,     y,          x + 3, y,             3)
+                ctx.closePath()
+            } else if (style === "slim") {
+                // IN-18 style: narrowed by 12% each side
+                const ins = Math.max(1, Math.ceil(tW * 0.12))
+                roundRectPath(ctx, x + ins, y, tW - 2 * ins, tH, 3)
+            } else {
+                // classic: rounded rectangle
+                roundRectPath(ctx, x, y, tW, tH, 3)
+            }
+        }
+
+        // nixieGetDigit – return the digit (0-9 integer) to display during a transition.
+        function nixieGetDigit(idx, prevDig, tgtDig, elapsed, durMs, transition) {
+            if (elapsed >= durMs) return tgtDig
+            const t    = elapsed / durMs
+            const ease = 1.0 - Math.pow(1.0 - t, 2.0)   // ease-out quadratic
+
+            if (transition === "cascade") {
+                // staggered per-tube: delays [0.0, 0.15, –, 0.30, 0.45] of total duration
+                // Index 2 is the separator slot (not a digit); its delay value is unused.
+                const delays = [0.0, 0.15, 0.0, 0.30, 0.45]
+                const d      = delays[idx]
+                const segLen = 0.40   // each tube animates for 40% of total duration
+                if (t < d) return prevDig
+                const localT = Math.min(1.0, (t - d) / segLen)
+                const localE = 1.0 - Math.pow(1.0 - localT, 2.0)
+                const dist   = (tgtDig - prevDig + 10) % 10 || 10
+                return (prevDig + Math.floor(dist * localE)) % 10
+            }
+            if (transition === "count") {
+                const dist = (tgtDig - prevDig + 10) % 10 || 10
+                return (prevDig + Math.floor(dist * ease)) % 10
+            }
+            // slot (default): spin through 5 extra steps then land on target
+            const extraSpin  = 5
+            const dist       = (tgtDig - prevDig + 10) % 10 || 10
+            const totalSteps = extraSpin + dist
+            return (prevDig + Math.floor(totalSteps * ease)) % 10
+        }
+
         function paintNixie() {
             const ctx = getContext("2d")
             const w = width, h = height
             ctx.clearRect(0, 0, w, h)
 
+            const now  = Date.now()
             const t    = new Date()
             const hrs  = root.use24Hour ? t.getHours() : (t.getHours() % 12 || 12)
             const mins = t.getMinutes()
-            const secs = t.getSeconds()
 
             const pad = n => String(n).padStart(2, "0")
             const hStr = pad(hrs)
             const mStr = pad(mins)
-            const digits = [hStr[0], hStr[1], null, mStr[0], mStr[1]]  // null = separator
+            // Target digit integers (0-9); index 2 is separator (use -1 as sentinel)
+            const tgtDigs = [
+                parseInt(hStr[0]), parseInt(hStr[1]),
+                -1,
+                parseInt(mStr[0]), parseInt(mStr[1])
+            ]
+
+            // ---- Animation state bookkeeping ----------------------------------
+            // On very first paint nxCurDig is [-1,...]: accept tgt without animation
+            if (nxCurDig[0] < 0) {
+                nxCurDig  = tgtDigs.slice()
+                nxTgtDig  = tgtDigs.slice()
+                nxPrevDig = tgtDigs.slice()
+            } else {
+                // Check whether any digit changed since last paint
+                let changed = false
+                for (let i = 0; i < 5; i++) {
+                    if (i === 2) continue
+                    if (nxCurDig[i] !== tgtDigs[i]) { changed = true; break }
+                }
+                if (changed) {
+                    nxPrevDig  = nxCurDig.slice()
+                    nxTgtDig   = tgtDigs.slice()
+                    nxAnimStart = now
+                    nxInAnim   = true
+                }
+                nxCurDig = tgtDigs.slice()
+            }
+
+            const elapsed    = nxInAnim ? (now - nxAnimStart) : nxAnimDurMs
+            const transition = root.nixieTransition || "slot"
+            const tubeStyle  = root.nixieTubeStyle  || "classic"
+            if (nxInAnim && elapsed >= nxAnimDurMs) nxInAnim = false
+
+            // ---- Per-digit flicker (simulates cathode-poisoning avoidance) ----
+            // Real nixie drivers periodically boost non-displayed cathodes to prevent
+            // sputtering buildup. Here we simulate it with random brightness dips.
+            const flickerWindowMs  = 45      // check for flicker event every 45 ms
+            const flickerProbability = 0.035 // 3.5% chance of a dip per window
+            const flickerMinBright = 0.28    // minimum brightness during a dip
+            const flickerDipRange  = 0.52    // dip is in [minBright, minBright+range]
+            const flickerRecovery  = 0.12    // brightness recovered per window
+            let flicker   = nxFlicker.slice()
+            let lastFlick = nxLastFlick.slice()
+            for (let i = 0; i < 5; i++) {
+                if (i === 2) continue
+                if (now - lastFlick[i] > flickerWindowMs) {
+                    lastFlick[i] = now
+                    if (Math.random() < flickerProbability) {
+                        flicker[i] = flickerMinBright + Math.random() * flickerDipRange
+                    } else {
+                        flicker[i] = Math.min(1.0, flicker[i] + flickerRecovery)
+                    }
+                }
+            }
+            nxFlicker   = flicker
+            nxLastFlick = lastFlick
 
             // ---- Layout -------------------------------------------------------
-            // Tube dimensions
-            const tubeW  = Math.floor(w * 0.175)   // ~11px at 64px
-            const tubeH  = Math.floor(h * 0.52)    // ~33px at 64px
-            const sepW   = Math.floor(w * 0.08)    // ~5px at 64px
+            const tubeW  = Math.floor(w * 0.175)
+            const tubeH  = Math.floor(h * 0.52)
+            const sepW   = Math.floor(w * 0.08)
             const gap    = Math.max(1, Math.floor(w * 0.025))
-            const tubeY  = Math.floor(h * 0.07)    // top of tubes
-
-            // Total layout width: 4*tubeW + sepW + 4*gap, centred in widget
+            const tubeY  = Math.floor(h * 0.07)
             const totalW = 4 * tubeW + sepW + 4 * gap
             const startX = Math.floor((w - totalW) / 2)
-
-            // X positions (left edge of each element)
-            const posX = [
+            const posX   = [
                 startX,
                 startX + tubeW + gap,
-                startX + 2 * (tubeW + gap),                // separator
+                startX + 2 * (tubeW + gap),
                 startX + 2 * (tubeW + gap) + sepW + gap,
                 startX + 3 * (tubeW + gap) + sepW + gap
             ]
-
-            const ledH   = Math.max(2, Math.floor(h * 0.055))   // ~3px LED strip
-            const ledY   = tubeY + tubeH + gap                   // LED strip top
+            const ledH   = Math.max(2, Math.floor(h * 0.055))
+            const ledY   = tubeY + tubeH + gap
             const fontSz = Math.max(8, Math.floor(tubeH * 0.72))
 
-            // Seconds pulse [0-1] – cosine so it smoothly brightens on odd secs
-            const sPulse = 0.55 + 0.45 * Math.abs(Math.cos(secs * Math.PI))
+            // ---- Smooth wall-clock phase for pulsing --------------------------
+            const phaseS = now * 0.001
+            // Separator pulsing: 1 Hz sine → [0, 1]
+            const sPulse = (Math.sin(phaseS * 2.0 * Math.PI) + 1.0) * 0.5
 
             // ---- Dark background ----------------------------------------------
             ctx.fillStyle = "#060508"
             ctx.fillRect(0, 0, w, h)
 
-            // ---- Draw digit tubes --------------------------------------------
+            // ---- Draw each position -------------------------------------------
             for (let i = 0; i < 5; i++) {
                 const x   = posX[i]
-                const isS = (i === 2)   // separator slot
+                const isS = (i === 2)
 
                 if (isS) {
-                    // Red pulsing seconds dot
+                    // Red pulsing separator dot
                     const dotCx = x + Math.floor(sepW / 2)
                     const dotCy = tubeY + Math.floor(tubeH / 2)
                     const dotR  = Math.max(2, Math.floor(sepW * 0.40))
 
-                    // Outer glow
                     const rg = ctx.createRadialGradient(dotCx, dotCy, 0, dotCx, dotCy, dotR * 3.5)
                     rg.addColorStop(0, "rgba(255,20,0," + (sPulse * 0.65).toFixed(2) + ")")
                     rg.addColorStop(1, "rgba(0,0,0,0)")
@@ -299,7 +431,6 @@ Item {
                     ctx.fillStyle = rg
                     ctx.fill()
 
-                    // Core dot
                     ctx.beginPath()
                     ctx.arc(dotCx, dotCy, dotR, 0, 2 * Math.PI)
                     ctx.fillStyle = "hsl(8,100%," + Math.round(40 + sPulse * 35) + "%)"
@@ -307,29 +438,28 @@ Item {
                     continue
                 }
 
-                const tW = (i < 2) ? tubeW : tubeW   // same for both sides
+                const tW = tubeW
+                const fk = flicker[i]
 
-                // ---- Glass tube outline ---------------------------------------
-                // Outer rim (dark metal / pins)
+                // ---- Glass tube body -----------------------------------------
                 ctx.strokeStyle = "#2a2520"
                 ctx.lineWidth   = 1
                 ctx.beginPath()
-                roundRectPath(ctx, x, tubeY, tW, tubeH, 3)
+                drawTubePath(ctx, x, tubeY, tW, tubeH, tubeStyle)
                 ctx.stroke()
 
-                // Inner glass (subtle warm tint)
                 const glassGrad = ctx.createLinearGradient(x, tubeY, x + tW, tubeY)
                 glassGrad.addColorStop(0,    "rgba(40,28,12,0.55)")
                 glassGrad.addColorStop(0.35, "rgba(18,12,6,0.30)")
                 glassGrad.addColorStop(1,    "rgba(40,28,12,0.55)")
                 ctx.fillStyle = glassGrad
                 ctx.beginPath()
-                roundRectPath(ctx, x, tubeY, tW, tubeH, 3)
+                drawTubePath(ctx, x, tubeY, tW, tubeH, tubeStyle)
                 ctx.fill()
 
-                // Cathode grid lines (faint horizontal bands in the glass)
+                // Cathode grid lines (faint horizontal bands)
                 ctx.strokeStyle = "rgba(60,45,20,0.18)"
-                ctx.lineWidth = 0.5
+                ctx.lineWidth   = 0.5
                 for (let row = 1; row < 4; row++) {
                     const ry = tubeY + row * (tubeH / 4)
                     ctx.beginPath()
@@ -338,45 +468,65 @@ Item {
                     ctx.stroke()
                 }
 
-                // ---- Digit glow (neon orange) ---------------------------------
-                const digit = digits[i]
-                const cx2   = x + Math.floor(tW / 2)
-                const cy2   = tubeY + Math.floor(tubeH * 0.52)
+                // ---- Digit (with transition) ----------------------------------
+                const dispD = (nxInAnim && transition !== "none")
+                              ? nixieGetDigit(i, nxPrevDig[i], nxTgtDig[i],
+                                              elapsed, nxAnimDurMs, transition)
+                              : tgtDigs[i]
+                const digit = String(dispD)
 
-                // Soft background plasma cloud behind digit
+                const cx2 = x + Math.floor(tW / 2)
+                const cy2 = tubeY + Math.floor(tubeH * 0.52)
+
+                // Soft background plasma cloud
                 const dg = ctx.createRadialGradient(cx2, cy2, 0, cx2, cy2, tW * 0.75)
-                dg.addColorStop(0,   "rgba(200,80,5,0.30)")
-                dg.addColorStop(0.5, "rgba(160,50,5,0.12)")
+                dg.addColorStop(0,   "rgba(200,80,5," + (0.30 * fk).toFixed(2) + ")")
+                dg.addColorStop(0.5, "rgba(160,50,5," + (0.12 * fk).toFixed(2) + ")")
                 dg.addColorStop(1,   "rgba(0,0,0,0)")
                 ctx.beginPath()
                 ctx.arc(cx2, cy2, tW * 0.75, 0, 2 * Math.PI)
                 ctx.fillStyle = dg
                 ctx.fill()
 
-                // Shadow layer (depth / shadow digit under glow)
                 ctx.save()
                 ctx.beginPath()
-                roundRectPath(ctx, x + 1, tubeY + 1, tW - 2, tubeH - 2, 2)
+                drawTubePath(ctx, x + 1, tubeY + 1, tW - 2, tubeH - 2, tubeStyle)
                 ctx.clip()
 
                 ctx.textAlign    = "center"
                 ctx.textBaseline = "middle"
+
+                // Fuzzy discharge glow: 3 offset passes at low alpha
+                const glowA = (0.13 * fk).toFixed(2)
+                for (let pass = 1; pass <= 3; pass++) {
+                    const blur = pass * 1.1
+                    ctx.font      = "bold " + (fontSz + pass * 2) + "px monospace"
+                    ctx.fillStyle = "rgba(255,120,10," + glowA + ")"
+                    ctx.fillText(digit, cx2 - blur, cy2)
+                    ctx.fillText(digit, cx2 + blur, cy2)
+                    ctx.fillText(digit, cx2, cy2 - blur)
+                    ctx.fillText(digit, cx2, cy2 + blur)
+                }
+
                 ctx.font = "bold " + fontSz + "px monospace"
 
+                // Depth shadow
                 ctx.fillStyle = "rgba(160,40,0,0.20)"
                 ctx.fillText(digit, cx2 + 1, cy2 + 1)
 
-                // Main orange digit
-                ctx.fillStyle = "hsl(22,100%,62%)"
+                // Main orange discharge, brightness scaled by flicker
+                ctx.fillStyle = "hsl(22,100%," + Math.round(50 + fk * 12) + "%)"
                 ctx.fillText(digit, cx2, cy2)
 
-                // Bright core highlight
-                ctx.fillStyle = "rgba(255,210,120,0.65)"
-                ctx.font = "bold " + Math.round(fontSz * 0.72) + "px monospace"
-                ctx.fillText(digit, cx2, cy2 - 1)
+                // Bright core highlight (suppressed when flickering badly)
+                if (fk > 0.5) {
+                    ctx.fillStyle = "rgba(255,210,120," + (0.55 * fk).toFixed(2) + ")"
+                    ctx.font      = "bold " + Math.round(fontSz * 0.72) + "px monospace"
+                    ctx.fillText(digit, cx2, cy2 - 1)
+                }
                 ctx.restore()
 
-                // Specular reflection streak on left side of glass
+                // Glass specular streak on left side
                 ctx.strokeStyle = "rgba(255,230,180,0.10)"
                 ctx.lineWidth   = 1
                 ctx.beginPath()
@@ -384,12 +534,12 @@ Item {
                 ctx.lineTo(x + 2, tubeY + tubeH - 4)
                 ctx.stroke()
 
-                // ---- Blue LED strip below tube --------------------------------
-                const ledX = x + 1
-                const lW   = tW - 2
-                const ledPulse = 0.50 + 0.50 * Math.abs(Math.sin(secs * Math.PI + i * 0.6))
+                // ---- Blue LED strip ------------------------------------------
+                const ledX     = x + 1
+                const lW       = tW - 2
+                const ledPhase = phaseS * 2.0 * Math.PI * 0.7 + i * 0.6
+                const ledPulse = ((Math.sin(ledPhase) + 1.0) * 0.5) * fk
 
-                // Glow spread above strip
                 const lg = ctx.createRadialGradient(
                     x + tW / 2, ledY + ledH / 2, 0,
                     x + tW / 2, ledY + ledH / 2, tW * 0.8)
@@ -398,7 +548,6 @@ Item {
                 ctx.fillStyle = lg
                 ctx.fillRect(ledX - 2, ledY - 2, lW + 4, ledH + 6)
 
-                // LED strip itself
                 ctx.fillStyle = "hsl(232,90%," + Math.round(25 + ledPulse * 25) + "%)"
                 ctx.fillRect(ledX, ledY, lW, ledH)
             }

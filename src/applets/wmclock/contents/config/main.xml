@@ -19,5 +19,13 @@
       <label>Clock display style</label>
       <default>analog</default>
     </entry>
+    <entry name="nixieTransition" type="String">
+      <label>Nixie digit transition style</label>
+      <default>slot</default>
+    </entry>
+    <entry name="nixieTubeStyle" type="String">
+      <label>Nixie tube visual style</label>
+      <default>classic</default>
+    </entry>
   </group>
 </kcfg>
