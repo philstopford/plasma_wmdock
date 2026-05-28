@@ -6,7 +6,9 @@ import org.kde.kirigami as Kirigami
 Item {
     id: page
 
-    property bool cfg_weekStartsMonday: false
+    property string title:                       ""
+    property bool   cfg_weekStartsMonday:        false
+    property bool   cfg_weekStartsMondayDefault: false
 
     Kirigami.FormLayout {
         anchors.left:  parent.left

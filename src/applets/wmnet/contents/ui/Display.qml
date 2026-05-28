@@ -198,6 +198,24 @@ Item {
         height: visible ? implicitHeight : 0
     }
 
+    // Interface name shown below NET title (single/cycle mode only)
+    Text {
+        id: ifaceText
+        visible: root.showTitle && root.useSingleDisplay && root.activeIface !== ""
+        anchors {
+            top:        titleText.bottom
+            left:       parent.left
+            right:      parent.right
+            leftMargin: 3
+            rightMargin: 3
+        }
+        text: root.activeIface
+        color: "#3377aa"
+        font { pixelSize: parent.height * 0.09; family: "monospace" }
+        horizontalAlignment: Text.AlignHCenter
+        height: visible ? implicitHeight : 0
+    }
+
     // -----------------------------------------------------------------------
     // Single / cycle mode: scrolling dual-channel graph
     // -----------------------------------------------------------------------
@@ -205,7 +223,7 @@ Item {
         id: singleView
         visible: root.useSingleDisplay
         anchors {
-            top:    root.showTitle ? titleText.bottom : parent.top
+            top:    root.showTitle ? (root.activeIface !== "" ? ifaceText.bottom : titleText.bottom) : parent.top
             left:   parent.left
             right:  parent.right
             bottom: parent.bottom
@@ -293,7 +311,7 @@ Item {
         id: multiView
         visible: !root.useSingleDisplay
         anchors {
-            top:    root.showTitle ? titleText.bottom : parent.top
+            top:    root.showTitle ? titleText.bottom : parent.top  // multi-mode never shows ifaceText
             left:   parent.left
             right:  parent.right
             bottom: parent.bottom

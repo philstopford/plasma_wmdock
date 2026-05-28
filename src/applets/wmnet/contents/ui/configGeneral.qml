@@ -14,10 +14,15 @@ Item {
     id: page
 
     // Writable cfg_ properties that Plasma reads/writes.
-    property var  cfg_ifaces:        []
-    property bool cfg_cycleMode:     false
-    property int  cfg_cycleInterval: 0
-    property bool cfg_showTitle:     true
+    property string title:                        ""
+    property var    cfg_ifaces:                   []
+    property var    cfg_ifacesDefault:            []
+    property bool   cfg_cycleMode:                false
+    property bool   cfg_cycleModeDefault:         true
+    property int    cfg_cycleInterval:            0
+    property int    cfg_cycleIntervalDefault:     4
+    property bool   cfg_showTitle:                true
+    property bool   cfg_showTitleDefault:         true
 
     Kirigami.FormLayout {
         anchors.left:  parent.left

@@ -6,7 +6,9 @@ import org.kde.kirigami as Kirigami
 Item {
     id: page
 
-    property bool cfg_showTitle: true
+    property string title:               ""
+    property bool   cfg_showTitle:       true
+    property bool   cfg_showTitleDefault: true
 
     Kirigami.FormLayout {
         anchors.left:  parent.left

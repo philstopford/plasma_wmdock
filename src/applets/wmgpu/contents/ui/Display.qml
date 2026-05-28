@@ -91,7 +91,7 @@ Item {
             leftMargin: 3
             rightMargin: 3
         }
-        text: root.activeGpu ? root.activeGpu.name : i18n("No GPU detected")
+        text: root.activeGpu ? (root.activeGpu.key + " · " + root.activeGpu.name) : i18n("No GPU detected")
         color: "#888"
         font { pixelSize: parent.height * 0.10; family: "monospace" }
         horizontalAlignment: Text.AlignHCenter

@@ -7,9 +7,13 @@ import org.kde.plasma.private.wmdock 1.0
 Item {
     id: page
 
-    property string cfg_gpu: ""
-    property int    cfg_cycleInterval: 0
-    property bool   cfg_showTitle: true
+    property string title:                    ""
+    property string cfg_gpu:                  ""
+    property string cfg_gpuDefault:           ""
+    property int    cfg_cycleInterval:        0
+    property int    cfg_cycleIntervalDefault: 4
+    property bool   cfg_showTitle:            true
+    property bool   cfg_showTitleDefault:     true
 
     Kirigami.FormLayout {
         anchors.left: parent.left

@@ -15,5 +15,21 @@
     <entry name="showDate" type="Bool">
       <default>true</default>
     </entry>
+    <entry name="clockStyle" type="String">
+      <label>Clock display style</label>
+      <default>analog</default>
+    </entry>
+    <entry name="nixieTransition" type="String">
+      <label>Nixie digit transition style</label>
+      <default>slot</default>
+    </entry>
+    <entry name="nixieTubeStyle" type="String">
+      <label>Nixie tube visual style</label>
+      <default>classic</default>
+    </entry>
+    <entry name="nixieGlowRadius" type="Double">
+      <label>Nixie discharge glow fall-off radius (fraction of tube inner radius)</label>
+      <default>0.55</default>
+    </entry>
   </group>
 </kcfg>

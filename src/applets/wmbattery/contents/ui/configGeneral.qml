@@ -6,7 +6,9 @@ import org.kde.kirigami as Kirigami
 Item {
     id: page
 
-    property int cfg_lowBatteryThreshold: 0
+    property string title:                          ""
+    property int    cfg_lowBatteryThreshold:        0
+    property int    cfg_lowBatteryThresholdDefault: 20
 
     Kirigami.FormLayout {
         anchors.left:  parent.left

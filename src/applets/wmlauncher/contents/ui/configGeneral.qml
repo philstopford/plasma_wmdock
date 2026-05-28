@@ -6,10 +6,15 @@ import org.kde.kirigami as Kirigami
 Item {
     id: page
 
-    property string cfg_command:   ""
-    property string cfg_icon:      ""
-    property string cfg_label:     ""
-    property bool   cfg_showLabel: false
+    property string title:                        ""
+    property string cfg_command:                  ""
+    property string cfg_commandDefault:           "konsole"
+    property string cfg_icon:                     ""
+    property string cfg_iconDefault:              "utilities-terminal"
+    property string cfg_label:                    ""
+    property string cfg_labelDefault:             "Launch"
+    property bool   cfg_showLabel:                false
+    property bool   cfg_showLabelDefault:         true
 
     Kirigami.FormLayout {
         anchors.left:  parent.left

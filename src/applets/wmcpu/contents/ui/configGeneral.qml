@@ -6,8 +6,11 @@ import org.kde.kirigami as Kirigami
 Item {
     id: page
 
-    property int  cfg_histLen:   0
-    property bool cfg_showTitle: true
+    property string title:               ""
+    property int    cfg_histLen:         0
+    property int    cfg_histLenDefault:  50
+    property bool   cfg_showTitle:       true
+    property bool   cfg_showTitleDefault: true
 
     Kirigami.FormLayout {
         anchors.left:  parent.left
