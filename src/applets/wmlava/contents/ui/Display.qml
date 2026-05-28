@@ -171,21 +171,18 @@ Item {
         const COOL_RATE      = Plasmoid.configuration.coolRate    // temp/tick lost outside heat zone
         // Viscous drag gives the lazy flow of real wax (terminal rise ≈ 1 px/tick).
         const DRAG           = Plasmoid.configuration.drag
-        // Merge threshold: merge when centre distance < factor * (ra+rb)
-        const MERGE_THRESH   = 0.70
-        // SPLIT_OFFSET must be GREATER than MERGE_THRESH so that daughter blobs
-        // are placed OUTSIDE the merge threshold from the start.  If it were
-        // smaller the daughters would re-merge on the very next tick, injecting
-        // SPLIT_KICK energy every cycle and causing the "energised jump" artifact.
-        // Daughter separation = 2 * nr * SPLIT_OFFSET; merge threshold = 2 * nr * MERGE_THRESH.
-        // With SPLIT_OFFSET = 0.80 > 0.70 daughters start safely separated.
+        // Merge threshold: blobs merge when centres are within factor*(ra+rb).
+        // Reduced from 0.70 → 0.52 so blobs must significantly overlap before
+        // merging, preventing the entire mass from fusing into one large blob.
+        const MERGE_THRESH   = 0.52
+        // SPLIT_OFFSET must exceed MERGE_THRESH so daughters start safely separated.
         const SPLIT_OFFSET   = 0.80
-        // SPLIT_KICK increased proportionally with SPLIT_OFFSET: daughters start
-        // further apart so they need enough outward velocity to stay beyond the
-        // merge threshold as they decelerate under drag.  0.30 gives roughly the
-        // same number of ticks-to-clear as the old (0.38, 0.22) pair did before
-        // the merge threshold bug was discovered.
         const SPLIT_KICK     = 0.30
+        // Soft repulsion: blobs closer than REPULSE_THRESH*(ra+rb) but not yet
+        // at the merge threshold push each other apart gently.  This breaks up
+        // tight clusters and maintains multiple distinct blobs.
+        const REPULSE_THRESH = 1.10
+        const REPULSE_K      = 0.012   // repulsion acceleration coefficient
 
         // ── Effective heat: base minimum + CPU component ──────────────────────
         // baseHeat sets how active the lamp is at zero CPU load.  At the
@@ -236,14 +233,23 @@ Item {
             // ─ Tiny organic wobble (scales with temperature to keep cold
             //   pooled blobs still) ─────────────────────────────────────────
             const wobble = b.temp * b.temp   // quadratic: very small when cold
-            b.vx += Math.cos(b.phase * 0.7) * 0.005 * wobble
-            b.vy += Math.sin(b.phase * 1.1) * 0.004 * wobble
+            b.vx += Math.cos(b.phase * 0.7) * 0.007 * wobble
+            b.vy += Math.sin(b.phase * 1.1) * 0.005 * wobble
 
-            // ─ Minute random turbulence (only when warm) ──────────────────────
-            if (b.temp > 0.35) {
-                const t = b.temp - 0.35
-                b.vx += (Math.random() - 0.5) * 0.008 * t
-                b.vy += (Math.random() - 0.5) * 0.006 * t
+            // ─ Turbulent convection (active across a wider temperature range)
+            //   Models the internal convection currents that keep real lava lamps
+            //   turbulent and prevent single-blob stagnation.
+            if (b.temp > 0.20) {
+                const t = b.temp - 0.20
+                b.vx += (Math.random() - 0.5) * 0.014 * t
+                b.vy += (Math.random() - 0.5) * 0.010 * t
+            }
+
+            // ─ Thermal plume kick: blobs in the heat zone get occasional lateral
+            //   impulses so they detach from the pool at different positions,
+            //   preventing all the wax from rising from one spot.
+            if (b.y / h > HEAT_ZONE_Y && b.temp > 0.30 && Math.random() < 0.04) {
+                b.vx += (Math.random() - 0.5) * 0.25 * effectiveHeat
             }
 
             // ─ Apply forces & drag ────────────────────────────────────────────
@@ -265,6 +271,30 @@ Item {
             if (b.x > w - margin) { b.x = w - margin; b.vx = -Math.abs(b.vx) * 0.20 }
             if (b.y < margin)     { b.y = margin;     b.vy =  Math.abs(b.vy) * 0.15 }
             if (b.y > h - margin) { b.y = h - margin; if (b.vy > 0) b.vy = 0 }
+        }
+
+        // ── 1b. Soft inter-blob repulsion ────────────────────────────────────
+        // Blobs that are close (REPULSE_THRESH contact radii) but not yet
+        // overlapping get a gentle push apart.  This prevents pile-ups at the
+        // base and maintains multiple distinct blobs even at low temperatures.
+        for (let i = 0; i < bs.length; i++) {
+            for (let j = i + 1; j < bs.length; j++) {
+                const dx    = bs[i].x - bs[j].x
+                const dy    = bs[i].y - bs[j].y
+                const dist2 = dx * dx + dy * dy
+                const contactDist = (bs[i].r + bs[j].r) * REPULSE_THRESH
+                if (dist2 < contactDist * contactDist && dist2 > 0.01) {
+                    const dist = Math.sqrt(dist2)
+                    const nx   = dx / dist
+                    const ny   = dy / dist
+                    // Force scales with how deeply the blobs overlap the repulsion zone
+                    const overlap = 1.0 - dist / contactDist
+                    const fx = nx * REPULSE_K * overlap
+                    const fy = ny * REPULSE_K * overlap
+                    bs[i].vx += fx;  bs[i].vy += fy
+                    bs[j].vx -= fx;  bs[j].vy -= fy
+                }
+            }
         }
 
         // ── 2. Merging ────────────────────────────────────────────────────────
@@ -323,9 +353,11 @@ Item {
         // The cap (blobCount × 3) bounds the maximum blob count so the pixel
         // loop stays cheap while still allowing generous fragmentation.
         const canSplit      = bs.length < root.blobCount * 3
-        // Fragmentation constants
-        const FRAG_AREA_FRAC = 0.15   // daughter takes 15 % of parent's area
-        const FRAG_KICK      = 0.25   // upward speed given to the rising bubble
+        // Fragmentation constants — 15 % area shed per bubble, raised probability
+        // (0.03 → 0.07) so pools break into rising bubbles more readily under load.
+        const FRAG_AREA_FRAC = 0.15
+        const FRAG_KICK      = 0.28
+        const FRAG_PROB      = 0.07   // probability per tick for bottom fragmentation
         const postSplit = []
         for (let i = 0; i < bs.length; i++) {
             const b = bs[i]
@@ -353,7 +385,7 @@ Item {
             } else if (canSplit && b.r > minR * 2.0
                        && b.y / h > HEAT_ZONE_Y
                        && b.temp > 0.25
-                       && Math.random() < 0.03) {
+                       && Math.random() < FRAG_PROB) {
                 // ── b) Bottom fragmentation: asymmetric bubble emission ────────
                 // Parent shrinks; daughter (the bubble) rises with an upward kick.
                 const parentR   = b.r * Math.sqrt(1.0 - FRAG_AREA_FRAC)
@@ -402,7 +434,10 @@ Item {
         running:  true
         onTriggered: {
             root.tickBlobs()
-            canvas.requestPaint()
+            // Decouple paint from physics so GC pauses in the physics tick
+            // don't block the compositor — the paint is scheduled for the
+            // next event-loop iteration, giving Qt a chance to breathe.
+            Qt.callLater(canvas.requestPaint)
         }
     }
 

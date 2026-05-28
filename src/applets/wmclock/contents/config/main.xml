@@ -15,5 +15,9 @@
     <entry name="showDate" type="Bool">
       <default>true</default>
     </entry>
+    <entry name="clockStyle" type="String">
+      <label>Clock display style</label>
+      <default>analog</default>
+    </entry>
   </group>
 </kcfg>

@@ -6,13 +6,33 @@ import org.kde.kirigami as Kirigami
 Item {
     id: page
 
-    property bool cfg_use24Hour:   false
-    property bool cfg_showSeconds: false
-    property bool cfg_showDate:    false
+    property bool   cfg_use24Hour:   false
+    property bool   cfg_showSeconds: false
+    property bool   cfg_showDate:    false
+    property string cfg_clockStyle:  ""
 
     Kirigami.FormLayout {
         anchors.left:  parent.left
         anchors.right: parent.right
+
+        QQC2.ComboBox {
+            id: styleCombo
+            Kirigami.FormData.label: i18n("Display style:")
+            model: [
+                { text: i18n("Analog"),     value: "analog" },
+                { text: i18n("Nixie Tube"), value: "nixie"  },
+            ]
+            textRole:  "text"
+            valueRole: "value"
+            Component.onCompleted: {
+                const v = page.cfg_clockStyle || "analog"
+                for (let i = 0; i < count; ++i) {
+                    if (model[i].value === v) { currentIndex = i; return }
+                }
+                currentIndex = 0
+            }
+            onActivated: page.cfg_clockStyle = currentValue
+        }
 
         QQC2.CheckBox {
             id: use24HourCheck
