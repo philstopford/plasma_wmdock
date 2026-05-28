@@ -76,7 +76,7 @@ Item {
                 Layout.preferredWidth: 140
                 from: 1; to: 4; stepSize: 1
                 value: page.cfg_resolution
-                onMoved: page.cfg_resolution = Math.round(value)
+                onValueChanged: page.cfg_resolution = value
             }
 
             QQC2.Label {
