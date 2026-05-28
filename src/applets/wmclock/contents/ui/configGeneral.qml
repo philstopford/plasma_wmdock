@@ -19,6 +19,8 @@ Item {
     property string cfg_nixieTransitionDefault:  "slot"
     property string cfg_nixieTubeStyle:          ""
     property string cfg_nixieTubeStyleDefault:   "classic"
+    property real   cfg_nixieGlowRadius:         0
+    property real   cfg_nixieGlowRadiusDefault:  0.55
 
     Kirigami.FormLayout {
         anchors.left:  parent.left
@@ -105,6 +107,22 @@ Item {
                 currentIndex = 0
             }
             onActivated: page.cfg_nixieTubeStyle = currentValue
+        }
+
+        QQC2.Label {
+            visible: page.cfg_clockStyle === "nixie"
+            Kirigami.FormData.label: i18n("Discharge glow radius:")
+            text: Math.round(glowSlider.value * 100) + "%"
+        }
+
+        QQC2.Slider {
+            id: glowSlider
+            visible: page.cfg_clockStyle === "nixie"
+            from:     0.20
+            to:       1.00
+            stepSize: 0.05
+            value:    page.cfg_nixieGlowRadius || 0.55
+            onMoved: page.cfg_nixieGlowRadius = value
         }
     }
 }

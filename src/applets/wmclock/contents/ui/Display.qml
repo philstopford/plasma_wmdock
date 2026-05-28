@@ -20,16 +20,19 @@ Item {
     readonly property bool   showSeconds:     Plasmoid.configuration.showSeconds     ?? true
     readonly property bool   showDate:        Plasmoid.configuration.showDate        ?? true
     readonly property string clockStyle:      Plasmoid.configuration.clockStyle      || "analog"
-    readonly property string nixieTransition: Plasmoid.configuration.nixieTransition || "slot"
-    readonly property string nixieTubeStyle:  Plasmoid.configuration.nixieTubeStyle  || "classic"
+    readonly property string nixieTransition:  Plasmoid.configuration.nixieTransition || "slot"
+    readonly property string nixieTubeStyle:   Plasmoid.configuration.nixieTubeStyle  || "classic"
+    readonly property real   nixieGlowRadius:  Plasmoid.configuration.nixieGlowRadius > 0
+                                               ? Plasmoid.configuration.nixieGlowRadius : 0.55
 
     // Repaint triggers
     onUse24HourChanged:       faceCanvas.requestPaint()
     onShowSecondsChanged:     faceCanvas.requestPaint()
     onShowDateChanged:        faceCanvas.requestPaint()
     onClockStyleChanged:      faceCanvas.requestPaint()
-    onNixieTransitionChanged: faceCanvas.requestPaint()
-    onNixieTubeStyleChanged:  faceCanvas.requestPaint()
+    onNixieTransitionChanged:  faceCanvas.requestPaint()
+    onNixieTubeStyleChanged:   faceCanvas.requestPaint()
+    onNixieGlowRadiusChanged:  faceCanvas.requestPaint()
 
     // -----------------------------------------------------------------------
     // Background
@@ -407,9 +410,17 @@ Item {
             const meshStep     = Math.max(3, Math.floor(tubeW * 0.30))
 
             // ---- Smooth wall-clock phase for pulsing --------------------------
-            const phaseS = now * 0.001
-            // Separator pulsing: 1 Hz sine → [0, 1]
-            const sPulse = (Math.sin(phaseS * 2.0 * Math.PI) + 1.0) * 0.5
+            const phaseS  = now * 0.001
+            // All pulsing at 1 Hz, synchronized (no per-tube offset)
+            const pulse1hz = (Math.sin(phaseS * 2.0 * Math.PI) + 1.0) * 0.5
+
+            // LED brightness: shared 1 Hz sine, same for all tubes
+            const ledPulse = pulse1hz
+
+            // Separator dot: exponential-decay flash at each second boundary
+            // (mimics a red LED that fires briefly as each second ticks over)
+            const fracSec = (now % 1000) / 1000
+            const dotBright = Math.exp(-fracSec * 9.0)   // 1.0 at t=0, ~0.01 at t=500ms
 
             // ---- Dark background ----------------------------------------------
             ctx.fillStyle = "#060508"
@@ -421,28 +432,37 @@ Item {
                 const isS = (i === 2)
 
                 if (isS) {
-                    // Red pulsing separator dot
+                    // Red LED-style separator dot – bright flash at second boundary,
+                    // then exponential decay to near-off (mimics a real indicator LED).
                     const dotCx = x + Math.floor(sepW / 2)
                     const dotCy = tubeY + Math.floor(tubeH / 2)
                     const dotR  = Math.max(2, Math.floor(sepW * 0.40))
 
-                    const rg = ctx.createRadialGradient(dotCx, dotCy, 0, dotCx, dotCy, dotR * 3.5)
-                    rg.addColorStop(0, "rgba(255,20,0," + (sPulse * 0.65).toFixed(2) + ")")
+                    const rg = ctx.createRadialGradient(dotCx, dotCy, 0, dotCx, dotCy, dotR * 3.0)
+                    rg.addColorStop(0, "rgba(255,20,0," + (dotBright * 0.70).toFixed(2) + ")")
                     rg.addColorStop(1, "rgba(0,0,0,0)")
                     ctx.beginPath()
-                    ctx.arc(dotCx, dotCy, dotR * 3.5, 0, 2 * Math.PI)
+                    ctx.arc(dotCx, dotCy, dotR * 3.0, 0, 2 * Math.PI)
                     ctx.fillStyle = rg
                     ctx.fill()
 
                     ctx.beginPath()
                     ctx.arc(dotCx, dotCy, dotR, 0, 2 * Math.PI)
-                    ctx.fillStyle = "hsl(8,100%," + Math.round(40 + sPulse * 35) + "%)"
+                    ctx.fillStyle = "hsl(8,100%," + Math.round(20 + dotBright * 55) + "%)"
                     ctx.fill()
                     continue
                 }
 
                 const tW = tubeW
                 const fk = flicker[i]
+
+                // ---- Effective inner half-width for this tube style ----------
+                // Used to scale the discharge cloud so it fits inside the envelope.
+                const bx  = Math.max(2, Math.ceil(tW * 0.12))  // barrel bulge px
+                const ins = Math.max(1, Math.ceil(tW * 0.12))  // slim inset px
+                const innerHalfW = tubeStyle === "slim"   ? (tW - 2 * ins) * 0.5
+                                 : tubeStyle === "barrel" ? tW * 0.5 + bx * 0.5
+                                 : tW * 0.5
 
                 // ---- Glass tube body – outer border --------------------------
                 ctx.strokeStyle = "rgba(80,65,35,0.75)"
@@ -462,91 +482,51 @@ Item {
                 drawTubePath(ctx, x, tubeY, tW, tubeH, tubeStyle)
                 ctx.fill()
 
-                // ---- Anode mesh / cathode grid (fine crosshatch) -------------
-                // Real nixie tubes show a rectangular wire mesh anode around
-                // the stacked digit cathodes.  Render as a faint amber grid.
-                ctx.save()
-                ctx.beginPath()
-                drawTubePath(ctx, x + 1, tubeY + 1, tW - 2, tubeH - 2, tubeStyle)
-                ctx.clip()
-                ctx.strokeStyle = "rgba(90,55,10,0.22)"
-                ctx.lineWidth   = 0.5
-                // Horizontal wires
-                for (let row = 1; row * meshStep < tubeH; row++) {
-                    const ry = tubeY + row * meshStep
-                    ctx.beginPath()
-                    ctx.moveTo(x + 1, ry)
-                    ctx.lineTo(x + tW - 1, ry)
-                    ctx.stroke()
-                }
-                // Vertical wires
-                for (let col = 1; col * meshStep < tW; col++) {
-                    const cx3 = x + col * meshStep
-                    ctx.beginPath()
-                    ctx.moveTo(cx3, tubeY + 1)
-                    ctx.lineTo(cx3, tubeY + tubeH - 1)
-                    ctx.stroke()
-                }
-                ctx.restore()
-
                 // ---- Digit (with transition) ----------------------------------
                 const dispD = (nxInAnim && transition !== "none")
                               ? nixieGetDigit(i, nxPrevDig[i], nxTgtDig[i],
                                               elapsed, nxAnimDurMs, transition)
                               : tgtDigs[i]
-                const digit = String(dispD)
+                const digit  = String(dispD)
+                const digitInt = parseInt(digit)
 
                 const cx2 = x + Math.floor(tW / 2)
                 const cy2 = tubeY + Math.floor(tubeH * 0.52)
 
-                // ---- Ghost cathodes – inactive stacked digit wire frames ------
-                // In a real nixie tube all 10 numeral cathodes are physically
-                // present (layered front-to-back); inactive ones are visible as
-                // dim, slightly offset wire outlines through the glass.
+                // ---- All inner rendering is clipped to tube interior ----------
                 ctx.save()
                 ctx.beginPath()
                 drawTubePath(ctx, x + 1, tubeY + 1, tW - 2, tubeH - 2, tubeStyle)
                 ctx.clip()
                 ctx.textAlign    = "center"
                 ctx.textBaseline = "middle"
-                // Ghost font slightly smaller than active to hint at depth stacking
-                const digitInt = parseInt(digit)
+
+                // Ghost cathodes – inactive stacked digit wire frames.
+                // Draw first so plasma cloud and active digit glow over them.
                 for (let d = 0; d < 10; d++) {
                     if (String(d) === digit) continue
-                    // Each cathode is at a slightly different Z depth → tiny
-                    // horizontal parallax offset for depth cues.
                     const depthOff = ((d - 5) * 0.25)
-                    // Digits closer to the active one are slightly brighter (less
-                    // occluded by the glowing cathode in front)
                     const dist = Math.min(Math.abs(d - digitInt),
                                          10 - Math.abs(d - digitInt))
-                    const gAlpha = (0.045 + dist * 0.008) * fk
+                    const gAlpha = (0.08 + dist * 0.012) * fk
                     ctx.font      = "bold " + ghostFontSz + "px monospace"
                     ctx.fillStyle = "rgba(160,80,12," + gAlpha.toFixed(3) + ")"
                     ctx.fillText(String(d), cx2 + depthOff, cy2)
                 }
-                ctx.restore()
 
-                // Soft background plasma cloud
-                const dg = ctx.createRadialGradient(cx2, cy2, 0, cx2, cy2, tW * 0.85)
-                dg.addColorStop(0,   "rgba(220,95,5,"  + (0.35 * fk).toFixed(2) + ")")
-                dg.addColorStop(0.4, "rgba(180,60,5,"  + (0.18 * fk).toFixed(2) + ")")
+                // Plasma cloud (discharge glow background) – clipped to tube interior.
+                // Radius is based on the tube's effective inner half-width × user setting.
+                const glowR = innerHalfW * 2.0 * root.nixieGlowRadius
+                const dg = ctx.createRadialGradient(cx2, cy2, 0, cx2, cy2, glowR)
+                dg.addColorStop(0,   "rgba(220,95,5,"  + (0.40 * fk).toFixed(2) + ")")
+                dg.addColorStop(0.4, "rgba(180,60,5,"  + (0.20 * fk).toFixed(2) + ")")
                 dg.addColorStop(1,   "rgba(0,0,0,0)")
                 ctx.beginPath()
-                ctx.arc(cx2, cy2, tW * 0.85, 0, 2 * Math.PI)
+                ctx.arc(cx2, cy2, glowR, 0, 2 * Math.PI)
                 ctx.fillStyle = dg
                 ctx.fill()
 
-                ctx.save()
-                ctx.beginPath()
-                drawTubePath(ctx, x + 1, tubeY + 1, tW - 2, tubeH - 2, tubeStyle)
-                ctx.clip()
-
-                ctx.textAlign    = "center"
-                ctx.textBaseline = "middle"
-
                 // Fuzzy discharge glow: 4 offset passes at low alpha
-                // (simulates diffuse ionised gas around the active cathode)
                 const glowA = (0.15 * fk).toFixed(2)
                 for (let pass = 1; pass <= 4; pass++) {
                     const blur = pass * 1.2
@@ -556,7 +536,6 @@ Item {
                     ctx.fillText(digit, cx2 + blur, cy2)
                     ctx.fillText(digit, cx2, cy2 - blur)
                     ctx.fillText(digit, cx2, cy2 + blur)
-                    // Diagonal passes for rounder halo
                     const db = blur * 0.7
                     ctx.fillText(digit, cx2 - db, cy2 - db)
                     ctx.fillText(digit, cx2 + db, cy2 - db)
@@ -570,20 +549,40 @@ Item {
                 ctx.fillStyle = "rgba(160,40,0,0.22)"
                 ctx.fillText(digit, cx2 + 1, cy2 + 1)
 
-                // Main orange discharge, brightness scaled by flicker
+                // Main orange discharge
                 ctx.fillStyle = "hsl(22,100%," + Math.round(50 + fk * 14) + "%)"
                 ctx.fillText(digit, cx2, cy2)
 
-                // Bright core highlight (suppressed when flickering badly)
+                // Bright core highlight
                 if (fk > 0.5) {
                     ctx.fillStyle = "rgba(255,215,130," + (0.60 * fk).toFixed(2) + ")"
                     ctx.font      = "bold " + highlightFontSz + "px monospace"
                     ctx.fillText(digit, cx2, cy2 - 1)
                 }
-                ctx.restore()
+
+                // ---- Anode mesh – drawn on top of the active digit -----------
+                // In a real tube the mesh anode surrounds all cathodes and is
+                // visible in front; draw it last inside the clip so it overlays.
+                ctx.strokeStyle = "rgba(90,55,10,0.40)"
+                ctx.lineWidth   = 0.5
+                for (let row = 1; row * meshStep < tubeH; row++) {
+                    const ry = tubeY + row * meshStep
+                    ctx.beginPath()
+                    ctx.moveTo(x + 1, ry)
+                    ctx.lineTo(x + tW - 1, ry)
+                    ctx.stroke()
+                }
+                for (let col = 1; col * meshStep < tW; col++) {
+                    const cx3 = x + col * meshStep
+                    ctx.beginPath()
+                    ctx.moveTo(cx3, tubeY + 1)
+                    ctx.lineTo(cx3, tubeY + tubeH - 1)
+                    ctx.stroke()
+                }
+
+                ctx.restore()   // end tube interior clip
 
                 // ---- Cylindrical glass overlay --------------------------------
-                // Left specular arc highlight (vertical curved streak on left 20%)
                 const specGr = ctx.createLinearGradient(x, tubeY, x + Math.floor(tW * 0.35), tubeY)
                 specGr.addColorStop(0,   "rgba(255,240,200,0.13)")
                 specGr.addColorStop(0.5, "rgba(255,240,200,0.07)")
@@ -595,7 +594,6 @@ Item {
                 ctx.fill()
                 ctx.restore()
 
-                // Right-edge reflection (narrow, darker amber)
                 const specR  = ctx.createLinearGradient(x + Math.floor(tW * 0.70), tubeY,
                                                          x + tW, tubeY)
                 specR.addColorStop(0,   "rgba(255,240,200,0.0)")
@@ -610,8 +608,6 @@ Item {
                 ctx.restore()
 
                 // ---- Lead pin wires at the bottom of the tube ----------------
-                // Thin vertical lines descending below the glass envelope to
-                // suggest the cathode-pin connectors (as seen in real nixie photos).
                 const pinY0 = tubeY + tubeH
                 const pinY1 = pinY0 + Math.max(2, Math.floor(h * 0.04))
                 const nPins = 5
@@ -625,21 +621,19 @@ Item {
                     ctx.stroke()
                 }
 
-                // ---- Blue LED strip ------------------------------------------
-                const ledX     = x + 1
-                const lW       = tW - 2
-                const ledPhase = phaseS * 2.0 * Math.PI * 0.7 + i * 0.6
-                const ledPulse = ((Math.sin(ledPhase) + 1.0) * 0.5) * fk
+                // ---- Blue LED strip (1 Hz, synchronized across all tubes) ----
+                const ledX = x + 1
+                const lW   = tW - 2
 
                 const lg = ctx.createRadialGradient(
                     x + tW / 2, ledY + ledH / 2, 0,
                     x + tW / 2, ledY + ledH / 2, tW * 0.8)
-                lg.addColorStop(0, "rgba(30,60,230," + (ledPulse * 0.55).toFixed(2) + ")")
+                lg.addColorStop(0, "rgba(30,60,230," + (ledPulse * fk * 0.55).toFixed(2) + ")")
                 lg.addColorStop(1, "rgba(0,0,0,0)")
                 ctx.fillStyle = lg
                 ctx.fillRect(ledX - 2, ledY - 2, lW + 4, ledH + 6)
 
-                ctx.fillStyle = "hsl(232,90%," + Math.round(25 + ledPulse * 25) + "%)"
+                ctx.fillStyle = "hsl(232,90%," + Math.round(25 + ledPulse * fk * 25) + "%)"
                 ctx.fillRect(ledX, ledY, lW, ledH)
             }
 
