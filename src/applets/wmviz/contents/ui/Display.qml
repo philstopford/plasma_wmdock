@@ -249,7 +249,7 @@ Item {
             case "galaxy":    tickGalaxy();     break
             case "aurora":    tickAurora();     break
             case "mandala":   tickMandala();    break
-            case "led":       tickLed();        break
+            case "led":       tickBars();       break  // LED meter uses same peak-hold logic as bars
             case "discharge": tickDischarge();  break
             case "lightning": tickLightning();  break
             case "concert":   tickConcert();    break
@@ -510,8 +510,7 @@ Item {
     }
 
     // ----- LED meter tick ---------------------------------------------------
-    // LED meter is bars with peak hold — tick is identical to tickBars.
-    function tickLed() { tickBars() }
+    // LED meter reuses tickBars for peak-hold state — see switch statement.
 
     // ----- discharge tick ---------------------------------------------------
     function tickDischarge() {
