@@ -474,10 +474,9 @@ Item {
             ctx.clearRect(0, 0, w, h)
             if (!blobs || blobs.length === 0) return
 
-            // Coarse pixel grid – resolution 1 keeps the original 4×4 cells,
-            // while 4 shrinks them to 1×1 for the smoothest appearance.
-            const stepBase = 5
-            const step = Math.max(1, stepBase - root.renderResolution)
+            // Coarse pixel grid – map resolution 1..4 to cell sizes 4..1, so
+            // the default keeps the original 4×4 look and higher values smooth it.
+            const step = Math.max(1, 5 - root.renderResolution)
 
             for (let py = 0; py < h; py += step) {
                 for (let px = 0; px < w; px += step) {
