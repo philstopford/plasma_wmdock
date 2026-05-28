@@ -303,7 +303,12 @@ Item {
             switch (ch) {
                 case '0':
                     // Tall narrow oval spanning full cell height.
-                    ctx.ellipse(cx, cy, w * 0.36, h * 0.46, 0, 0, Math.PI * 2)
+                    // Drawn as two bezier arcs (right half then left half) because
+                    // QML Canvas ctx.ellipse(x,y,w,h) takes top-left+size, NOT
+                    // the HTML5 centre+radii API — using bezier avoids that mismatch.
+                    ctx.moveTo(cx, Y(-0.46))
+                    ctx.bezierCurveTo(X(0.38), Y(-0.46), X(0.38), Y(0.46), cx, Y(0.46))
+                    ctx.bezierCurveTo(X(-0.38), Y(0.46), X(-0.38), Y(-0.46), cx, Y(-0.46))
                     break
                 case '1':
                     // Serif hook at top, then vertical stroke to bottom.
