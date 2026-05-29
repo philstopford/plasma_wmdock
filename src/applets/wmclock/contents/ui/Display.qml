@@ -289,7 +289,8 @@ Item {
 
         // drawNixieGlyph – renders a single digit '0'-'9' as stroked canvas paths
         // shaped to better match real wire-formed nixie cathodes: tall, slim,
-        // softly asymmetric, with smaller upper bowls and fuller lower loops.
+        // softly asymmetric, with several digits using smaller upper bowls and
+        // fuller lower loops instead of purely geometric font shapes.
         // (cx,cy) is the centre; (w,h) is the bounding cell for the digit.
         // All digit endpoints span roughly cy ± h*0.48 (full cell height).
         // Bezier control points may extend slightly beyond those bounds to pull
@@ -313,7 +314,6 @@ Item {
                     ctx.moveTo(X(-0.12), Y(-0.30))
                     ctx.lineTo(cx, Y(-0.48))
                     ctx.lineTo(cx, Y(0.48))
-                    ctx.quadraticCurveTo(X(0.01), Y(0.48), X(0.06), Y(0.44))
                     break
                 case '2':
                     // Slightly asymmetric on purpose: tighter top sweep, longer base.
