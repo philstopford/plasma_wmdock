@@ -288,13 +288,9 @@ Item {
         }
 
         // drawNixieGlyph – renders a single digit '0'-'9' as stroked canvas paths
-        // that mimic the wire-formed cathode shape of a real nixie tube.
+        // shaped to better match real wire-formed nixie cathodes: tall, slim,
+        // softly asymmetric, with smaller upper bowls and fuller lower loops.
         // (cx,cy) is the centre; (w,h) is the bounding cell for the digit.
-        // All digit endpoints span cy ± h*0.46 (full cell height).
-        // Bezier CONTROL POINTS may extend beyond ±0.46 to correctly pull curve
-        // apices to the ±0.46 boundary — this is expected and correct for bezier curves.
-        // Every digit is a SINGLE continuous sub-path (no moveTo break mid-digit,
-        // except for the 4 which has two physically separate wires).
         // Caller must set ctx.strokeStyle, ctx.lineWidth, ctx.lineCap, ctx.lineJoin.
         function drawNixieGlyph(ctx, ch, cx, cy, w, h) {
             const X = f => cx + f * w
@@ -302,90 +298,72 @@ Item {
             ctx.beginPath()
             switch (ch) {
                 case '0':
-                    // Tall narrow oval spanning full cell height.
-                    // Drawn as two bezier arcs (right half then left half) because
-                    // QML Canvas ctx.ellipse(x,y,w,h) takes top-left+size, NOT
-                    // the HTML5 centre+radii API — using bezier avoids that mismatch.
-                    ctx.moveTo(cx, Y(-0.46))
-                    ctx.bezierCurveTo(X(0.38), Y(-0.46), X(0.38), Y(0.46), cx, Y(0.46))
-                    ctx.bezierCurveTo(X(-0.38), Y(0.46), X(-0.38), Y(-0.46), cx, Y(-0.46))
+                    ctx.moveTo(cx, Y(-0.48))
+                    ctx.bezierCurveTo(X(0.24), Y(-0.50), X(0.33), Y(-0.18), X(0.31), Y(0.10))
+                    ctx.bezierCurveTo(X(0.29), Y(0.38), X(0.14), Y(0.50), cx, Y(0.48))
+                    ctx.bezierCurveTo(X(-0.18), Y(0.48), X(-0.31), Y(0.28), X(-0.31), Y(0.00))
+                    ctx.bezierCurveTo(X(-0.31), Y(-0.28), X(-0.18), Y(-0.50), cx, Y(-0.48))
                     break
                 case '1':
-                    // Simple vertical stroke — no serif.
-                    ctx.moveTo(cx, Y(-0.46))
-                    ctx.lineTo(cx, Y(0.46))
+                    ctx.moveTo(X(-0.12), Y(-0.30))
+                    ctx.lineTo(cx, Y(-0.48))
+                    ctx.lineTo(cx, Y(0.48))
+                    ctx.quadraticCurveTo(X(0.01), Y(0.49), X(0.06), Y(0.45))
                     break
                 case '2':
-                    // Top arc from lower-left, bowing to full height, sweeping right;
-                    // diagonal down-left; horizontal base bar.
-                    // Control points use Y(-0.55) to pull the arc apex to ≈ Y(-0.46).
-                    ctx.moveTo(X(-0.30), Y(-0.16))
-                    ctx.bezierCurveTo(X(-0.36), Y(-0.55), X(0.34), Y(-0.55), X(0.34), Y(-0.14))
-                    ctx.bezierCurveTo(X(0.34), Y(0.08), X(-0.26), Y(0.22), X(-0.36), Y(0.46))
-                    ctx.lineTo(X(0.36), Y(0.46))
+                    ctx.moveTo(X(-0.28), Y(-0.24))
+                    ctx.bezierCurveTo(X(-0.20), Y(-0.48), X(0.12), Y(-0.52), X(0.28), Y(-0.30))
+                    ctx.bezierCurveTo(X(0.39), Y(-0.12), X(0.16), Y(0.02), X(-0.04), Y(0.16))
+                    ctx.bezierCurveTo(X(-0.23), Y(0.28), X(-0.34), Y(0.37), X(-0.34), Y(0.46))
+                    ctx.lineTo(X(0.30), Y(0.46))
                     break
                 case '3':
-                    // Two right-facing arcs spanning full height.
-                    ctx.moveTo(X(-0.28), Y(-0.46))
-                    ctx.bezierCurveTo(X(0.36), Y(-0.46), X(0.36), Y(-0.04), X(0.02), Y(-0.02))
-                    ctx.bezierCurveTo(X(0.38), Y(0.00), X(0.38), Y(0.46), X(-0.28), Y(0.46))
+                    ctx.moveTo(X(-0.24), Y(-0.42))
+                    ctx.bezierCurveTo(X(0.15), Y(-0.50), X(0.35), Y(-0.34), X(0.24), Y(-0.08))
+                    ctx.bezierCurveTo(X(0.18), Y(0.00), X(0.03), Y(0.02), X(-0.03), Y(0.03))
+                    ctx.bezierCurveTo(X(0.14), Y(0.03), X(0.34), Y(0.12), X(0.31), Y(0.32))
+                    ctx.bezierCurveTo(X(0.28), Y(0.52), X(0.04), Y(0.54), X(-0.26), Y(0.44))
                     break
                 case '4':
-                    // Angled left stroke down to crossbar (one wire).
-                    // Separate right vertical (physically distinct cathode wire).
-                    ctx.moveTo(X(-0.22), Y(-0.46))
-                    ctx.lineTo(X(-0.30), Y(0.08))
-                    ctx.lineTo(X(0.34), Y(0.08))
-                    ctx.moveTo(X(0.16), Y(-0.46))
-                    ctx.lineTo(X(0.16), Y(0.46))
+                    ctx.moveTo(X(-0.24), Y(-0.44))
+                    ctx.lineTo(X(-0.31), Y(0.06))
+                    ctx.lineTo(X(0.22), Y(0.06))
+                    ctx.moveTo(X(0.18), Y(-0.48))
+                    ctx.lineTo(X(0.18), Y(0.48))
                     break
                 case '5':
-                    // Top bar, left vertical half, lower right arc to full height.
-                    ctx.moveTo(X(0.32), Y(-0.46))
-                    ctx.lineTo(X(-0.32), Y(-0.46))
-                    ctx.lineTo(X(-0.32), Y(-0.04))
-                    ctx.bezierCurveTo(X(-0.30), Y(-0.04), X(0.34), Y(-0.06), X(0.34), Y(0.20))
-                    ctx.bezierCurveTo(X(0.34), Y(0.46), X(-0.34), Y(0.46), X(-0.34), Y(0.20))
+                    ctx.moveTo(X(0.28), Y(-0.46))
+                    ctx.lineTo(X(-0.26), Y(-0.46))
+                    ctx.lineTo(X(-0.31), Y(-0.08))
+                    ctx.bezierCurveTo(X(-0.16), Y(-0.10), X(0.20), Y(-0.12), X(0.29), Y(0.02))
+                    ctx.bezierCurveTo(X(0.38), Y(0.16), X(0.28), Y(0.48), X(-0.04), Y(0.48))
+                    ctx.bezierCurveTo(X(-0.24), Y(0.48), X(-0.34), Y(0.37), X(-0.29), Y(0.20))
                     break
                 case '6':
-                    // Tail from top-right down left side into closed lower loop.
-                    ctx.moveTo(X(0.26), Y(-0.46))
-                    ctx.bezierCurveTo(X(-0.36), Y(-0.46), X(-0.36), Y(0.06), X(-0.36), Y(0.18))
-                    ctx.bezierCurveTo(X(-0.36), Y(0.46), X(0.36), Y(0.46), X(0.36), Y(0.18))
-                    ctx.bezierCurveTo(X(0.36), Y(-0.06), X(-0.32), Y(-0.06), X(-0.36), Y(0.18))
+                    ctx.moveTo(X(0.22), Y(-0.46))
+                    ctx.bezierCurveTo(X(-0.08), Y(-0.52), X(-0.33), Y(-0.28), X(-0.31), Y(0.04))
+                    ctx.bezierCurveTo(X(-0.29), Y(0.32), X(-0.14), Y(0.50), X(0.08), Y(0.48))
+                    ctx.bezierCurveTo(X(0.31), Y(0.46), X(0.36), Y(0.18), X(0.22), Y(0.03))
+                    ctx.bezierCurveTo(X(0.10), Y(-0.10), X(-0.18), Y(-0.08), X(-0.30), Y(0.10))
                     break
                 case '7':
-                    // Horizontal top bar, then diagonal stroke to bottom.
-                    ctx.moveTo(X(-0.34), Y(-0.46))
-                    ctx.lineTo(X(0.34), Y(-0.46))
-                    ctx.bezierCurveTo(X(0.34), Y(-0.42), X(0.10), Y(-0.04), X(-0.12), Y(0.46))
+                    ctx.moveTo(X(-0.32), Y(-0.46))
+                    ctx.lineTo(X(0.30), Y(-0.46))
+                    ctx.bezierCurveTo(X(0.24), Y(-0.24), X(0.04), Y(0.02), X(-0.12), Y(0.48))
                     break
                 case '8':
-                    // Single continuous figure-eight: wire crosses itself at the waist (cx,cy).
-                    // Upper loop winds CW, lower loop winds CCW, so the path is self-consistent.
-                    // X control points use ±0.38/±0.40 (upper vs lower) because the lower
-                    // loop is deliberately wider — matching the asymmetric silhouette of
-                    // real in-18 cathode wires where the bottom lobe is slightly larger.
-                    // Upper loop (CW): waist → right arc to top → left arc back to waist.
-                    ctx.moveTo(cx, cy)
-                    ctx.bezierCurveTo(X(0.38), Y(0.00), X(0.36), Y(-0.46), cx, Y(-0.46))
-                    ctx.bezierCurveTo(X(-0.36), Y(-0.46), X(-0.38), Y(0.00), cx, cy)
-                    // Lower loop (CCW): waist → left arc to bottom → right arc back to waist.
-                    ctx.bezierCurveTo(X(-0.40), Y(0.00), X(-0.38), Y(0.46), cx, Y(0.46))
-                    ctx.bezierCurveTo(X(0.38), Y(0.46), X(0.40), Y(0.00), cx, cy)
+                    ctx.moveTo(cx, Y(-0.01))
+                    ctx.bezierCurveTo(X(0.28), Y(-0.02), X(0.28), Y(-0.44), cx, Y(-0.46))
+                    ctx.bezierCurveTo(X(-0.26), Y(-0.44), X(-0.26), Y(-0.04), cx, Y(-0.01))
+                    ctx.bezierCurveTo(X(-0.33), Y(0.02), X(-0.35), Y(0.46), cx, Y(0.48))
+                    ctx.bezierCurveTo(X(0.34), Y(0.46), X(0.34), Y(0.04), cx, Y(-0.01))
                     break
                 case '9':
-                    // Single continuous path: oval loop (traced as two bezier halves)
-                    // then tail — no moveTo break, so the whole shape is one wire.
-                    // The path crosses itself at the right-side junction (X(0.34), Y(-0.20)).
-                    // Control points use Y(-0.54) to pull the arc apex to ≈ Y(-0.46).
-                    // Top arc CCW: right-junction → top → left.
-                    ctx.moveTo(X(0.34), Y(-0.20))
-                    ctx.bezierCurveTo(X(0.36), Y(-0.54), X(-0.36), Y(-0.54), X(-0.36), Y(-0.20))
-                    // Bottom arc: left → bottom → right-junction.
-                    ctx.bezierCurveTo(X(-0.36), Y(0.06), X(0.34), Y(0.06), X(0.34), Y(-0.20))
-                    // Tail: right-junction curves down to base.
-                    ctx.bezierCurveTo(X(0.36), Y(0.18), X(0.28), Y(0.46), X(0.04), Y(0.46))
+                    ctx.moveTo(X(0.28), Y(0.14))
+                    ctx.bezierCurveTo(X(0.30), Y(-0.14), X(0.18), Y(-0.50), cx, Y(-0.48))
+                    ctx.bezierCurveTo(X(-0.22), Y(-0.46), X(-0.32), Y(-0.22), X(-0.28), Y(0.04))
+                    ctx.bezierCurveTo(X(-0.24), Y(0.22), X(-0.06), Y(0.28), X(0.10), Y(0.20))
+                    ctx.bezierCurveTo(X(0.24), Y(0.14), X(0.30), Y(0.30), X(0.10), Y(0.48))
                     break
                 default:
                     return
