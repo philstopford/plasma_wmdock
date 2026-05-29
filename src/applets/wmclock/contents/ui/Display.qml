@@ -292,9 +292,9 @@ Item {
         // softly asymmetric, with several digits using smaller upper bowls and
         // fuller lower loops instead of purely geometric font shapes.
         // (cx,cy) is the centre; (w,h) is the bounding cell for the digit.
-        // All digit endpoints span roughly cy ± h*0.48 (full cell height).
-        // Bezier control points may extend slightly beyond those bounds to pull
-        // visible curve apices to the correct height — that is intentional.
+        // Visible digit endpoints span most of the cell height (about cy ± h*0.48).
+        // Bezier control points may extend a little further to pull visible curve
+        // apices to the intended height — that is intentional.
         // Every digit is drawn as a single continuous sub-path except '4',
         // which intentionally uses two cathode wires.
         // Caller must set ctx.strokeStyle, ctx.lineWidth, ctx.lineCap, ctx.lineJoin.
