@@ -291,6 +291,11 @@ Item {
         // shaped to better match real wire-formed nixie cathodes: tall, slim,
         // softly asymmetric, with smaller upper bowls and fuller lower loops.
         // (cx,cy) is the centre; (w,h) is the bounding cell for the digit.
+        // All digit endpoints span roughly cy ± h*0.48 (full cell height).
+        // Bezier control points may extend slightly beyond those bounds to pull
+        // visible curve apices to the correct height — that is intentional.
+        // Every digit is drawn as a single continuous sub-path except '4',
+        // which intentionally uses two cathode wires.
         // Caller must set ctx.strokeStyle, ctx.lineWidth, ctx.lineCap, ctx.lineJoin.
         function drawNixieGlyph(ctx, ch, cx, cy, w, h) {
             const X = f => cx + f * w
@@ -308,14 +313,15 @@ Item {
                     ctx.moveTo(X(-0.12), Y(-0.30))
                     ctx.lineTo(cx, Y(-0.48))
                     ctx.lineTo(cx, Y(0.48))
-                    ctx.quadraticCurveTo(X(0.01), Y(0.49), X(0.06), Y(0.45))
+                    ctx.quadraticCurveTo(X(0.01), Y(0.48), X(0.06), Y(0.44))
                     break
                 case '2':
+                    // Slightly asymmetric on purpose: tighter top sweep, longer base.
                     ctx.moveTo(X(-0.28), Y(-0.24))
                     ctx.bezierCurveTo(X(-0.20), Y(-0.48), X(0.12), Y(-0.52), X(0.28), Y(-0.30))
                     ctx.bezierCurveTo(X(0.39), Y(-0.12), X(0.16), Y(0.02), X(-0.04), Y(0.16))
                     ctx.bezierCurveTo(X(-0.23), Y(0.28), X(-0.34), Y(0.37), X(-0.34), Y(0.46))
-                    ctx.lineTo(X(0.30), Y(0.46))
+                    ctx.lineTo(X(0.34), Y(0.46))
                     break
                 case '3':
                     ctx.moveTo(X(-0.24), Y(-0.42))
