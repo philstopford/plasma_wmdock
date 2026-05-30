@@ -37,6 +37,8 @@ Item {
                 { text: i18n("Galaxy"),         value: "galaxy"    },
                 { text: i18n("Aurora"),         value: "aurora"    },
                 { text: i18n("Mandala"),        value: "mandala"   },
+                { text: i18n("Matrix Rain"),    value: "matrix"    },
+                { text: i18n("Plasma Ball"),    value: "plasmaball"},
                 { text: i18n("LED Meter"),      value: "led"       },
                 { text: i18n("Discharge"),      value: "discharge" },
                 { text: i18n("Lightning"),      value: "lightning" },

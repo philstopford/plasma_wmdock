@@ -14,6 +14,8 @@ set(WMDOCK_APPLETS
     wmweather
     wmdrawer
     wmviz
+    wmmatrix
+    wmplasmaball
     wmplay
     wmeyes
     wmlava

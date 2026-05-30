@@ -1,0 +1,12 @@
+{
+    "KPlugin": {
+        "Category": "Multimedia",
+        "Description": "Matrix-style digital rain effect in classic WindowMaker dockapp style",
+        "Icon": "preferences-desktop-font",
+        "Id": "org.kde.plasma.wmmatrix",
+        "License": "GPL-2.0-or-later",
+        "Name": "WMMatrix"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "KPackageStructure": "Plasma/Applet"
+}

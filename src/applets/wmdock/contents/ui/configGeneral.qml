@@ -156,6 +156,8 @@ Item {
                     { text: i18n("WMDrawer – App drawer"),    value: "org.kde.plasma.wmdrawer"   },
                     { text: i18n("WMWeather – Weather"),      value: "org.kde.plasma.wmweather"  },
                     { text: i18n("WMViz – Audio visualizer"), value: "org.kde.plasma.wmviz"      },
+                    { text: i18n("WMMatrix – Matrix rain"),   value: "org.kde.plasma.wmmatrix"   },
+                    { text: i18n("WMPlasmaBall – Plasma ball"), value: "org.kde.plasma.wmplasmaball" },
                     { text: i18n("WMPlay – Audio player"),    value: "org.kde.plasma.wmplay"     },
                     { text: i18n("WMEyes – Mouse tracker"),   value: "org.kde.plasma.wmeyes"     },
                     { text: i18n("WMLava – Lava lamp"),       value: "org.kde.plasma.wmlava"     },

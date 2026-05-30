@@ -17,6 +17,7 @@ WeatherProvider::WeatherProvider(QObject *parent)
 
     connect(&m_timer, &QTimer::timeout, this, &WeatherProvider::refresh);
     m_timer.setInterval(30 * 60 * 1000); // 30 minutes
+    m_timer.start();
 
     // Coalesce rapid lat/lon/unit changes from QML property bindings.
     // 400 ms is shorter than the startup delay intentionally: on startup we

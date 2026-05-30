@@ -7,7 +7,7 @@ import org.kde.plasma.private.wmdock 1.0
 /**
  * WMViz – Audio spectrum visualizer backed by CAVA (via AudioSpectrum).
  *
- * Eighteen MilkDrop-inspired effects driven by real spectral data:
+ * Twenty MilkDrop-inspired effects driven by real spectral data:
  *
  *   bars      – classic spectrum analyser with per-bar peak markers
  *   wave      – radial scope: 16 bands plotted as a rotating petal blob
@@ -22,6 +22,8 @@ import org.kde.plasma.private.wmdock 1.0
  *   galaxy    – rotating logarithmic spiral galaxy
  *   aurora    – 8 flowing northern-lights curtains
  *   mandala   – 12/8/6-fold geometric mandala with counter-rotating petal layers
+ *   matrix    – Matrix-style digital rain with audio-driven spawn and speed
+ *   plasmaball – plasma globe: reactive tendrils from a central electrode
  *   led       – retro LED segment VU meter: stacked dot columns, green→red
  *   discharge – plasma discharge tubes: glowing branching arcs between nodes
  *   lightning – branching storm bolts from the top, recursive fractal tree
@@ -35,7 +37,9 @@ Item {
     id: root
 
     // ----- configuration ---------------------------------------------------
-    readonly property string effect:           Plasmoid.configuration.effect      || "bars"
+    property string forcedEffect:              ""
+    readonly property string effect:           forcedEffect.length > 0 ? forcedEffect
+                                                                    : (Plasmoid.configuration.effect || "bars")
     readonly property string colorScheme:      Plasmoid.configuration.colorScheme || "green"
     readonly property bool   terrainRotate:    Plasmoid.configuration.terrainRotate    || false
     readonly property bool   terrainWireframe: Plasmoid.configuration.terrainWireframe || false
@@ -135,6 +139,13 @@ Item {
     // ----- LED meter state --------------------------------------------------
     // (reuses peakBands from bars effect — no extra state needed)
 
+    // ----- matrix rain state ------------------------------------------------
+    property var matrixStreams: []
+
+    // ----- plasma ball state ------------------------------------------------
+    property var  plasmaBallArcs: []
+    property real plasmaBallPhase: 0
+
     // ----- discharge state --------------------------------------------------
     // Each arc: { x1,y1, x2,y2, jitter:[], energy, hue }
     property var dischargeArcs: []
@@ -160,6 +171,7 @@ Item {
     readonly property var effectOrder: [
         "bars","wave","circles","plasma","terrain","vortex","warp",
         "ripple","kaleid","nova","galaxy","aurora","mandala",
+        "matrix","plasmaball",
         "led","discharge","lightning","concert","pyro"
     ]
 
@@ -249,6 +261,8 @@ Item {
             case "galaxy":    tickGalaxy();     break
             case "aurora":    tickAurora();     break
             case "mandala":   tickMandala();    break
+            case "matrix":    tickMatrix();     break
+            case "plasmaball": tickPlasmaBall(); break
             case "led":       tickBars();       break  // LED meter uses same peak-hold logic as bars
             case "discharge": tickDischarge();  break
             case "lightning": tickLightning();  break
@@ -512,6 +526,90 @@ Item {
     // ----- LED meter tick ---------------------------------------------------
     // LED meter reuses tickBars for peak-hold state — see switch statement.
 
+    // ----- matrix rain tick -------------------------------------------------
+    function tickMatrix() {
+        const w = canvas.width  > 4 ? canvas.width  : 64
+        const h = canvas.height > 4 ? canvas.height : 64
+        const cols = Math.max(8, Math.floor(w / 6))
+        const cellH = Math.max(7, Math.floor(h / 9))
+        const glyphs = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ#$%*+-="
+        let streams = root.matrixStreams
+
+        if (!streams || streams.length !== cols) {
+            streams = []
+            for (let i = 0; i < cols; i++) {
+                streams.push({
+                    y: Math.random() * (h + cellH * 8) - cellH * 8,
+                    speed: 0.6 + Math.random() * 0.9,
+                    trail: 5 + Math.floor(Math.random() * 8),
+                    phase: Math.floor(Math.random() * glyphs.length)
+                })
+            }
+        }
+
+        streams = streams.map((stream, i) => {
+            const next = Object.assign({}, stream)
+            const band = root.bandVals[i % root.numBands] || 0
+            next.y += cellH * next.speed * (0.28 + root.rms * 0.9 + band * 1.4)
+            if (root.gotBeat && Math.random() < 0.18)
+                next.trail = 7 + Math.floor((root.bass + Math.random()) * 8)
+            next.phase = (next.phase + 1 + Math.floor(band * 3 + root.treble * 2)) % glyphs.length
+            if (next.y - next.trail * cellH > h + cellH) {
+                next.y = -cellH * (2 + Math.random() * 8)
+                next.speed = 0.6 + Math.random() * 1.0
+                next.trail = 5 + Math.floor(Math.random() * 8)
+                next.phase = Math.floor(Math.random() * glyphs.length)
+            }
+            return next
+        })
+
+        root.matrixStreams = streams
+    }
+
+    // ----- plasma ball tick -------------------------------------------------
+    function tickPlasmaBall() {
+        const w = canvas.width  > 4 ? canvas.width  : 64
+        const h = canvas.height > 4 ? canvas.height : 64
+        const cx = w / 2
+        const cy = h / 2
+        const radius = Math.min(w, h) * 0.34
+        const arcCount = 5 + Math.round(root.bass * 4) + (root.gotBeat ? 2 : 0)
+        root.plasmaBallPhase += 0.08 + root.rms * 0.16 + (root.gotBeat ? 0.08 : 0)
+
+        let arcs = []
+        for (let i = 0; i < arcCount; i++) {
+            const band = root.bandVals[i % root.numBands] || 0
+            const baseAngle = root.plasmaBallPhase * 0.7 + i * (2 * Math.PI / arcCount)
+            const angle = baseAngle + (band - 0.5) * 0.85
+            const endR = radius * (0.74 + band * 0.22)
+            const endX = cx + Math.cos(angle) * endR
+            const endY = cy + Math.sin(angle) * endR
+            const segs = 7
+            let points = []
+            for (let s = 0; s <= segs; s++) {
+                const t = s / segs
+                let px = cx + (endX - cx) * t
+                let py = cy + (endY - cy) * t
+                if (s > 0 && s < segs) {
+                    const wobble = (Math.random() - 0.5) * radius * (0.22 - t * 0.10)
+                    const wobbleAng = angle + Math.PI / 2 + Math.sin(root.plasmaBallPhase + i + t * 8) * 0.35
+                    px += Math.cos(wobbleAng) * wobble
+                    py += Math.sin(wobbleAng) * wobble
+                }
+                points.push({ x: px, y: py })
+            }
+            arcs.push({
+                points: points,
+                alpha: 0.35 + band * 0.55 + (root.gotBeat ? 0.15 : 0),
+                hue: 0.60 + band * 0.10 + root.treble * 0.06,
+                endX: endX,
+                endY: endY
+            })
+        }
+
+        root.plasmaBallArcs = arcs
+    }
+
     // ----- discharge tick ---------------------------------------------------
     function tickDischarge() {
         const w = canvas.width  > 4 ? canvas.width  : 64
@@ -725,6 +823,8 @@ Item {
             case "galaxy":    paintGalaxy(ctx);     break
             case "aurora":    paintAurora(ctx);     break
             case "mandala":   paintMandala(ctx);    break
+            case "matrix":    paintMatrix(ctx);     break
+            case "plasmaball": paintPlasmaBall(ctx); break
             case "led":       paintLed(ctx);        break
             case "discharge": paintDischarge(ctx);  break
             case "lightning": paintLightning(ctx);  break
@@ -1438,6 +1538,132 @@ Item {
             ctx.fill()
         }
 
+        // ---- matrix rain ----------------------------------------------------
+        function paintMatrix(ctx) {
+            const w = width, h = height
+            const streams = root.matrixStreams
+            if (!streams || streams.length === 0) return
+
+            const cols = streams.length
+            const cellW = w / cols
+            const cellH = Math.max(7, Math.floor(h / 9))
+            const glyphs = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ#$%*+-="
+
+            ctx.fillStyle = "rgba(0,8,0,0.95)"
+            ctx.fillRect(0, 0, w, h)
+            ctx.font = Math.max(7, Math.floor(cellH * 0.95)) + "px monospace"
+            ctx.textAlign = "center"
+            ctx.textBaseline = "middle"
+
+            for (let i = 0; i < cols; i++) {
+                const stream = streams[i]
+                const x = (i + 0.5) * cellW
+                const tailGlow = Math.min(1, 0.18 + (root.bandVals[i % root.numBands] || 0) * 0.9)
+
+                for (let t = 0; t < stream.trail; t++) {
+                    const y = stream.y - t * cellH
+                    if (y < -cellH || y > h + cellH)
+                        continue
+                    const frac = 1 - t / Math.max(1, stream.trail - 1)
+                    const glyphIndex = (stream.phase + t + root.tickCount) % glyphs.length
+                    const alpha = frac * (0.10 + tailGlow * 0.55)
+                    ctx.fillStyle = t === 0
+                        ? "rgba(220,255,220," + Math.min(0.95, alpha + 0.25).toFixed(2) + ")"
+                        : "rgba(70,255,120," + alpha.toFixed(2) + ")"
+                    ctx.fillText(glyphs.charAt(glyphIndex), x, y)
+                }
+            }
+        }
+
+        // ---- plasma ball ----------------------------------------------------
+        function paintPlasmaBall(ctx) {
+            const w = width, h = height
+            const cx = w / 2
+            const cy = h / 2
+            const radius = Math.min(w, h) * 0.34
+            const arcs = root.plasmaBallArcs
+
+            ctx.fillStyle = "rgba(4,0,12,0.95)"
+            ctx.fillRect(0, 0, w, h)
+
+            const sphere = ctx.createRadialGradient(cx - radius * 0.2, cy - radius * 0.25, radius * 0.08,
+                                                    cx, cy, radius * 1.05)
+            sphere.addColorStop(0, "rgba(70,30,110,0.30)")
+            sphere.addColorStop(0.72, "rgba(18,8,30,0.08)")
+            sphere.addColorStop(1, "rgba(120,180,255,0.18)")
+            ctx.beginPath()
+            ctx.arc(cx, cy, radius, 0, 2 * Math.PI)
+            ctx.fillStyle = sphere
+            ctx.fill()
+
+            const coreGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius * 0.32)
+            coreGlow.addColorStop(0, "rgba(255,180,250,0.85)")
+            coreGlow.addColorStop(0.4, "rgba(170,90,255,0.40)")
+            coreGlow.addColorStop(1, "rgba(0,0,0,0)")
+            ctx.beginPath()
+            ctx.arc(cx, cy, radius * 0.32, 0, 2 * Math.PI)
+            ctx.fillStyle = coreGlow
+            ctx.fill()
+
+            ctx.strokeStyle = "rgba(220,230,255,0.65)"
+            ctx.lineWidth = Math.max(1.2, radius * 0.05)
+            ctx.beginPath()
+            ctx.moveTo(cx, cy + radius * 0.10)
+            ctx.lineTo(cx, cy + radius * 0.48)
+            ctx.stroke()
+
+            ctx.fillStyle = "rgba(255,230,255,0.95)"
+            ctx.beginPath()
+            ctx.arc(cx, cy, Math.max(2.2, radius * 0.08), 0, 2 * Math.PI)
+            ctx.fill()
+
+            for (let i = 0; i < arcs.length; i++) {
+                const arc = arcs[i]
+                const hue = Math.round(arc.hue * 360)
+                const wideAlpha = Math.min(0.28, arc.alpha * 0.22)
+                const coreAlpha = Math.min(0.95, arc.alpha)
+
+                for (const pass of [
+                    { lw: Math.max(2.5, radius * 0.06), alpha: wideAlpha, light: 58 },
+                    { lw: Math.max(0.9, radius * 0.018), alpha: coreAlpha, light: 82 }
+                ]) {
+                    ctx.beginPath()
+                    for (let p = 0; p < arc.points.length; p++) {
+                        const pt = arc.points[p]
+                        if (p === 0) ctx.moveTo(pt.x, pt.y)
+                        else         ctx.lineTo(pt.x, pt.y)
+                    }
+                    ctx.strokeStyle = "hsla(" + hue + ",100%," + pass.light + "%," + pass.alpha.toFixed(2) + ")"
+                    ctx.lineWidth = pass.lw
+                    ctx.stroke()
+                }
+
+                const endGlow = ctx.createRadialGradient(arc.endX, arc.endY, 0, arc.endX, arc.endY, radius * 0.10)
+                endGlow.addColorStop(0, "hsla(" + hue + ",100%,85%," + Math.min(0.85, arc.alpha).toFixed(2) + ")")
+                endGlow.addColorStop(1, "rgba(0,0,0,0)")
+                ctx.beginPath()
+                ctx.arc(arc.endX, arc.endY, radius * 0.10, 0, 2 * Math.PI)
+                ctx.fillStyle = endGlow
+                ctx.fill()
+            }
+
+            ctx.strokeStyle = "rgba(220,235,255,0.42)"
+            ctx.lineWidth = Math.max(1, radius * 0.02)
+            ctx.beginPath()
+            ctx.arc(cx, cy, radius, 0, 2 * Math.PI)
+            ctx.stroke()
+
+            ctx.save()
+            ctx.translate(cx - radius * 0.22, cy - radius * 0.28)
+            ctx.rotate(-0.7)
+            ctx.scale(radius * 0.18, radius * 0.10)
+            ctx.fillStyle = "rgba(255,255,255,0.24)"
+            ctx.beginPath()
+            ctx.arc(0, 0, 1, 0, 2 * Math.PI)
+            ctx.fill()
+            ctx.restore()
+        }
+
         // ---- LED segment meter ----------------------------------------------
         // Stacked dot columns styled after old Hi-Fi peak meters.
         function paintLed(ctx) {
@@ -1680,8 +1906,10 @@ Item {
     // ----- mouse wheel: cycle effects ----------------------------------------
     MouseArea {
         anchors.fill: parent
-        acceptedButtons: Qt.RightButton
+        acceptedButtons: root.forcedEffect.length > 0 ? Qt.NoButton : Qt.RightButton
         onWheel: whe => {
+            if (root.forcedEffect.length > 0)
+                return
             const order = root.effectOrder
             const cur   = order.indexOf(root.effect)
             const next  = (cur + (whe.angleDelta.y > 0 ? -1 : 1) + order.length) % order.length
@@ -1689,7 +1917,7 @@ Item {
             whe.accepted = true
         }
         onClicked: mouse => {
-            if (mouse.button === Qt.RightButton)
+            if (root.forcedEffect.length === 0 && mouse.button === Qt.RightButton)
                 effectMenu.popup()
         }
     }
@@ -1712,6 +1940,8 @@ Item {
         QQC2.MenuItem { text: i18n("Galaxy");        onTriggered: Plasmoid.configuration.effect = "galaxy"    }
         QQC2.MenuItem { text: i18n("Aurora");        onTriggered: Plasmoid.configuration.effect = "aurora"    }
         QQC2.MenuItem { text: i18n("Mandala");       onTriggered: Plasmoid.configuration.effect = "mandala"   }
+        QQC2.MenuItem { text: i18n("Matrix Rain");   onTriggered: Plasmoid.configuration.effect = "matrix"    }
+        QQC2.MenuItem { text: i18n("Plasma Ball");   onTriggered: Plasmoid.configuration.effect = "plasmaball"}
         QQC2.MenuSeparator {}
         QQC2.MenuItem { text: i18n("LED Meter");     onTriggered: Plasmoid.configuration.effect = "led"       }
         QQC2.MenuItem { text: i18n("Discharge");     onTriggered: Plasmoid.configuration.effect = "discharge" }
@@ -1720,4 +1950,3 @@ Item {
         QQC2.MenuItem { text: i18n("Pyrotechnics");  onTriggered: Plasmoid.configuration.effect = "pyro"      }
     }
 }
-

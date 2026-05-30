@@ -218,6 +218,8 @@ PlasmoidItem {
                         ListElement { label: "WMDrawer – Expandable launcher drawer"; appletId: "org.kde.plasma.wmdrawer" }
                         ListElement { label: "WMWeather – Weather conditions";    appletId: "org.kde.plasma.wmweather" }
                         ListElement { label: "WMViz – Audio visualizer";          appletId: "org.kde.plasma.wmviz" }
+                        ListElement { label: "WMMatrix – Matrix rain";            appletId: "org.kde.plasma.wmmatrix" }
+                        ListElement { label: "WMPlasmaBall – Plasma ball";        appletId: "org.kde.plasma.wmplasmaball" }
                         ListElement { label: "WMPlay – Audio player";             appletId: "org.kde.plasma.wmplay" }
                         ListElement { label: "WMEyes – Mouse-tracking eyes";      appletId: "org.kde.plasma.wmeyes" }
                         ListElement { label: "WMLava – Lava lamp simulation";     appletId: "org.kde.plasma.wmlava" }
