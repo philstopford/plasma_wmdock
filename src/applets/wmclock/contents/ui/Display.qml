@@ -337,10 +337,10 @@ Item {
                 case '5':
                     ctx.moveTo(X(0.28), Y(-0.46))
                     ctx.lineTo(X(-0.26), Y(-0.46))
-                    ctx.lineTo(X(-0.31), Y(-0.08))
+                    ctx.lineTo(X(-0.175), Y(-0.08))
                     ctx.bezierCurveTo(X(-0.16), Y(-0.10), X(0.20), Y(-0.12), X(0.29), Y(0.02))
                     ctx.bezierCurveTo(X(0.38), Y(0.16), X(0.28), Y(0.48), X(-0.04), Y(0.48))
-                    ctx.bezierCurveTo(X(-0.24), Y(0.48), X(-0.34), Y(0.37), X(-0.29), Y(0.20))
+                    ctx.bezierCurveTo(X(-0.34), Y(0.48), X(-0.34), Y(0.37), X(-0.29), Y(0.40))
                     break
                 case '6':
                     ctx.moveTo(X(0.22), Y(-0.46))
