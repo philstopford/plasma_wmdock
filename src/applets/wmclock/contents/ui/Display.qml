@@ -308,10 +308,9 @@ Item {
                     ctx.bezierCurveTo(X(-0.31), Y(-0.28), X(-0.18), Y(-0.50), cx, Y(-0.48))
                     break
                 case '1':
-                    ctx.moveTo(X(-0.12), Y(-0.30))
-                    ctx.lineTo(cx, Y(-0.48))
+                    ctx.moveTo(cx, Y(-0.48))
                     ctx.lineTo(cx, Y(0.48))
-                    break
+                    break;
                 case '2':
                     // Slightly asymmetric on purpose: tighter top sweep, longer base.
                     ctx.moveTo(X(-0.28), Y(-0.24))
@@ -321,16 +320,17 @@ Item {
                     ctx.lineTo(X(0.34), Y(0.46))
                     break
                 case '3':
-                    ctx.moveTo(X(-0.24), Y(-0.42))
-                    ctx.bezierCurveTo(X(0.15), Y(-0.50), X(0.35), Y(-0.34), X(0.24), Y(-0.08))
-                    ctx.bezierCurveTo(X(0.18), Y(0.00), X(0.03), Y(0.02), X(-0.03), Y(0.03))
-                    ctx.bezierCurveTo(X(0.14), Y(0.03), X(0.34), Y(0.12), X(0.31), Y(0.32))
-                    ctx.bezierCurveTo(X(0.28), Y(0.52), X(0.04), Y(0.54), X(-0.26), Y(0.44))
+                    ctx.moveTo(X(-0.24), Y(-0.50))
+                    ctx.lineTo(X(0.28), Y(-0.50))
+                    ctx.lineTo(X(-0.24), Y(-0.10))
+                    ctx.bezierCurveTo(X(-0.16), Y(-0.10), X(0.20), Y(-0.12), X(0.29), Y(0.02))
+                    ctx.bezierCurveTo(X(0.38), Y(0.16), X(0.28), Y(0.48), X(-0.04), Y(0.48))
+                    ctx.bezierCurveTo(X(-0.24), Y(0.48), X(-0.34), Y(0.37), X(-0.29), Y(0.40))
                     break
                 case '4':
-                    ctx.moveTo(X(-0.24), Y(-0.44))
-                    ctx.lineTo(X(-0.31), Y(0.06))
-                    ctx.lineTo(X(0.22), Y(0.06))
+                    ctx.moveTo(X(0.18), Y(-0.48))
+                    ctx.lineTo(X(-0.31), Y(0.16))
+                    ctx.lineTo(X(0.22), Y(0.16))
                     ctx.moveTo(X(0.18), Y(-0.48))
                     ctx.lineTo(X(0.18), Y(0.48))
                     break
@@ -362,11 +362,16 @@ Item {
                     ctx.bezierCurveTo(X(0.34), Y(0.46), X(0.34), Y(0.04), cx, Y(-0.01))
                     break
                 case '9':
-                    ctx.moveTo(X(0.28), Y(0.14))
-                    ctx.bezierCurveTo(X(0.30), Y(-0.14), X(0.18), Y(-0.50), cx, Y(-0.48))
-                    ctx.bezierCurveTo(X(-0.22), Y(-0.46), X(-0.32), Y(-0.22), X(-0.28), Y(0.04))
-                    ctx.bezierCurveTo(X(-0.24), Y(0.22), X(-0.06), Y(0.28), X(0.10), Y(0.20))
-                    ctx.bezierCurveTo(X(0.24), Y(0.14), X(0.30), Y(0.30), X(0.10), Y(0.48))
+                    ctx.moveTo(X(-0.22), Y(0.46))
+                    ctx.bezierCurveTo(X(0.08), Y(0.52), X(0.33), Y(0.28), X(0.31), Y(-0.04))
+                    ctx.bezierCurveTo(X(0.29), Y(-0.32), X(0.14), Y(-0.50), X(-0.08), Y(-0.48))
+                    ctx.bezierCurveTo(X(-0.31), Y(-0.46), X(-0.36), Y(-0.18), X(-0.22), Y(-0.03))
+                    ctx.bezierCurveTo(X(-0.10), Y(0.10), X(0.18), Y(0.08), X(0.30), Y(-0.10))
+                    // ctx.moveTo(X(0.28), Y(0.14))
+                    // ctx.bezierCurveTo(X(0.30), Y(-0.14), X(0.18), Y(-0.50), cx, Y(-0.48))
+                    // ctx.bezierCurveTo(X(-0.22), Y(-0.46), X(-0.32), Y(-0.22), X(-0.28), Y(0.04))
+                    // ctx.bezierCurveTo(X(-0.24), Y(0.22), X(-0.06), Y(0.28), X(0.10), Y(0.20))
+                    // ctx.bezierCurveTo(X(0.24), Y(0.14), X(0.30), Y(0.30), X(0.10), Y(0.48))
                     break
                 default:
                     return
