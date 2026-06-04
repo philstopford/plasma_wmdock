@@ -14,5 +14,9 @@
       <label>Show title text</label>
       <default>true</default>
     </entry>
+    <entry name="loadAction" type="String">
+      <label>Load-average interaction mode</label>
+      <default>disabled</default>
+    </entry>
   </group>
 </kcfg>

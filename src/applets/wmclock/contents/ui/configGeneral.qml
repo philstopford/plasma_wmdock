@@ -13,6 +13,10 @@ Item {
     property bool   cfg_showSecondsDefault:  true
     property bool   cfg_showDate:            false
     property bool   cfg_showDateDefault:     true
+    property string cfg_calendarAction:       ""
+    property string cfg_calendarActionDefault:"disabled"
+    property bool   cfg_weekStartsMonday:     false
+    property bool   cfg_weekStartsMondayDefault: false
     property string cfg_clockStyle:              ""
     property string cfg_clockStyleDefault:       "analog"
     property string cfg_nixieTransition:         ""
@@ -64,6 +68,34 @@ Item {
             Kirigami.FormData.label: i18n("Show date line:")
             checked: page.cfg_showDate
             onCheckedChanged: page.cfg_showDate = checked
+        }
+
+        QQC2.ComboBox {
+            id: calendarActionCombo
+            Kirigami.FormData.label: i18n("Calendar action:")
+            model: [
+                { text: i18n("Disabled"),                 value: "disabled"    },
+                { text: i18n("Mouse wheel toggles slot"), value: "wheelToggle" },
+                { text: i18n("Left click opens drawer"),  value: "clickDrawer" },
+            ]
+            textRole:  "text"
+            valueRole: "value"
+            Component.onCompleted: {
+                const v = page.cfg_calendarAction || "disabled"
+                for (let i = 0; i < count; ++i) {
+                    if (model[i].value === v) { currentIndex = i; return }
+                }
+                currentIndex = 0
+            }
+            onActivated: page.cfg_calendarAction = currentValue
+        }
+
+        QQC2.CheckBox {
+            id: mondayCheck
+            visible: page.cfg_calendarAction !== "disabled"
+            Kirigami.FormData.label: i18n("Calendar week starts on Monday:")
+            checked: page.cfg_weekStartsMonday
+            onCheckedChanged: page.cfg_weekStartsMonday = checked
         }
 
         QQC2.ComboBox {

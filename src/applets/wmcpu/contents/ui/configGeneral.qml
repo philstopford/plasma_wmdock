@@ -11,6 +11,8 @@ Item {
     property int    cfg_histLenDefault:  50
     property bool   cfg_showTitle:       true
     property bool   cfg_showTitleDefault: true
+    property string cfg_loadAction:      ""
+    property string cfg_loadActionDefault: "disabled"
 
     Kirigami.FormLayout {
         anchors.left:  parent.left
@@ -30,6 +32,26 @@ Item {
             Kirigami.FormData.label: i18n("Show title:")
             checked: page.cfg_showTitle
             onToggled: page.cfg_showTitle = checked
+        }
+
+        QQC2.ComboBox {
+            id: loadActionCombo
+            Kirigami.FormData.label: i18n("Load action:")
+            model: [
+                { text: i18n("Disabled"),                 value: "disabled"    },
+                { text: i18n("Mouse wheel toggles slot"), value: "wheelToggle" },
+                { text: i18n("Left click opens drawer"),  value: "clickDrawer" },
+            ]
+            textRole:  "text"
+            valueRole: "value"
+            Component.onCompleted: {
+                const v = page.cfg_loadAction || "disabled"
+                for (let i = 0; i < count; ++i) {
+                    if (model[i].value === v) { currentIndex = i; return }
+                }
+                currentIndex = 0
+            }
+            onActivated: page.cfg_loadAction = currentValue
         }
     }
 }

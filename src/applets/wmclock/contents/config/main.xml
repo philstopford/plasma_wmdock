@@ -15,6 +15,14 @@
     <entry name="showDate" type="Bool">
       <default>true</default>
     </entry>
+    <entry name="calendarAction" type="String">
+      <label>Calendar interaction mode</label>
+      <default>disabled</default>
+    </entry>
+    <entry name="weekStartsMonday" type="Bool">
+      <label>Week starts on Monday in the embedded calendar</label>
+      <default>false</default>
+    </entry>
     <entry name="clockStyle" type="String">
       <label>Clock display style</label>
       <default>analog</default>

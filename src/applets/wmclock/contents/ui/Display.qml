@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 import QtQuick
 import QtQuick.Controls as QQC2
+import QtQuick.Window
 import org.kde.plasma.plasmoid
 
 /**
@@ -19,11 +20,24 @@ Item {
     readonly property bool   use24Hour:       Plasmoid.configuration.use24Hour       ?? true
     readonly property bool   showSeconds:     Plasmoid.configuration.showSeconds     ?? true
     readonly property bool   showDate:        Plasmoid.configuration.showDate        ?? true
+    readonly property string calendarAction:  Plasmoid.configuration.calendarAction  || "disabled"
     readonly property string clockStyle:      Plasmoid.configuration.clockStyle      || "analog"
     readonly property string nixieTransition:  Plasmoid.configuration.nixieTransition || "slot"
     readonly property string nixieTubeStyle:   Plasmoid.configuration.nixieTubeStyle  || "classic"
     readonly property real   nixieGlowRadius:  Plasmoid.configuration.nixieGlowRadius > 0
                                                ? Plasmoid.configuration.nixieGlowRadius : 0.35
+    property string externalOrientation: ""
+    property bool calendarInlineVisible: false
+    property real _lastWheelToggleTime: 0
+
+    readonly property bool isHorizontalDock: {
+        if (externalOrientation === "vertical") return false
+        if (externalOrientation === "horizontal") return true
+        return Plasmoid.location !== 5 && Plasmoid.location !== 6
+    }
+
+    readonly property url calendarDisplaySource:
+        Qt.resolvedUrl("../../../org.kde.plasma.wmcal/contents/ui/Display.qml")
 
     // Repaint triggers
     onUse24HourChanged:       faceCanvas.requestPaint()
@@ -33,6 +47,10 @@ Item {
     onNixieTransitionChanged:  faceCanvas.requestPaint()
     onNixieTubeStyleChanged:   faceCanvas.requestPaint()
     onNixieGlowRadiusChanged:  faceCanvas.requestPaint()
+    onCalendarActionChanged: {
+        calendarInlineVisible = false
+        if (calendarPopup.drawerOpen) calendarPopup.closeDrawer()
+    }
 
     // -----------------------------------------------------------------------
     // Background
@@ -41,6 +59,7 @@ Item {
         anchors.fill: parent
         color:   "#111"
         radius:  3
+        visible: !root.calendarInlineVisible
     }
 
     // -----------------------------------------------------------------------
@@ -50,6 +69,7 @@ Item {
         id: faceCanvas
         anchors.fill: parent
         antialiasing: true
+        visible: !root.calendarInlineVisible
 
         Timer {
             interval: root.showSeconds ? 1000 : 60000
@@ -870,6 +890,147 @@ Item {
                 ctx.fillStyle    = "rgba(210,145,55,0.95)"
                 ctx.fillText(dateStr, w / 2, dateY)
             }
+        }
+    }
+
+    Loader {
+        id: inlineCalendarLoader
+        anchors.fill: parent
+        active: root.calendarAction === "wheelToggle" && root.calendarInlineVisible
+        visible: active
+        source: root.calendarDisplaySource
+    }
+
+    WheelHandler {
+        enabled: root.calendarAction === "wheelToggle"
+        onWheel: function(event) {
+            if (event.angleDelta.y === 0 && event.pixelDelta.y === 0) return
+            const now = Date.now()
+            if (now - root._lastWheelToggleTime < 250) {
+                event.accepted = true
+                return
+            }
+            root._lastWheelToggleTime = now
+            root.calendarInlineVisible = !root.calendarInlineVisible
+            event.accepted = true
+        }
+    }
+
+    TapHandler {
+        acceptedButtons: Qt.LeftButton
+        enabled: root.calendarAction === "clickDrawer"
+        onTapped: {
+            if (calendarPopup.drawerOpen) {
+                calendarPopup.closeDrawer()
+                return
+            }
+            if (Date.now() - calendarPopup._lastCloseTime < 300) return
+            calendarPopup.openDrawer()
+        }
+    }
+
+    Window {
+        id: calendarPopup
+
+        flags: Qt.Popup | Qt.FramelessWindowHint
+        color: "transparent"
+        visible: false
+
+        property bool drawerOpen: false
+        property real _lastCloseTime: 0
+        property real _hiddenPos: 0
+        onVisibleChanged: { if (!visible) _lastCloseTime = Date.now() }
+
+        NumberAnimation {
+            id: calendarSlideInAnim
+            target: calendarPopup
+            duration: 160
+            easing.type: Easing.OutQuad
+        }
+
+        SequentialAnimation {
+            id: calendarSlideOutAnim
+            PropertyAnimation {
+                id: calendarSlideOutPropAnim
+                target: calendarPopup
+                duration: 140
+                easing.type: Easing.InQuad
+            }
+            ScriptAction { script: calendarPopup.visible = false }
+        }
+
+        function openDrawer() {
+            drawerOpen = true
+
+            var popW = root.width
+            var popH = root.height
+            width = popW
+            height = popH
+
+            var btnPos = root.mapToGlobal(0, 0)
+            var scr = root.Screen
+            var targetX, targetY
+
+            if (root.isHorizontalDock) {
+                targetX = btnPos.x
+                if (btnPos.y - popH - 4 >= scr.virtualY) {
+                    targetY = btnPos.y - popH - 4
+                    _hiddenPos = btnPos.y - 4
+                } else {
+                    targetY = btnPos.y + root.height + 4
+                    _hiddenPos = targetY - popH
+                }
+            } else {
+                targetY = btnPos.y
+                if (Plasmoid.location === 6) {
+                    targetX = btnPos.x - popW - 4
+                    _hiddenPos = btnPos.x - 4
+                } else {
+                    targetX = btnPos.x + root.width + 4
+                    _hiddenPos = targetX - popW
+                }
+            }
+
+            targetX = Math.max(scr.virtualX, Math.min(targetX, scr.virtualX + scr.width - popW))
+            targetY = Math.max(scr.virtualY, Math.min(targetY, scr.virtualY + scr.height - popH))
+
+            opacity = 1
+            if (root.isHorizontalDock) {
+                x = targetX
+                y = _hiddenPos
+                calendarSlideInAnim.property = "y"
+                calendarSlideInAnim.from = _hiddenPos
+                calendarSlideInAnim.to = targetY
+            } else {
+                x = _hiddenPos
+                y = targetY
+                calendarSlideInAnim.property = "x"
+                calendarSlideInAnim.from = _hiddenPos
+                calendarSlideInAnim.to = targetX
+            }
+            visible = true
+            calendarSlideInAnim.start()
+        }
+
+        function closeDrawer() {
+            drawerOpen = false
+            calendarSlideOutPropAnim.property = root.isHorizontalDock ? "y" : "x"
+            calendarSlideOutPropAnim.to = _hiddenPos
+            calendarSlideOutAnim.start()
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            color: "#1c1c1c"
+            border.color: "#555"
+            border.width: 1
+            radius: 4
+        }
+
+        Loader {
+            anchors { fill: parent; margins: 1 }
+            active: calendarPopup.visible
+            source: root.calendarDisplaySource
         }
     }
 }

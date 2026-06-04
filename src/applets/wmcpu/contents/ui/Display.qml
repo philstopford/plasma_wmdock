@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 import QtQuick
+import QtQuick.Window
 import org.kde.plasma.plasmoid
 import org.kde.plasma.private.wmdock 1.0
 
@@ -20,9 +21,27 @@ Item {
     property int histLen: Plasmoid.configuration.histLen ?? 50
     property var history: []
     readonly property bool showTitle: Plasmoid.configuration.showTitle ?? true
+    readonly property string loadAction: Plasmoid.configuration.loadAction || "disabled"
+    property string externalOrientation: ""
+    property bool loadInlineVisible: false
+    property real _lastWheelToggleTime: 0
+
+    readonly property bool isHorizontalDock: {
+        if (externalOrientation === "vertical") return false
+        if (externalOrientation === "horizontal") return true
+        return Plasmoid.location !== 5 && Plasmoid.location !== 6
+    }
+
+    readonly property url loadDisplaySource:
+        Qt.resolvedUrl("../../../org.kde.plasma.wmload/contents/ui/Display.qml")
 
     // Core usage (array of 0–100 values)
     property var coreUsage: SystemMonitor.cpuCoreUsage
+
+    onLoadActionChanged: {
+        loadInlineVisible = false
+        if (loadPopup.drawerOpen) loadPopup.closeDrawer()
+    }
 
     Component.onCompleted: {
         Qt.callLater(function() {
@@ -52,6 +71,7 @@ Item {
         radius: 2
         border.color: "#2a2a2a"
         border.width: 1
+        visible: !root.loadInlineVisible
     }
 
     // -----------------------------------------------------------------------
@@ -59,7 +79,7 @@ Item {
     // -----------------------------------------------------------------------
     Text {
         id: titleText
-        visible: root.showTitle
+        visible: root.showTitle && !root.loadInlineVisible
         anchors {
             top:        parent.top
             left:       parent.left
@@ -80,6 +100,7 @@ Item {
     // -----------------------------------------------------------------------
     Canvas {
         id: coreBar
+        visible: !root.loadInlineVisible
         anchors {
             top:         root.showTitle ? titleText.bottom : parent.top
             left:        parent.left
@@ -120,6 +141,7 @@ Item {
     // -----------------------------------------------------------------------
     Canvas {
         id: graph
+        visible: !root.loadInlineVisible
         anchors {
             top:         coreBar.bottom
             left:        parent.left
@@ -177,6 +199,7 @@ Item {
     // -----------------------------------------------------------------------
     Text {
         id: pctLabel
+        visible: !root.loadInlineVisible
         anchors {
             bottom:           parent.bottom
             horizontalCenter: parent.horizontalCenter
@@ -188,5 +211,146 @@ Item {
             return v > 75 ? "#ff4400" : v > 50 ? "#aacc00" : "#00cc00"
         }
         font { pixelSize: parent.height * 0.14; family: "monospace"; bold: true }
+    }
+
+    Loader {
+        id: inlineLoadLoader
+        anchors.fill: parent
+        active: root.loadAction === "wheelToggle" && root.loadInlineVisible
+        visible: active
+        source: root.loadDisplaySource
+    }
+
+    WheelHandler {
+        enabled: root.loadAction === "wheelToggle"
+        onWheel: function(event) {
+            if (event.angleDelta.y === 0 && event.pixelDelta.y === 0) return
+            const now = Date.now()
+            if (now - root._lastWheelToggleTime < 250) {
+                event.accepted = true
+                return
+            }
+            root._lastWheelToggleTime = now
+            root.loadInlineVisible = !root.loadInlineVisible
+            event.accepted = true
+        }
+    }
+
+    TapHandler {
+        acceptedButtons: Qt.LeftButton
+        enabled: root.loadAction === "clickDrawer"
+        onTapped: {
+            if (loadPopup.drawerOpen) {
+                loadPopup.closeDrawer()
+                return
+            }
+            if (Date.now() - loadPopup._lastCloseTime < 300) return
+            loadPopup.openDrawer()
+        }
+    }
+
+    Window {
+        id: loadPopup
+
+        flags: Qt.Popup | Qt.FramelessWindowHint
+        color: "transparent"
+        visible: false
+
+        property bool drawerOpen: false
+        property real _lastCloseTime: 0
+        property real _hiddenPos: 0
+        onVisibleChanged: { if (!visible) _lastCloseTime = Date.now() }
+
+        NumberAnimation {
+            id: loadSlideInAnim
+            target: loadPopup
+            duration: 160
+            easing.type: Easing.OutQuad
+        }
+
+        SequentialAnimation {
+            id: loadSlideOutAnim
+            PropertyAnimation {
+                id: loadSlideOutPropAnim
+                target: loadPopup
+                duration: 140
+                easing.type: Easing.InQuad
+            }
+            ScriptAction { script: loadPopup.visible = false }
+        }
+
+        function openDrawer() {
+            drawerOpen = true
+
+            var popW = root.width
+            var popH = root.height
+            width = popW
+            height = popH
+
+            var btnPos = root.mapToGlobal(0, 0)
+            var scr = root.Screen
+            var targetX, targetY
+
+            if (root.isHorizontalDock) {
+                targetX = btnPos.x
+                if (btnPos.y - popH - 4 >= scr.virtualY) {
+                    targetY = btnPos.y - popH - 4
+                    _hiddenPos = btnPos.y - 4
+                } else {
+                    targetY = btnPos.y + root.height + 4
+                    _hiddenPos = targetY - popH
+                }
+            } else {
+                targetY = btnPos.y
+                if (Plasmoid.location === 6) {
+                    targetX = btnPos.x - popW - 4
+                    _hiddenPos = btnPos.x - 4
+                } else {
+                    targetX = btnPos.x + root.width + 4
+                    _hiddenPos = targetX - popW
+                }
+            }
+
+            targetX = Math.max(scr.virtualX, Math.min(targetX, scr.virtualX + scr.width - popW))
+            targetY = Math.max(scr.virtualY, Math.min(targetY, scr.virtualY + scr.height - popH))
+
+            opacity = 1
+            if (root.isHorizontalDock) {
+                x = targetX
+                y = _hiddenPos
+                loadSlideInAnim.property = "y"
+                loadSlideInAnim.from = _hiddenPos
+                loadSlideInAnim.to = targetY
+            } else {
+                x = _hiddenPos
+                y = targetY
+                loadSlideInAnim.property = "x"
+                loadSlideInAnim.from = _hiddenPos
+                loadSlideInAnim.to = targetX
+            }
+            visible = true
+            loadSlideInAnim.start()
+        }
+
+        function closeDrawer() {
+            drawerOpen = false
+            loadSlideOutPropAnim.property = root.isHorizontalDock ? "y" : "x"
+            loadSlideOutPropAnim.to = _hiddenPos
+            loadSlideOutAnim.start()
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            color: "#1c1c1c"
+            border.color: "#555"
+            border.width: 1
+            radius: 4
+        }
+
+        Loader {
+            anchors { fill: parent; margins: 1 }
+            active: loadPopup.visible
+            source: root.loadDisplaySource
+        }
     }
 }
