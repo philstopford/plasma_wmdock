@@ -920,11 +920,10 @@ Item {
         acceptedButtons: Qt.LeftButton
         enabled: root.calendarAction === "clickDrawer"
         onTapped: {
-            if (calendarPopup.drawerOpen) {
+            if (calendarPopup.drawerOpen || calendarPopup.visible) {
                 calendarPopup.closeDrawer()
                 return
             }
-            if (Date.now() - calendarPopup._lastCloseTime < 300) return
             calendarPopup.openDrawer()
         }
     }
@@ -932,14 +931,18 @@ Item {
     Window {
         id: calendarPopup
 
-        flags: Qt.Popup | Qt.FramelessWindowHint
+        flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
+        modality: Qt.NonModal
         color: "transparent"
         visible: false
 
         property bool drawerOpen: false
-        property real _lastCloseTime: 0
         property real _hiddenPos: 0
-        onVisibleChanged: { if (!visible) _lastCloseTime = Date.now() }
+        onVisibleChanged: {
+            if (!visible) {
+                drawerOpen = false
+            }
+        }
 
         NumberAnimation {
             id: calendarSlideInAnim
@@ -960,6 +963,7 @@ Item {
         }
 
         function openDrawer() {
+            calendarSlideOutAnim.stop()
             drawerOpen = true
 
             var popW = root.width
@@ -1013,6 +1017,11 @@ Item {
         }
 
         function closeDrawer() {
+            if (!visible) {
+                drawerOpen = false
+                return
+            }
+            calendarSlideInAnim.stop()
             drawerOpen = false
             calendarSlideOutPropAnim.property = root.isHorizontalDock ? "y" : "x"
             calendarSlideOutPropAnim.to = _hiddenPos

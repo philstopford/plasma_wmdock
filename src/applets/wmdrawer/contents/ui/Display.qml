@@ -134,7 +134,7 @@ Item {
         id: hoverOpenTimer
         interval: 600
         repeat: false
-        onTriggered: { if (!drawerPopup.drawerOpen) drawerPopup.openDrawer() }
+        onTriggered: { if (!drawerPopup.drawerOpen && !drawerPopup.visible) drawerPopup.openDrawer() }
     }
 
     // -----------------------------------------------------------------------
@@ -229,17 +229,9 @@ Item {
         acceptedButtons: Qt.LeftButton
         onPressedChanged: root.pressed = tapHandler.pressed
         onTapped: {
-            // If the drawer is logically open, always close it on a tap.
-            if (drawerPopup.drawerOpen) {
+            // If the drawer is open or still animating closed, close it on a tap.
+            if (drawerPopup.drawerOpen || drawerPopup.visible) {
                 drawerPopup.closeDrawer()
-                return
-            }
-            // The drawer is closed.  Qt.Popup auto-closes the window when the
-            // user clicks outside it, which can include a click on this very
-            // button.  If the popup disappeared less than 300 ms ago the close
-            // was caused by this same gesture, so leave it closed instead of
-            // toggling it back open.
-            if (Date.now() - drawerPopup._lastCloseTime < 300) {
                 return
             }
             drawerPopup.openDrawer()
@@ -281,27 +273,26 @@ Item {
     ListModel { id: launcherModel }
 
     // -----------------------------------------------------------------------
-    // Drawer popup – uses a top-level Qt.Popup Window so it can appear
-    // above/below/beside the panel regardless of the panel window bounds.
+    // Drawer window – uses a non-modal top-level tool window so it can appear
+    // outside the panel bounds without grabbing clicks from other applets.
     // -----------------------------------------------------------------------
     Window {
         id: drawerPopup
 
-        flags: Qt.Popup | Qt.FramelessWindowHint
+        flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
+        modality: Qt.NonModal
         color: "transparent"
         visible: false
 
-        // Authoritative open/closed state set by openDrawer()/closeDrawer().
-        // Using this (rather than checking visible) makes the toggle reliable
-        // even when Qt.Popup auto-closes the window before onTapped fires.
+        // Open/closed state set by openDrawer()/closeDrawer() and synchronized
+        // if the window is hidden externally.
         property bool drawerOpen: false
 
-        // Timestamp of the last time the popup became hidden.  Used by the
-        // TapHandler to suppress reopening when Qt.Popup auto-closed the
-        // window as a result of the same button click that is about to fire
-        // onTapped.
-        property real _lastCloseTime: 0
-        onVisibleChanged: { if (!visible) _lastCloseTime = Date.now() }
+        onVisibleChanged: {
+            if (!visible) {
+                drawerOpen = false
+            }
+        }
 
         // Saved so closeDrawer() can animate back to the button.
         property real _hiddenPos: 0    // y (horiz dock) or x (vert dock)
@@ -338,6 +329,8 @@ Item {
 
         // --- Open / close -------------------------------------------------
         function openDrawer() {
+            fadeOutAnim.stop()
+            slideOutAnim.stop()
             drawerOpen = true
             // Rebuild model from current launcher list
             launcherModel.clear()
@@ -417,6 +410,12 @@ Item {
         }
 
         function closeDrawer() {
+            if (!visible) {
+                drawerOpen = false
+                return
+            }
+            fadeInAnim.stop()
+            slideInAnim.stop()
             drawerOpen = false
             var effect = root.openEffect
             if (effect === "fade") {
@@ -597,4 +596,3 @@ Item {
         }
     }
 }
-

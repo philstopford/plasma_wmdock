@@ -240,11 +240,10 @@ Item {
         acceptedButtons: Qt.LeftButton
         enabled: root.loadAction === "clickDrawer"
         onTapped: {
-            if (loadPopup.drawerOpen) {
+            if (loadPopup.drawerOpen || loadPopup.visible) {
                 loadPopup.closeDrawer()
                 return
             }
-            if (Date.now() - loadPopup._lastCloseTime < 300) return
             loadPopup.openDrawer()
         }
     }
@@ -252,14 +251,18 @@ Item {
     Window {
         id: loadPopup
 
-        flags: Qt.Popup | Qt.FramelessWindowHint
+        flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
+        modality: Qt.NonModal
         color: "transparent"
         visible: false
 
         property bool drawerOpen: false
-        property real _lastCloseTime: 0
         property real _hiddenPos: 0
-        onVisibleChanged: { if (!visible) _lastCloseTime = Date.now() }
+        onVisibleChanged: {
+            if (!visible) {
+                drawerOpen = false
+            }
+        }
 
         NumberAnimation {
             id: loadSlideInAnim
@@ -280,6 +283,7 @@ Item {
         }
 
         function openDrawer() {
+            loadSlideOutAnim.stop()
             drawerOpen = true
 
             var popW = root.width
@@ -333,6 +337,11 @@ Item {
         }
 
         function closeDrawer() {
+            if (!visible) {
+                drawerOpen = false
+                return
+            }
+            loadSlideInAnim.stop()
             drawerOpen = false
             loadSlideOutPropAnim.property = root.isHorizontalDock ? "y" : "x"
             loadSlideOutPropAnim.to = _hiddenPos
