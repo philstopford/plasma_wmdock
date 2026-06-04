@@ -273,14 +273,14 @@ Item {
     ListModel { id: launcherModel }
 
     // -----------------------------------------------------------------------
-    // Drawer window – uses a non-modal top-level tool window so it can appear
-    // outside the panel bounds without grabbing clicks from other applets.
+    // Drawer popup – uses a top-level Qt.Popup window so Plasma/Wayland can
+    // place it adjacent to the owning dock slot instead of treating it as a
+    // separately managed tool window.
     // -----------------------------------------------------------------------
     Window {
         id: drawerPopup
 
-        flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
-        modality: Qt.NonModal
+        flags: Qt.Popup | Qt.FramelessWindowHint
         color: "transparent"
         visible: false
 
@@ -290,7 +290,19 @@ Item {
 
         onVisibleChanged: {
             if (!visible) {
-                drawerOpen = false
+                ownerClickOverlay.visible = false
+                autoCloseStateResetTimer.restart()
+            }
+        }
+
+        Timer {
+            id: autoCloseStateResetTimer
+            interval: 250
+            repeat: false
+            onTriggered: {
+                if (!drawerPopup.visible) {
+                    drawerPopup.drawerOpen = false
+                }
             }
         }
 
@@ -329,6 +341,7 @@ Item {
 
         // --- Open / close -------------------------------------------------
         function openDrawer() {
+            autoCloseStateResetTimer.stop()
             fadeOutAnim.stop()
             slideOutAnim.stop()
             drawerOpen = true
@@ -348,21 +361,21 @@ Item {
             var cellH = root.height
             var popW  = root.isHorizontalDock ? cellW      : cellW * n
             var popH  = root.isHorizontalDock ? cellH * n  : cellH
-
             width  = popW
             height = popH
 
             var btnPos = root.mapToGlobal(0, 0)
             var scr    = root.Screen
+            var gap    = 4
             var targetX, targetY
 
             if (root.isHorizontalDock) {
                 targetX = btnPos.x
-                if (btnPos.y - popH - 4 >= scr.virtualY) {
-                    targetY    = btnPos.y - popH - 4
-                    _hiddenPos = btnPos.y - 4  // popup bottom at button's top
+                if (btnPos.y - popH - gap >= scr.virtualY) {
+                    targetY    = btnPos.y - popH - gap
+                    _hiddenPos = btnPos.y - gap  // popup bottom at button's top
                 } else {
-                    targetY    = btnPos.y + root.height + 4
+                    targetY    = btnPos.y + root.height + gap
                     _hiddenPos = targetY - popH  // popup top at button's bottom
                 }
                 _targetPos = targetY
@@ -370,10 +383,10 @@ Item {
             } else {
                 targetY = btnPos.y
                 if (Plasmoid.location === 6) {  // 6=RightEdge: popup to the left
-                    targetX    = btnPos.x - popW - 4
-                    _hiddenPos = btnPos.x - 4   // popup right edge at button's left
+                    targetX    = btnPos.x - popW - gap
+                    _hiddenPos = btnPos.x - gap   // popup right edge at button's left
                 } else {                         // LeftEdge: popup to the right
-                    targetX    = btnPos.x + root.width + 4
+                    targetX    = btnPos.x + root.width + gap
                     _hiddenPos = targetX - popW  // popup left edge at button's right
                 }
                 _targetPos = targetX
@@ -407,9 +420,16 @@ Item {
                 opacity = 1
                 visible = true
             }
+            ownerClickOverlay.x = btnPos.x
+            ownerClickOverlay.y = btnPos.y
+            ownerClickOverlay.width = root.width
+            ownerClickOverlay.height = root.height
+            ownerClickOverlay.visible = true
         }
 
         function closeDrawer() {
+            autoCloseStateResetTimer.stop()
+            ownerClickOverlay.visible = false
             if (!visible) {
                 drawerOpen = false
                 return
@@ -429,42 +449,46 @@ Item {
             }
         }
 
-        // --- Background ---------------------------------------------------
-        Rectangle {
+        Item {
+            id: drawerContent
             anchors.fill: parent
-            color:        "#1c1c1c"
-            border.color: "#555"
-            border.width: 1
-            radius: 4
-        }
 
-        // --- Launcher strip -----------------------------------------------
-        ListView {
-            id: launcherList
-            anchors.fill: parent
-            model:       launcherModel
-            orientation: root.isHorizontalDock ? ListView.Vertical : ListView.Horizontal
-            spacing:     0
-            clip:        true
-            interactive: false
-
-            // Track the model index of the item currently being drag-reordered.
-            property int draggedItemIndex: -1
-
-            displaced: Transition {
-                NumberAnimation { properties: "x,y"; duration: 80 }
+            // --- Background ---------------------------------------------------
+            Rectangle {
+                anchors.fill: parent
+                color:        "#1c1c1c"
+                border.color: "#555"
+                border.width: 1
+                radius: 4
             }
 
-            delegate: Item {
-                id: delItem
+            // --- Launcher strip -----------------------------------------------
+            ListView {
+                id: launcherList
+                anchors.fill: parent
+                model:       launcherModel
+                orientation: root.isHorizontalDock ? ListView.Vertical : ListView.Horizontal
+                spacing:     0
+                clip:        true
+                interactive: false
 
-                // Make delegate index available to drag handler
-                readonly property int delegateIndex: index
+                // Track the model index of the item currently being drag-reordered.
+                property int draggedItemIndex: -1
 
-                width:  root.width
-                height: root.height
+                displaced: Transition {
+                    NumberAnimation { properties: "x,y"; duration: 80 }
+                }
 
-                property bool itemPressed: false
+                delegate: Item {
+                    id: delItem
+
+                    // Make delegate index available to drag handler
+                    readonly property int delegateIndex: index
+
+                    width:  root.width
+                    height: root.height
+
+                    property bool itemPressed: false
 
                 // Button background
                 Rectangle {
@@ -593,6 +617,21 @@ Item {
                                    launcherModel.count))
                 root.addLauncherFromUrls(drop.urls, idx)
             }
+        }
+    }
+
+    }
+
+    Window {
+        id: ownerClickOverlay
+        flags: Qt.Popup | Qt.FramelessWindowHint
+        color: "transparent"
+        visible: false
+
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.LeftButton
+            onClicked: drawerPopup.closeDrawer()
         }
     }
 }

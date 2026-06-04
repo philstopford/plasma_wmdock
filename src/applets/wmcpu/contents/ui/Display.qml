@@ -251,8 +251,7 @@ Item {
     Window {
         id: loadPopup
 
-        flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
-        modality: Qt.NonModal
+        flags: Qt.Popup | Qt.FramelessWindowHint
         color: "transparent"
         visible: false
 
@@ -260,7 +259,19 @@ Item {
         property real _hiddenPos: 0
         onVisibleChanged: {
             if (!visible) {
-                drawerOpen = false
+                ownerClickOverlay.visible = false
+                autoCloseStateResetTimer.restart()
+            }
+        }
+
+        Timer {
+            id: autoCloseStateResetTimer
+            interval: 250
+            repeat: false
+            onTriggered: {
+                if (!loadPopup.visible) {
+                    loadPopup.drawerOpen = false
+                }
             }
         }
 
@@ -283,6 +294,7 @@ Item {
         }
 
         function openDrawer() {
+            autoCloseStateResetTimer.stop()
             loadSlideOutAnim.stop()
             drawerOpen = true
 
@@ -293,24 +305,25 @@ Item {
 
             var btnPos = root.mapToGlobal(0, 0)
             var scr = root.Screen
+            var gap = 4
             var targetX, targetY
 
             if (root.isHorizontalDock) {
                 targetX = btnPos.x
-                if (btnPos.y - popH - 4 >= scr.virtualY) {
-                    targetY = btnPos.y - popH - 4
-                    _hiddenPos = btnPos.y - 4
+                if (btnPos.y - popH - gap >= scr.virtualY) {
+                    targetY = btnPos.y - popH - gap
+                    _hiddenPos = btnPos.y - gap
                 } else {
-                    targetY = btnPos.y + root.height + 4
+                    targetY = btnPos.y + root.height + gap
                     _hiddenPos = targetY - popH
                 }
             } else {
                 targetY = btnPos.y
                 if (Plasmoid.location === 6) {
-                    targetX = btnPos.x - popW - 4
-                    _hiddenPos = btnPos.x - 4
+                    targetX = btnPos.x - popW - gap
+                    _hiddenPos = btnPos.x - gap
                 } else {
-                    targetX = btnPos.x + root.width + 4
+                    targetX = btnPos.x + root.width + gap
                     _hiddenPos = targetX - popW
                 }
             }
@@ -332,11 +345,18 @@ Item {
                 loadSlideInAnim.from = _hiddenPos
                 loadSlideInAnim.to = targetX
             }
+            ownerClickOverlay.x = btnPos.x
+            ownerClickOverlay.y = btnPos.y
+            ownerClickOverlay.width = root.width
+            ownerClickOverlay.height = root.height
             visible = true
+            ownerClickOverlay.visible = true
             loadSlideInAnim.start()
         }
 
         function closeDrawer() {
+            autoCloseStateResetTimer.stop()
+            ownerClickOverlay.visible = false
             if (!visible) {
                 drawerOpen = false
                 return
@@ -348,18 +368,36 @@ Item {
             loadSlideOutAnim.start()
         }
 
-        Rectangle {
+        Item {
+            id: loadContent
             anchors.fill: parent
-            color: "#1c1c1c"
-            border.color: "#555"
-            border.width: 1
-            radius: 4
-        }
 
-        Loader {
-            anchors { fill: parent; margins: 1 }
-            active: loadPopup.visible
-            source: root.loadDisplaySource
+            Rectangle {
+                anchors.fill: parent
+                color: "#1c1c1c"
+                border.color: "#555"
+                border.width: 1
+                radius: 4
+            }
+
+            Loader {
+                anchors { fill: parent; margins: 1 }
+                active: loadPopup.visible
+                source: root.loadDisplaySource
+            }
+        }
+    }
+
+    Window {
+        id: ownerClickOverlay
+        flags: Qt.Popup | Qt.FramelessWindowHint
+        color: "transparent"
+        visible: false
+
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.LeftButton
+            onClicked: loadPopup.closeDrawer()
         }
     }
 }
