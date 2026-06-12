@@ -41,6 +41,7 @@ Item {
                 { text: i18n("Disabled"),                 value: "disabled"    },
                 { text: i18n("Mouse wheel toggles slot"), value: "wheelToggle" },
                 { text: i18n("Left click opens drawer"),  value: "clickDrawer" },
+                { text: i18n("Left click toggles drawer"), value: "clickToggleDrawer" },
             ]
             textRole:  "text"
             valueRole: "value"

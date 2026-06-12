@@ -97,6 +97,11 @@ Item {
             if (cfg.showLabel  !== undefined) appletLoader.item.externalShowLabel = cfg.showLabel
             if (cfg.drawerIcon !== undefined) appletLoader.item.externalDrawerIcon  = cfg.drawerIcon
             if (cfg.drawerLabel!== undefined) appletLoader.item.externalDrawerLabel = cfg.drawerLabel
+            if (cfg.drawerClickMode !== undefined) {
+                appletLoader.item.externalDrawerClickMode = cfg.drawerClickMode
+            } else if (appletId === "org.kde.plasma.wmdrawer") {
+                appletLoader.item.externalDrawerClickMode = "open"
+            }
             if (cfg.launchers  !== undefined) appletLoader.item.externalLaunchers  = cfg.launchers
             // WMNet: support new multi-interface config (ifaces array + cycleMode + cycleInterval)
             // with backward-compat fallback for the old singular iface key.
@@ -300,10 +305,12 @@ Item {
                 var cfg = slotConfig ? JSON.parse(slotConfig) : {}
                 drawerIconField.text  = cfg.drawerIcon  || "folder"
                 drawerLabelField.text = cfg.drawerLabel || "Apps"
+                drawerClickToggleBox.checked = cfg.drawerClickMode === "toggle"
                 editingLaunchers = cfg.launchers ? JSON.parse(JSON.stringify(cfg.launchers)) : []
             } catch(e) {
                 drawerIconField.text  = "folder"
                 drawerLabelField.text = "Apps"
+                drawerClickToggleBox.checked = false
                 editingLaunchers = []
             }
             launcherListView.reload()
@@ -324,6 +331,11 @@ Item {
                     id: drawerLabelField
                     Kirigami.FormData.label: i18n("Drawer label:")
                     placeholderText: "Apps"
+                }
+                QQC2.CheckBox {
+                    id: drawerClickToggleBox
+                    Kirigami.FormData.label: i18n("Trigger click:")
+                    text: i18n("Click again to close")
                 }
             }
 
@@ -401,6 +413,7 @@ Item {
             var cfg = {
                 drawerIcon:   drawerIconField.text  || "folder",
                 drawerLabel:  drawerLabelField.text || "Apps",
+                drawerClickMode: drawerClickToggleBox.checked ? "toggle" : "open",
                 launchers:    editingLaunchers
             }
             slot.slotConfigSaved(slotIndex, JSON.stringify(cfg))

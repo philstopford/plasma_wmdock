@@ -26,6 +26,7 @@ Item {
     readonly property string nixieTubeStyle:   Plasmoid.configuration.nixieTubeStyle  || "classic"
     readonly property real   nixieGlowRadius:  Plasmoid.configuration.nixieGlowRadius > 0
                                                ? Plasmoid.configuration.nixieGlowRadius : 0.35
+    readonly property bool   calendarClickToggles: calendarAction === "clickToggleDrawer"
     property string externalOrientation: ""
     property bool calendarInlineVisible: false
     property real _lastWheelToggleTime: 0
@@ -918,10 +919,10 @@ Item {
 
     TapHandler {
         acceptedButtons: Qt.LeftButton
-        enabled: root.calendarAction === "clickDrawer"
+        enabled: root.calendarAction === "clickDrawer" || root.calendarAction === "clickToggleDrawer"
         onTapped: {
             if (calendarPopup.drawerOpen || calendarPopup.visible) {
-                calendarPopup.closeDrawer()
+                if (root.calendarClickToggles) calendarPopup.closeDrawer()
                 return
             }
             calendarPopup.openDrawer()
@@ -1030,7 +1031,7 @@ Item {
             ownerClickOverlay.width = root.width
             ownerClickOverlay.height = root.height
             visible = true
-            ownerClickOverlay.visible = true
+            ownerClickOverlay.visible = !root.calendarClickToggles
             calendarSlideInAnim.start()
         }
 

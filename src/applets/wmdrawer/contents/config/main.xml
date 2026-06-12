@@ -21,5 +21,9 @@
       <label>Opening animation effect: instant, slide, or fade</label>
       <default>slide</default>
     </entry>
+    <entry name="drawerClickMode" type="String">
+      <label>Drawer trigger click behavior: open or toggle</label>
+      <default>open</default>
+    </entry>
   </group>
 </kcfg>

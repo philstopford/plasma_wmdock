@@ -21,6 +21,8 @@ Item {
     property string cfg_launchersJsonDefault: "[]"
     property string cfg_openEffect:          ""
     property string cfg_openEffectDefault:   "slide"
+    property string cfg_drawerClickMode:     ""
+    property string cfg_drawerClickModeDefault: "open"
     property string title:                   ""
 
     property int editIndex: -1
@@ -148,6 +150,23 @@ Item {
                 }
             }
             onActivated: configPage.cfg_openEffect = model[currentIndex].value
+        }
+
+        QQC2.ComboBox {
+            id: drawerClickModeCombo
+            Kirigami.FormData.label: i18n("Trigger click:")
+            model: [
+                { text: i18n("Open drawer"),   value: "open"   },
+                { text: i18n("Toggle drawer"), value: "toggle" }
+            ]
+            textRole: "text"
+            Component.onCompleted: {
+                var v = configPage.cfg_drawerClickMode || "open"
+                for (var i = 0; i < model.length; i++) {
+                    if (model[i].value === v) { currentIndex = i; break }
+                }
+            }
+            onActivated: configPage.cfg_drawerClickMode = model[currentIndex].value
         }
 
         // ── Launcher list ───────────────────────────────────────────────────

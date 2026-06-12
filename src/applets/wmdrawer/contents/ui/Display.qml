@@ -37,6 +37,7 @@ Item {
     // -----------------------------------------------------------------------
     property string externalDrawerIcon:  ""
     property string externalDrawerLabel: ""
+    property string externalDrawerClickMode: ""
     property var    externalLaunchers:   null   // array of {command,icon,label}
     property string externalOrientation: ""     // "horizontal" or "vertical"
 
@@ -65,6 +66,8 @@ Item {
     }
 
     readonly property string openEffect: Plasmoid.configuration.openEffect || "slide"
+    readonly property string drawerClickMode: externalDrawerClickMode || Plasmoid.configuration.drawerClickMode || "open"
+    readonly property bool triggerClickToggles: drawerClickMode === "toggle"
 
     property bool pressed: false
 
@@ -231,7 +234,7 @@ Item {
         onTapped: {
             // If the drawer is open or still animating closed, close it on a tap.
             if (drawerPopup.drawerOpen || drawerPopup.visible) {
-                drawerPopup.closeDrawer()
+                if (root.triggerClickToggles) drawerPopup.closeDrawer()
                 return
             }
             drawerPopup.openDrawer()
@@ -424,7 +427,7 @@ Item {
             ownerClickOverlay.y = btnPos.y
             ownerClickOverlay.width = root.width
             ownerClickOverlay.height = root.height
-            ownerClickOverlay.visible = true
+            ownerClickOverlay.visible = !root.triggerClickToggles
         }
 
         function closeDrawer() {

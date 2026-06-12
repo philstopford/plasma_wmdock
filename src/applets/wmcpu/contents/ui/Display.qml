@@ -22,6 +22,7 @@ Item {
     property var history: []
     readonly property bool showTitle: Plasmoid.configuration.showTitle ?? true
     readonly property string loadAction: Plasmoid.configuration.loadAction || "disabled"
+    readonly property bool loadClickToggles: loadAction === "clickToggleDrawer"
     property string externalOrientation: ""
     property bool loadInlineVisible: false
     property real _lastWheelToggleTime: 0
@@ -238,10 +239,10 @@ Item {
 
     TapHandler {
         acceptedButtons: Qt.LeftButton
-        enabled: root.loadAction === "clickDrawer"
+        enabled: root.loadAction === "clickDrawer" || root.loadAction === "clickToggleDrawer"
         onTapped: {
             if (loadPopup.drawerOpen || loadPopup.visible) {
-                loadPopup.closeDrawer()
+                if (root.loadClickToggles) loadPopup.closeDrawer()
                 return
             }
             loadPopup.openDrawer()
@@ -350,7 +351,7 @@ Item {
             ownerClickOverlay.width = root.width
             ownerClickOverlay.height = root.height
             visible = true
-            ownerClickOverlay.visible = true
+            ownerClickOverlay.visible = !root.loadClickToggles
             loadSlideInAnim.start()
         }
 
