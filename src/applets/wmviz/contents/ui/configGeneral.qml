@@ -6,8 +6,15 @@ import org.kde.kirigami as Kirigami
 Item {
     id: page
 
-    property string cfg_effect:      ""
-    property string cfg_colorScheme: ""
+    property string title:                        ""
+    property string cfg_effect:                   ""
+    property string cfg_effectDefault:            "bars"
+    property string cfg_colorScheme:              ""
+    property string cfg_colorSchemeDefault:       "green"
+    property bool   cfg_terrainRotate:            false
+    property bool   cfg_terrainRotateDefault:     false
+    property bool   cfg_terrainWireframe:         false
+    property bool   cfg_terrainWireframeDefault:  false
 
     Kirigami.FormLayout {
         anchors.left:  parent.left
@@ -17,10 +24,26 @@ Item {
             id: effectCombo
             Kirigami.FormData.label: i18n("Visualization effect:")
             model: [
-                { text: i18n("Bars"),       value: "bars"     },
-                { text: i18n("Waveform"),   value: "wave"     },
-                { text: i18n("Circles"),    value: "circles"  },
-                { text: i18n("Plasma"),     value: "plasma"   },
+                { text: i18n("Bars"),           value: "bars"      },
+                { text: i18n("Scope"),          value: "wave"      },
+                { text: i18n("Starfield"),      value: "circles"   },
+                { text: i18n("Tunnel"),         value: "plasma"    },
+                { text: i18n("Terrain"),        value: "terrain"   },
+                { text: i18n("Vortex"),         value: "vortex"    },
+                { text: i18n("Warp"),           value: "warp"      },
+                { text: i18n("Ripple"),         value: "ripple"    },
+                { text: i18n("Kaleidoscope"),   value: "kaleid"    },
+                { text: i18n("Nova"),           value: "nova"      },
+                { text: i18n("Galaxy"),         value: "galaxy"    },
+                { text: i18n("Aurora"),         value: "aurora"    },
+                { text: i18n("Mandala"),        value: "mandala"   },
+                { text: i18n("Matrix Rain"),    value: "matrix"    },
+                { text: i18n("Plasma Ball"),    value: "plasmaball"},
+                { text: i18n("LED Meter"),      value: "led"       },
+                { text: i18n("Discharge"),      value: "discharge" },
+                { text: i18n("Lightning"),      value: "lightning" },
+                { text: i18n("Concert"),        value: "concert"   },
+                { text: i18n("Pyrotechnics"),   value: "pyro"      },
             ]
             textRole:  "text"
             valueRole: "value"
@@ -55,6 +78,21 @@ Item {
                 currentIndex = 0
             }
             onActivated: page.cfg_colorScheme = currentValue
+        }
+
+        // ── Terrain options ──────────────────────────────────────────────────
+        Item { Kirigami.FormData.isSection: true; Kirigami.FormData.label: i18n("Terrain Options") }
+
+        QQC2.CheckBox {
+            Kirigami.FormData.label: i18n("Rotate terrain view:")
+            checked: page.cfg_terrainRotate
+            onToggled: page.cfg_terrainRotate = checked
+        }
+
+        QQC2.CheckBox {
+            Kirigami.FormData.label: i18n("Wireframe mode:")
+            checked: page.cfg_terrainWireframe
+            onToggled: page.cfg_terrainWireframe = checked
         }
     }
 }

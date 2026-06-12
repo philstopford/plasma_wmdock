@@ -9,13 +9,41 @@
       <label>Blob color scheme</label>
       <default>red</default>
     </entry>
-    <entry name="speed" type="Int">
-      <label>Animation speed (1=slow, 5=fast)</label>
-      <default>3</default>
-    </entry>
     <entry name="blobCount" type="Int">
       <label>Number of blobs</label>
       <default>5</default>
+    </entry>
+    <entry name="resolution" type="Int">
+      <label>Render resolution (higher = smoother)</label>
+      <default>1</default>
+    </entry>
+    <entry name="gravity" type="Double">
+      <label>Gravitational acceleration (px/tick²)</label>
+      <default>0.08</default>
+    </entry>
+    <entry name="buoyancy" type="Double">
+      <label>Buoyancy coefficient (px/tick² at temp=1)</label>
+      <default>0.18</default>
+    </entry>
+    <entry name="drag" type="Double">
+      <label>Viscous drag – velocity multiplier per tick (lower = more viscous)</label>
+      <default>0.91</default>
+    </entry>
+    <entry name="baseHeat" type="Double">
+      <label>Base heat minimum – fraction applied regardless of CPU load</label>
+      <default>0.40</default>
+    </entry>
+    <entry name="heatRate" type="Double">
+      <label>Heat absorption rate (temp/tick in heat zone)</label>
+      <default>0.030</default>
+    </entry>
+    <entry name="coolRate" type="Double">
+      <label>Heat dissipation rate (temp/tick outside heat zone)</label>
+      <default>0.010</default>
+    </entry>
+    <entry name="heatZoneY" type="Double">
+      <label>Heat zone boundary – fraction of height from top (larger = bigger heat zone)</label>
+      <default>0.60</default>
     </entry>
   </group>
 </kcfg>

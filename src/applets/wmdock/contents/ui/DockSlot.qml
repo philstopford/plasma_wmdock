@@ -5,6 +5,7 @@ import QtQuick.Layouts
 import org.kde.plasma.plasmoid
 import org.kde.plasma.components 3.0 as PlasmaComponents
 import org.kde.kirigami as Kirigami
+import org.kde.plasma.private.wmdock 1.0
 
 /**
  * DockSlot – hosts one mini-applet by embedding its QML as a Loader.
@@ -97,6 +98,15 @@ Item {
             if (cfg.drawerIcon !== undefined) appletLoader.item.externalDrawerIcon  = cfg.drawerIcon
             if (cfg.drawerLabel!== undefined) appletLoader.item.externalDrawerLabel = cfg.drawerLabel
             if (cfg.launchers  !== undefined) appletLoader.item.externalLaunchers  = cfg.launchers
+            // WMNet: support new multi-interface config (ifaces array + cycleMode + cycleInterval)
+            // with backward-compat fallback for the old singular iface key.
+            if (cfg.ifaces !== undefined) {
+                appletLoader.item.externalIfaces = cfg.ifaces
+            } else if (cfg.iface !== undefined) {
+                appletLoader.item.externalIfaces = cfg.iface ? [cfg.iface] : []
+            }
+            if (cfg.cycleMode     !== undefined) appletLoader.item.externalCycleMode     = cfg.cycleMode
+            if (cfg.cycleInterval !== undefined) appletLoader.item.externalCycleInterval = cfg.cycleInterval
         } catch(e) {
             console.warn("WMDock: failed to parse slotConfig for", appletId, e)
         }
@@ -162,19 +172,23 @@ Item {
         QQC2.MenuItem {
             text: i18n("Configure Applet…")
             visible: appletId === "org.kde.plasma.wmlauncher" ||
-                     appletId === "org.kde.plasma.wmdrawer"
+                     appletId === "org.kde.plasma.wmdrawer"   ||
+                     appletId === "org.kde.plasma.wmnet"
             height: visible ? implicitHeight : 0
             onTriggered: {
                 if (appletId === "org.kde.plasma.wmlauncher") {
                     launcherConfigDialog.openForSlot()
                 } else if (appletId === "org.kde.plasma.wmdrawer") {
                     drawerConfigDialog.openForSlot()
+                } else if (appletId === "org.kde.plasma.wmnet") {
+                    wmnetConfigDialog.openForSlot()
                 }
             }
         }
         QQC2.MenuSeparator {
             visible: appletId === "org.kde.plasma.wmlauncher" ||
-                     appletId === "org.kde.plasma.wmdrawer"
+                     appletId === "org.kde.plasma.wmdrawer"   ||
+                     appletId === "org.kde.plasma.wmnet"
             height: visible ? implicitHeight : 0
         }
         QQC2.MenuItem {
@@ -474,6 +488,115 @@ Item {
     }
 
     // -----------------------------------------------------------------------
+    // WMNet configure dialog – lets the user pick which interfaces to monitor
+    // when WMNet is embedded in WMDock (Plasmoid.configuration is WMDock's,
+    // not WMNet's).  Choices are persisted in slotConfig and forwarded to
+    // Display.qml via externalIfaces / externalCycleMode / externalCycleInterval.
+    // -----------------------------------------------------------------------
+    QQC2.Dialog {
+        id: wmnetConfigDialog
+        title: i18n("Configure Network Monitor")
+        modal: true
+        parent: QQC2.Overlay.overlay
+        anchors.centerIn: parent
+        width: 320
+
+        // Mutable state held while the dialog is open
+        property var  editIfaces:        []
+        property bool editCycleMode:     true
+        property int  editCycleInterval: 4
+
+        function openForSlot() {
+            try {
+                var cfg = slotConfig ? JSON.parse(slotConfig) : {}
+                // Support both new ifaces array and legacy singular iface key
+                if (cfg.ifaces !== undefined) {
+                    editIfaces = cfg.ifaces.slice()
+                } else if (cfg.iface !== undefined) {
+                    editIfaces = cfg.iface ? [cfg.iface] : []
+                } else {
+                    editIfaces = []
+                }
+                editCycleMode     = cfg.cycleMode     !== undefined ? cfg.cycleMode     : true
+                editCycleInterval = cfg.cycleInterval !== undefined ? cfg.cycleInterval : 4
+            } catch(e) {
+                editIfaces        = []
+                editCycleMode     = true
+                editCycleInterval = 4
+            }
+            open()
+        }
+
+        contentItem: Kirigami.FormLayout {
+
+            // Per-interface checkboxes (all non-loopback)
+            Repeater {
+                id: wmnetIfaceRepeater
+                model: NetworkMonitor.interfaces.filter(function(i) {
+                    return !i.startsWith("lo")
+                })
+                delegate: QQC2.CheckBox {
+                    Kirigami.FormData.label: index === 0 ? i18n("Interfaces\n(none = all):") : ""
+                    text: modelData
+                    // Checked when editIfaces is empty (= all) or explicitly contains this iface
+                    checked: wmnetConfigDialog.editIfaces.length === 0 ||
+                             wmnetConfigDialog.editIfaces.indexOf(modelData) >= 0
+                    onToggled: {
+                        var newList = []
+                        for (var i = 0; i < wmnetIfaceRepeater.count; i++) {
+                            var item = wmnetIfaceRepeater.itemAt(i)
+                            if (item && item.checked)
+                                newList.push(item.text)
+                        }
+                        // All checked = auto mode (empty list)
+                        if (newList.length === wmnetIfaceRepeater.count)
+                            newList = []
+                        wmnetConfigDialog.editIfaces = newList
+                    }
+                }
+            }
+
+            QQC2.CheckBox {
+                id: wmnetCycleModeCheck
+                Kirigami.FormData.label: i18n("Auto cycle interfaces:")
+                checked: wmnetConfigDialog.editCycleMode
+                onToggled: wmnetConfigDialog.editCycleMode = checked
+            }
+
+            QQC2.SpinBox {
+                Kirigami.FormData.label: i18n("Cycle interval (seconds):")
+                enabled: wmnetCycleModeCheck.checked
+                from: 1
+                to: 60
+                stepSize: 1
+                value: wmnetConfigDialog.editCycleInterval
+                onValueChanged: wmnetConfigDialog.editCycleInterval = value
+            }
+        }
+
+        footer: QQC2.DialogButtonBox {
+            QQC2.Button {
+                text: i18n("OK")
+                QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.AcceptRole
+            }
+            QQC2.Button {
+                text: i18n("Cancel")
+                QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.RejectRole
+            }
+        }
+
+        onAccepted: {
+            var cfg = {}
+            try { if (slotConfig) cfg = JSON.parse(slotConfig) } catch(e) {}
+            cfg.ifaces        = wmnetConfigDialog.editIfaces
+            cfg.cycleMode     = wmnetConfigDialog.editCycleMode
+            cfg.cycleInterval = wmnetConfigDialog.editCycleInterval
+            delete cfg.iface   // remove legacy singular key
+            slot.slotConfigSaved(slotIndex, JSON.stringify(cfg))
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // Helper: map applet ID → QML source URL
     // -----------------------------------------------------------------------
     function resolveSource(id) {
@@ -489,6 +612,15 @@ Item {
             "org.kde.plasma.wmlauncher": Qt.resolvedUrl("../../../org.kde.plasma.wmlauncher/contents/ui/Display.qml"),
             "org.kde.plasma.wmweather":  Qt.resolvedUrl("../../../org.kde.plasma.wmweather/contents/ui/Display.qml"),
             "org.kde.plasma.wmdrawer":   Qt.resolvedUrl("../../../org.kde.plasma.wmdrawer/contents/ui/Display.qml"),
+            "org.kde.plasma.wmviz":      Qt.resolvedUrl("../../../org.kde.plasma.wmviz/contents/ui/Display.qml"),
+            "org.kde.plasma.wmmatrix":   Qt.resolvedUrl("../../../org.kde.plasma.wmmatrix/contents/ui/Display.qml"),
+            "org.kde.plasma.wmplasmaball": Qt.resolvedUrl("../../../org.kde.plasma.wmplasmaball/contents/ui/Display.qml"),
+            "org.kde.plasma.wmplay":     Qt.resolvedUrl("../../../org.kde.plasma.wmplay/contents/ui/Display.qml"),
+            "org.kde.plasma.wmeyes":     Qt.resolvedUrl("../../../org.kde.plasma.wmeyes/contents/ui/Display.qml"),
+            "org.kde.plasma.wmlava":     Qt.resolvedUrl("../../../org.kde.plasma.wmlava/contents/ui/Display.qml"),
+            "org.kde.plasma.wmsensors":  Qt.resolvedUrl("../../../org.kde.plasma.wmsensors/contents/ui/Display.qml"),
+            "org.kde.plasma.wmstorage":  Qt.resolvedUrl("../../../org.kde.plasma.wmstorage/contents/ui/Display.qml"),
+            "org.kde.plasma.wmgpu":      Qt.resolvedUrl("../../../org.kde.plasma.wmgpu/contents/ui/Display.qml"),
         }
         return map[id] || ""
     }

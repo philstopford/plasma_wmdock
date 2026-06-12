@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 import QtQuick
+import QtQuick.Window
 import org.kde.plasma.plasmoid
 import org.kde.plasma.private.wmdock 1.0
 
@@ -19,9 +20,28 @@ Item {
     // Rolling history (filled left→right, newest on right)
     property int histLen: Plasmoid.configuration.histLen ?? 50
     property var history: []
+    readonly property bool showTitle: Plasmoid.configuration.showTitle ?? true
+    readonly property string loadAction: Plasmoid.configuration.loadAction || "disabled"
+    property string externalOrientation: ""
+    property bool loadInlineVisible: false
+    property real _lastWheelToggleTime: 0
+
+    readonly property bool isHorizontalDock: {
+        if (externalOrientation === "vertical") return false
+        if (externalOrientation === "horizontal") return true
+        return Plasmoid.location !== 5 && Plasmoid.location !== 6
+    }
+
+    readonly property url loadDisplaySource:
+        Qt.resolvedUrl("../../../org.kde.plasma.wmload/contents/ui/Display.qml")
 
     // Core usage (array of 0–100 values)
     property var coreUsage: SystemMonitor.cpuCoreUsage
+
+    onLoadActionChanged: {
+        loadInlineVisible = false
+        if (loadPopup.drawerOpen) loadPopup.closeDrawer()
+    }
 
     Component.onCompleted: {
         Qt.callLater(function() {
@@ -51,32 +71,48 @@ Item {
         radius: 2
         border.color: "#2a2a2a"
         border.width: 1
+        visible: !root.loadInlineVisible
     }
 
     // -----------------------------------------------------------------------
-    // Header label
+    // Title
     // -----------------------------------------------------------------------
     Text {
         id: titleText
-        anchors { top: parent.top; horizontalCenter: parent.horizontalCenter; topMargin: 2 }
-        text: "CPU"
-        color: "#00cc00"
-        font { pixelSize: parent.height * 0.12; family: "monospace"; bold: true }
-    }
-
-    // -----------------------------------------------------------------------
-    // Per-core bars (thin strip below title)
-    // -----------------------------------------------------------------------
-    Canvas {
-        id: coreBar
+        visible: root.showTitle && !root.loadInlineVisible
         anchors {
-            top:        titleText.bottom
+            top:        parent.top
             left:       parent.left
             right:      parent.right
+            topMargin:  2
             leftMargin: 3
             rightMargin: 3
         }
+        text: "CPU"
+        color: "#00aa44"
+        font { pixelSize: parent.height * 0.12; family: "monospace"; bold: true }
+        horizontalAlignment: Text.AlignHCenter
+        height: visible ? implicitHeight : 0
+    }
+
+    // -----------------------------------------------------------------------
+    // Per-core bars (thin strip at top)
+    // -----------------------------------------------------------------------
+    Canvas {
+        id: coreBar
+        visible: !root.loadInlineVisible
+        anchors {
+            top:         root.showTitle ? titleText.bottom : parent.top
+            left:        parent.left
+            right:       parent.right
+            topMargin:   root.showTitle ? 1 : 3
+            leftMargin:  3
+            rightMargin: 3
+        }
         height: Math.max(4, Math.ceil(SystemMonitor.cpuCoreCount / 4) * 4)
+
+        onWidthChanged:  Qt.callLater(requestPaint)
+        onHeightChanged: Qt.callLater(requestPaint)
 
         onPaint: {
             const ctx = getContext("2d")
@@ -105,6 +141,7 @@ Item {
     // -----------------------------------------------------------------------
     Canvas {
         id: graph
+        visible: !root.loadInlineVisible
         anchors {
             top:         coreBar.bottom
             left:        parent.left
@@ -115,6 +152,9 @@ Item {
             rightMargin: 3
             bottomMargin: 2
         }
+
+        onWidthChanged:  Qt.callLater(requestPaint)
+        onHeightChanged: Qt.callLater(requestPaint)
 
         onPaint: {
             const ctx  = getContext("2d")
@@ -159,6 +199,7 @@ Item {
     // -----------------------------------------------------------------------
     Text {
         id: pctLabel
+        visible: !root.loadInlineVisible
         anchors {
             bottom:           parent.bottom
             horizontalCenter: parent.horizontalCenter
@@ -170,5 +211,193 @@ Item {
             return v > 75 ? "#ff4400" : v > 50 ? "#aacc00" : "#00cc00"
         }
         font { pixelSize: parent.height * 0.14; family: "monospace"; bold: true }
+    }
+
+    Loader {
+        id: inlineLoadLoader
+        anchors.fill: parent
+        active: root.loadAction === "wheelToggle" && root.loadInlineVisible
+        visible: active
+        source: root.loadDisplaySource
+    }
+
+    WheelHandler {
+        enabled: root.loadAction === "wheelToggle"
+        onWheel: function(event) {
+            if (event.angleDelta.y === 0 && event.pixelDelta.y === 0) return
+            const now = Date.now()
+            if (now - root._lastWheelToggleTime < 250) {
+                event.accepted = true
+                return
+            }
+            root._lastWheelToggleTime = now
+            root.loadInlineVisible = !root.loadInlineVisible
+            event.accepted = true
+        }
+    }
+
+    TapHandler {
+        acceptedButtons: Qt.LeftButton
+        enabled: root.loadAction === "clickDrawer"
+        onTapped: {
+            if (loadPopup.drawerOpen || loadPopup.visible) {
+                loadPopup.closeDrawer()
+                return
+            }
+            loadPopup.openDrawer()
+        }
+    }
+
+    Window {
+        id: loadPopup
+
+        flags: Qt.Popup | Qt.FramelessWindowHint
+        color: "transparent"
+        visible: false
+
+        property bool drawerOpen: false
+        property real _hiddenPos: 0
+        onVisibleChanged: {
+            if (!visible) {
+                ownerClickOverlay.visible = false
+                autoCloseStateResetTimer.restart()
+            }
+        }
+
+        Timer {
+            id: autoCloseStateResetTimer
+            interval: 250
+            repeat: false
+            onTriggered: {
+                if (!loadPopup.visible) {
+                    loadPopup.drawerOpen = false
+                }
+            }
+        }
+
+        NumberAnimation {
+            id: loadSlideInAnim
+            target: loadPopup
+            duration: 160
+            easing.type: Easing.OutQuad
+        }
+
+        SequentialAnimation {
+            id: loadSlideOutAnim
+            PropertyAnimation {
+                id: loadSlideOutPropAnim
+                target: loadPopup
+                duration: 140
+                easing.type: Easing.InQuad
+            }
+            ScriptAction { script: loadPopup.visible = false }
+        }
+
+        function openDrawer() {
+            autoCloseStateResetTimer.stop()
+            loadSlideOutAnim.stop()
+            drawerOpen = true
+
+            var popW = root.width
+            var popH = root.height
+            width = popW
+            height = popH
+
+            var btnPos = root.mapToGlobal(0, 0)
+            var scr = root.Screen
+            var gap = 4
+            var targetX, targetY
+
+            if (root.isHorizontalDock) {
+                targetX = btnPos.x
+                if (btnPos.y - popH - gap >= scr.virtualY) {
+                    targetY = btnPos.y - popH - gap
+                    _hiddenPos = btnPos.y - gap
+                } else {
+                    targetY = btnPos.y + root.height + gap
+                    _hiddenPos = targetY - popH
+                }
+            } else {
+                targetY = btnPos.y
+                if (Plasmoid.location === 6) {
+                    targetX = btnPos.x - popW - gap
+                    _hiddenPos = btnPos.x - gap
+                } else {
+                    targetX = btnPos.x + root.width + gap
+                    _hiddenPos = targetX - popW
+                }
+            }
+
+            targetX = Math.max(scr.virtualX, Math.min(targetX, scr.virtualX + scr.width - popW))
+            targetY = Math.max(scr.virtualY, Math.min(targetY, scr.virtualY + scr.height - popH))
+
+            opacity = 1
+            if (root.isHorizontalDock) {
+                x = targetX
+                y = _hiddenPos
+                loadSlideInAnim.property = "y"
+                loadSlideInAnim.from = _hiddenPos
+                loadSlideInAnim.to = targetY
+            } else {
+                x = _hiddenPos
+                y = targetY
+                loadSlideInAnim.property = "x"
+                loadSlideInAnim.from = _hiddenPos
+                loadSlideInAnim.to = targetX
+            }
+            ownerClickOverlay.x = btnPos.x
+            ownerClickOverlay.y = btnPos.y
+            ownerClickOverlay.width = root.width
+            ownerClickOverlay.height = root.height
+            visible = true
+            ownerClickOverlay.visible = true
+            loadSlideInAnim.start()
+        }
+
+        function closeDrawer() {
+            autoCloseStateResetTimer.stop()
+            ownerClickOverlay.visible = false
+            if (!visible) {
+                drawerOpen = false
+                return
+            }
+            loadSlideInAnim.stop()
+            drawerOpen = false
+            loadSlideOutPropAnim.property = root.isHorizontalDock ? "y" : "x"
+            loadSlideOutPropAnim.to = _hiddenPos
+            loadSlideOutAnim.start()
+        }
+
+        Item {
+            id: loadContent
+            anchors.fill: parent
+
+            Rectangle {
+                anchors.fill: parent
+                color: "#1c1c1c"
+                border.color: "#555"
+                border.width: 1
+                radius: 4
+            }
+
+            Loader {
+                anchors { fill: parent; margins: 1 }
+                active: loadPopup.visible
+                source: root.loadDisplaySource
+            }
+        }
+    }
+
+    Window {
+        id: ownerClickOverlay
+        flags: Qt.Popup | Qt.FramelessWindowHint
+        color: "transparent"
+        visible: false
+
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.LeftButton
+            onClicked: loadPopup.closeDrawer()
+        }
     }
 }

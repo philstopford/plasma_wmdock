@@ -13,5 +13,13 @@
       <label>Color scheme</label>
       <default>green</default>
     </entry>
+    <entry name="terrainRotate" type="Bool">
+      <label>Rotate terrain view</label>
+      <default>false</default>
+    </entry>
+    <entry name="terrainWireframe" type="Bool">
+      <label>Terrain wireframe mode</label>
+      <default>false</default>
+    </entry>
   </group>
 </kcfg>

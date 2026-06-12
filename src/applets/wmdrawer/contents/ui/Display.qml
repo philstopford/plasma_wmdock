@@ -134,7 +134,7 @@ Item {
         id: hoverOpenTimer
         interval: 600
         repeat: false
-        onTriggered: { if (!drawerPopup.drawerOpen) drawerPopup.openDrawer() }
+        onTriggered: { if (!drawerPopup.drawerOpen && !drawerPopup.visible) drawerPopup.openDrawer() }
     }
 
     // -----------------------------------------------------------------------
@@ -179,8 +179,7 @@ Item {
             topMargin:    6
             bottomMargin: 2
         }
-        width:  Math.min(implicitWidth, parent.width - 12)
-        height: width
+        width:  height
         source: drawerIcon
         isMask: false
     }
@@ -230,17 +229,9 @@ Item {
         acceptedButtons: Qt.LeftButton
         onPressedChanged: root.pressed = tapHandler.pressed
         onTapped: {
-            // If the drawer is logically open, always close it on a tap.
-            if (drawerPopup.drawerOpen) {
+            // If the drawer is open or still animating closed, close it on a tap.
+            if (drawerPopup.drawerOpen || drawerPopup.visible) {
                 drawerPopup.closeDrawer()
-                return
-            }
-            // The drawer is closed.  Qt.Popup auto-closes the window when the
-            // user clicks outside it, which can include a click on this very
-            // button.  If the popup disappeared less than 300 ms ago the close
-            // was caused by this same gesture, so leave it closed instead of
-            // toggling it back open.
-            if (Date.now() - drawerPopup._lastCloseTime < 300) {
                 return
             }
             drawerPopup.openDrawer()
@@ -282,8 +273,9 @@ Item {
     ListModel { id: launcherModel }
 
     // -----------------------------------------------------------------------
-    // Drawer popup – uses a top-level Qt.Popup Window so it can appear
-    // above/below/beside the panel regardless of the panel window bounds.
+    // Drawer popup – uses a top-level Qt.Popup window so Plasma/Wayland can
+    // place it adjacent to the owning dock slot instead of treating it as a
+    // separately managed tool window.
     // -----------------------------------------------------------------------
     Window {
         id: drawerPopup
@@ -292,17 +284,27 @@ Item {
         color: "transparent"
         visible: false
 
-        // Authoritative open/closed state set by openDrawer()/closeDrawer().
-        // Using this (rather than checking visible) makes the toggle reliable
-        // even when Qt.Popup auto-closes the window before onTapped fires.
+        // Open/closed state set by openDrawer()/closeDrawer() and synchronized
+        // if the window is hidden externally.
         property bool drawerOpen: false
 
-        // Timestamp of the last time the popup became hidden.  Used by the
-        // TapHandler to suppress reopening when Qt.Popup auto-closed the
-        // window as a result of the same button click that is about to fire
-        // onTapped.
-        property real _lastCloseTime: 0
-        onVisibleChanged: { if (!visible) _lastCloseTime = Date.now() }
+        onVisibleChanged: {
+            if (!visible) {
+                ownerClickOverlay.visible = false
+                autoCloseStateResetTimer.restart()
+            }
+        }
+
+        Timer {
+            id: autoCloseStateResetTimer
+            interval: 250
+            repeat: false
+            onTriggered: {
+                if (!drawerPopup.visible) {
+                    drawerPopup.drawerOpen = false
+                }
+            }
+        }
 
         // Saved so closeDrawer() can animate back to the button.
         property real _hiddenPos: 0    // y (horiz dock) or x (vert dock)
@@ -339,6 +341,9 @@ Item {
 
         // --- Open / close -------------------------------------------------
         function openDrawer() {
+            autoCloseStateResetTimer.stop()
+            fadeOutAnim.stop()
+            slideOutAnim.stop()
             drawerOpen = true
             // Rebuild model from current launcher list
             launcherModel.clear()
@@ -356,21 +361,21 @@ Item {
             var cellH = root.height
             var popW  = root.isHorizontalDock ? cellW      : cellW * n
             var popH  = root.isHorizontalDock ? cellH * n  : cellH
-
             width  = popW
             height = popH
 
             var btnPos = root.mapToGlobal(0, 0)
             var scr    = root.Screen
+            var gap    = 4
             var targetX, targetY
 
             if (root.isHorizontalDock) {
                 targetX = btnPos.x
-                if (btnPos.y - popH - 4 >= scr.virtualY) {
-                    targetY    = btnPos.y - popH - 4
-                    _hiddenPos = btnPos.y - 4  // popup bottom at button's top
+                if (btnPos.y - popH - gap >= scr.virtualY) {
+                    targetY    = btnPos.y - popH - gap
+                    _hiddenPos = btnPos.y - gap  // popup bottom at button's top
                 } else {
-                    targetY    = btnPos.y + root.height + 4
+                    targetY    = btnPos.y + root.height + gap
                     _hiddenPos = targetY - popH  // popup top at button's bottom
                 }
                 _targetPos = targetY
@@ -378,10 +383,10 @@ Item {
             } else {
                 targetY = btnPos.y
                 if (Plasmoid.location === 6) {  // 6=RightEdge: popup to the left
-                    targetX    = btnPos.x - popW - 4
-                    _hiddenPos = btnPos.x - 4   // popup right edge at button's left
+                    targetX    = btnPos.x - popW - gap
+                    _hiddenPos = btnPos.x - gap   // popup right edge at button's left
                 } else {                         // LeftEdge: popup to the right
-                    targetX    = btnPos.x + root.width + 4
+                    targetX    = btnPos.x + root.width + gap
                     _hiddenPos = targetX - popW  // popup left edge at button's right
                 }
                 _targetPos = targetX
@@ -415,9 +420,22 @@ Item {
                 opacity = 1
                 visible = true
             }
+            ownerClickOverlay.x = btnPos.x
+            ownerClickOverlay.y = btnPos.y
+            ownerClickOverlay.width = root.width
+            ownerClickOverlay.height = root.height
+            ownerClickOverlay.visible = true
         }
 
         function closeDrawer() {
+            autoCloseStateResetTimer.stop()
+            ownerClickOverlay.visible = false
+            if (!visible) {
+                drawerOpen = false
+                return
+            }
+            fadeInAnim.stop()
+            slideInAnim.stop()
             drawerOpen = false
             var effect = root.openEffect
             if (effect === "fade") {
@@ -431,42 +449,46 @@ Item {
             }
         }
 
-        // --- Background ---------------------------------------------------
-        Rectangle {
+        Item {
+            id: drawerContent
             anchors.fill: parent
-            color:        "#1c1c1c"
-            border.color: "#555"
-            border.width: 1
-            radius: 4
-        }
 
-        // --- Launcher strip -----------------------------------------------
-        ListView {
-            id: launcherList
-            anchors.fill: parent
-            model:       launcherModel
-            orientation: root.isHorizontalDock ? ListView.Vertical : ListView.Horizontal
-            spacing:     0
-            clip:        true
-            interactive: false
-
-            // Track the model index of the item currently being drag-reordered.
-            property int draggedItemIndex: -1
-
-            displaced: Transition {
-                NumberAnimation { properties: "x,y"; duration: 80 }
+            // --- Background ---------------------------------------------------
+            Rectangle {
+                anchors.fill: parent
+                color:        "#1c1c1c"
+                border.color: "#555"
+                border.width: 1
+                radius: 4
             }
 
-            delegate: Item {
-                id: delItem
+            // --- Launcher strip -----------------------------------------------
+            ListView {
+                id: launcherList
+                anchors.fill: parent
+                model:       launcherModel
+                orientation: root.isHorizontalDock ? ListView.Vertical : ListView.Horizontal
+                spacing:     0
+                clip:        true
+                interactive: false
 
-                // Make delegate index available to drag handler
-                readonly property int delegateIndex: index
+                // Track the model index of the item currently being drag-reordered.
+                property int draggedItemIndex: -1
 
-                width:  root.width
-                height: root.height
+                displaced: Transition {
+                    NumberAnimation { properties: "x,y"; duration: 80 }
+                }
 
-                property bool itemPressed: false
+                delegate: Item {
+                    id: delItem
+
+                    // Make delegate index available to drag handler
+                    readonly property int delegateIndex: index
+
+                    width:  root.width
+                    height: root.height
+
+                    property bool itemPressed: false
 
                 // Button background
                 Rectangle {
@@ -488,8 +510,7 @@ Item {
                         topMargin:    5
                         bottomMargin: 1
                     }
-                    width:  Math.min(implicitWidth, parent.width - 10)
-                    height: width
+                    width:  height
                     source: model.icon || "application-x-executable"
                     isMask: false
                 }
@@ -598,5 +619,19 @@ Item {
             }
         }
     }
-}
 
+    }
+
+    Window {
+        id: ownerClickOverlay
+        flags: Qt.Popup | Qt.FramelessWindowHint
+        color: "transparent"
+        visible: false
+
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.LeftButton
+            onClicked: drawerPopup.closeDrawer()
+        }
+    }
+}

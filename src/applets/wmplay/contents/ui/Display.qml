@@ -81,20 +81,11 @@ Item {
         border.width: 1
     }
 
-    // ----- title bar -------------------------------------------------------
-    Text {
-        id: titleText
-        anchors { top: parent.top; horizontalCenter: parent.horizontalCenter; topMargin: 2 }
-        text: "PLAY"
-        color: "#00aaff"
-        font { pixelSize: parent.height * 0.11; family: "monospace"; bold: true }
-    }
-
     // ----- scrolling track name --------------------------------------------
     Item {
         id: trackRow
         anchors {
-            top: titleText.bottom; topMargin: 2
+            top: parent.top; topMargin: 2
             left: parent.left; right: parent.right
             leftMargin: 3; rightMargin: 3
         }
@@ -172,8 +163,8 @@ Item {
             return m + ":" + String(s % 60).padStart(2, "0")
         }
         text: fmt(player.position) + "/" + fmt(player.duration)
-        color: "#446688"
-        font { pixelSize: parent.height * 0.09; family: "monospace" }
+        color: "#88aadd"
+        font { pixelSize: parent.height * 0.12; family: "monospace" }
     }
 
     // ----- transport controls ----------------------------------------------
@@ -257,18 +248,24 @@ Item {
     // ----- drag-and-drop ---------------------------------------------------
     DropArea {
         anchors.fill: parent
-        keys: ["text/uri-list"]
+        onEntered: function(drag) {
+            drag.accepted = drag.hasUrls
+        }
 
-        onEntered: drag => drag.accepted = true
-
-        onDropped: drop => {
+        onDropped: function(drop) {
+            if (!drop.hasUrls) {
+                drop.accepted = false
+                return
+            }
             const urls = drop.urls
             let paths = []
             for (let i = 0; i < urls.length; i++) {
-                // Convert file:// URL to local path for MediaScanner
+                // drop.urls entries are strings in QML; strip the file:// scheme
                 let p = urls[i].toString()
                 if (p.startsWith("file://"))
-                    p = p.substring(7)
+                    p = decodeURIComponent(p.substring(7))
+                if (!p)
+                    continue
                 const scanned = MediaScanner.scan(p)
                 for (let j = 0; j < scanned.length; j++)
                     paths.push(scanned[j])

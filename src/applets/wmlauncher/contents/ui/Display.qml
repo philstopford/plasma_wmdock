@@ -77,8 +77,7 @@ Item {
             topMargin: showLabel ? 6 : 8
             bottomMargin: 2
         }
-        width:  Math.min(implicitWidth, parent.width - 12)
-        height: width
+        width:  height
         source: launchIcon
         isMask: false
     }

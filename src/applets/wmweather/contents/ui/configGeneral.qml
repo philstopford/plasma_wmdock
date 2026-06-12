@@ -7,9 +7,15 @@ import org.kde.kirigami as Kirigami
 Item {
     id: page
 
-    property real   cfg_latitude:  0
-    property real   cfg_longitude: 0
-    property string cfg_tempUnit:  ""
+    property string title:                              ""
+    property real   cfg_latitude:                       0
+    property real   cfg_latitudeDefault:                51.5
+    property real   cfg_longitude:                      0
+    property real   cfg_longitudeDefault:               -0.12
+    property string cfg_tempUnit:                       ""
+    property string cfg_tempUnitDefault:                "celsius"
+    property int    cfg_updateIntervalMinutes:          0
+    property int    cfg_updateIntervalMinutesDefault:   30
 
     // Geocoding state (not persisted)
     property var    _geoResults:   []
@@ -231,6 +237,16 @@ Item {
                 currentIndex = 0
             }
             onActivated: page.cfg_tempUnit = currentValue
+        }
+
+        QQC2.SpinBox {
+            id: updateIntervalSpin
+            Kirigami.FormData.label: i18n("Auto update interval (minutes):")
+            from: 1
+            to: 360
+            stepSize: 1
+            value: page.cfg_updateIntervalMinutes
+            onValueChanged: page.cfg_updateIntervalMinutes = value
         }
     }
 }

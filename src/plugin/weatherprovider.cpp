@@ -17,8 +17,22 @@ WeatherProvider::WeatherProvider(QObject *parent)
 
     connect(&m_timer, &QTimer::timeout, this, &WeatherProvider::refresh);
     m_timer.setInterval(30 * 60 * 1000); // 30 minutes
+    m_timer.start();
 
-    refresh();
+    // Coalesce rapid lat/lon/unit changes from QML property bindings.
+    // 400 ms is shorter than the startup delay intentionally: on startup we
+    // need the full 500 ms for QML to set all properties; for subsequent
+    // user-initiated changes (e.g. config page edits) 400 ms is enough.
+    m_debounceTimer.setSingleShot(true);
+    m_debounceTimer.setInterval(400);
+    connect(&m_debounceTimer, &QTimer::timeout, this, &WeatherProvider::refresh);
+
+    // Delay the first fetch so QML has time to apply all Plasmoid.configuration
+    // bindings before the network request fires.  Without this delay the
+    // constructor fires refresh() with the default London co-ordinates and the
+    // correct configured location is only applied on subsequent QML-triggered
+    // setter calls.
+    QTimer::singleShot(500, this, &WeatherProvider::refresh);
 }
 
 int WeatherProvider::updateIntervalMinutes() const
@@ -35,10 +49,31 @@ void WeatherProvider::setUpdateIntervalMinutes(int minutes)
     }
 }
 
-void WeatherProvider::setLatitude(double lat)  { m_lat = lat; Q_EMIT locationChanged(); refresh(); }
-void WeatherProvider::setLongitude(double lon) { m_lon = lon; Q_EMIT locationChanged(); refresh(); }
+void WeatherProvider::setLatitude(double lat)
+{
+    if (qFuzzyCompare(m_lat, lat)) return;
+    m_lat = lat;
+    Q_EMIT locationChanged();
+    m_debounceTimer.start();
+}
+
+void WeatherProvider::setLongitude(double lon)
+{
+    if (qFuzzyCompare(m_lon, lon)) return;
+    m_lon = lon;
+    Q_EMIT locationChanged();
+    m_debounceTimer.start();
+}
+
 void WeatherProvider::setLocationName(const QString &n) { m_locationName = n; Q_EMIT locationChanged(); }
-void WeatherProvider::setTempUnit(const QString &u) { m_tempUnit = u; Q_EMIT tempUnitChanged(); refresh(); }
+
+void WeatherProvider::setTempUnit(const QString &u)
+{
+    if (m_tempUnit == u) return;
+    m_tempUnit = u;
+    Q_EMIT tempUnitChanged();
+    m_debounceTimer.start();
+}
 
 void WeatherProvider::refresh()
 {

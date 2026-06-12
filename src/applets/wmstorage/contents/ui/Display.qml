@@ -25,20 +25,11 @@ Item {
         border.width: 1
     }
 
-    // ----- title -----------------------------------------------------------
-    Text {
-        id: titleText
-        anchors { top: parent.top; horizontalCenter: parent.horizontalCenter; topMargin: 2 }
-        text: "DISK"
-        color: "#00aaff"
-        font { pixelSize: parent.height * 0.11; family: "monospace"; bold: true }
-    }
-
     // ----- volume list -----------------------------------------------------
     ListView {
         id: volumeList
         anchors {
-            top:          titleText.bottom; topMargin: 2
+            top:          parent.top; topMargin: 2
             left:         parent.left;  leftMargin:  3
             right:        parent.right; rightMargin: 3
             bottom:       parent.bottom; bottomMargin: 2
@@ -122,6 +113,14 @@ Item {
                     color: "#ffffff"
                     font { pixelSize: parent.height * 0.65; family: "monospace"; bold: true }
                 }
+            }
+
+            Text {
+                anchors.centerIn: volumeList
+                visible: StorageMonitor.volumes.length === 0
+                text: i18n("No volumes")
+                color: "#666"
+                font { pixelSize: parent.height * 0.11; family: "monospace" }
             }
         }
     }

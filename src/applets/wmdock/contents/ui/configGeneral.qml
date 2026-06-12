@@ -16,11 +16,17 @@ import org.kde.kirigami as Kirigami
 Item {
     id: page
 
-    property int    cfg_slotSize:          0
-    property int    cfg_slotSpacing:       0
-    property bool   cfg_showBackground:    false
-    property real   cfg_backgroundOpacity: 0.0
-    property var    cfg_appletList:        []
+    property string title:                          ""
+    property int    cfg_slotSize:                   0
+    property int    cfg_slotSizeDefault:            64
+    property int    cfg_slotSpacing:                0
+    property int    cfg_slotSpacingDefault:         2
+    property bool   cfg_showBackground:             false
+    property bool   cfg_showBackgroundDefault:      true
+    property real   cfg_backgroundOpacity:          0.0
+    property real   cfg_backgroundOpacityDefault:   0.85
+    property var    cfg_appletList:                 []
+    property var    cfg_appletListDefault:          []
 
     ColumnLayout {
         anchors.left:  parent.left
@@ -149,6 +155,15 @@ Item {
                     { text: i18n("WMLauncher – Launcher"),    value: "org.kde.plasma.wmlauncher" },
                     { text: i18n("WMDrawer – App drawer"),    value: "org.kde.plasma.wmdrawer"   },
                     { text: i18n("WMWeather – Weather"),      value: "org.kde.plasma.wmweather"  },
+                    { text: i18n("WMViz – Audio visualizer"), value: "org.kde.plasma.wmviz"      },
+                    { text: i18n("WMMatrix – Matrix rain"),   value: "org.kde.plasma.wmmatrix"   },
+                    { text: i18n("WMPlasmaBall – Plasma ball"), value: "org.kde.plasma.wmplasmaball" },
+                    { text: i18n("WMPlay – Audio player"),    value: "org.kde.plasma.wmplay"     },
+                    { text: i18n("WMEyes – Mouse tracker"),   value: "org.kde.plasma.wmeyes"     },
+                    { text: i18n("WMLava – Lava lamp"),       value: "org.kde.plasma.wmlava"     },
+                    { text: i18n("WMSensors – Temperatures"), value: "org.kde.plasma.wmsensors"  },
+                    { text: i18n("WMStorage – Disks"),        value: "org.kde.plasma.wmstorage"  },
+                    { text: i18n("WMGPU – GPU monitor"),      value: "org.kde.plasma.wmgpu"      },
                 ]
                 textRole: "text"
             }

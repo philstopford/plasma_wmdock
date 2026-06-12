@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 import QtQuick
+import org.kde.plasma.plasmoid
 import org.kde.plasma.private.wmdock 1.0
 
 /**
@@ -17,6 +18,8 @@ import org.kde.plasma.private.wmdock 1.0
 Item {
     id: root
 
+    readonly property bool showTitle: Plasmoid.configuration.showTitle ?? true
+
     // -----------------------------------------------------------------------
     // Background
     // -----------------------------------------------------------------------
@@ -33,10 +36,20 @@ Item {
     // -----------------------------------------------------------------------
     Text {
         id: titleText
-        anchors { top: parent.top; horizontalCenter: parent.horizontalCenter; topMargin: 2 }
+        visible: root.showTitle
+        anchors {
+            top:        parent.top
+            left:       parent.left
+            right:      parent.right
+            topMargin:  2
+            leftMargin: 3
+            rightMargin: 3
+        }
         text: "MEM"
-        color: "#00aaff"
+        color: "#0088ff"
         font { pixelSize: parent.height * 0.12; family: "monospace"; bold: true }
+        horizontalAlignment: Text.AlignHCenter
+        height: visible ? implicitHeight : 0
     }
 
     // -----------------------------------------------------------------------
@@ -45,7 +58,7 @@ Item {
     Item {
         id: ramRow
         anchors {
-            top:        titleText.bottom
+            top:        root.showTitle ? titleText.bottom : parent.top
             topMargin:  parent.height * 0.04
             left:       parent.left
             right:      parent.right

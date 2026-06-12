@@ -217,6 +217,15 @@ PlasmoidItem {
                         ListElement { label: "WMLauncher – App launcher button";  appletId: "org.kde.plasma.wmlauncher"}
                         ListElement { label: "WMDrawer – Expandable launcher drawer"; appletId: "org.kde.plasma.wmdrawer" }
                         ListElement { label: "WMWeather – Weather conditions";    appletId: "org.kde.plasma.wmweather" }
+                        ListElement { label: "WMViz – Audio visualizer";          appletId: "org.kde.plasma.wmviz" }
+                        ListElement { label: "WMMatrix – Matrix rain";            appletId: "org.kde.plasma.wmmatrix" }
+                        ListElement { label: "WMPlasmaBall – Plasma ball";        appletId: "org.kde.plasma.wmplasmaball" }
+                        ListElement { label: "WMPlay – Audio player";             appletId: "org.kde.plasma.wmplay" }
+                        ListElement { label: "WMEyes – Mouse-tracking eyes";      appletId: "org.kde.plasma.wmeyes" }
+                        ListElement { label: "WMLava – Lava lamp simulation";     appletId: "org.kde.plasma.wmlava" }
+                        ListElement { label: "WMSensors – Thermal sensors";       appletId: "org.kde.plasma.wmsensors" }
+                        ListElement { label: "WMStorage – Disk usage";            appletId: "org.kde.plasma.wmstorage" }
+                        ListElement { label: "WMGPU – GPU load and VRAM";         appletId: "org.kde.plasma.wmgpu" }
                     }
 
                     delegate: QQC2.ItemDelegate {
