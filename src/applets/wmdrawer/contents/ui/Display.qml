@@ -427,7 +427,7 @@ Item {
             ownerClickOverlay.y = btnPos.y
             ownerClickOverlay.width = root.width
             ownerClickOverlay.height = root.height
-            ownerClickOverlay.visible = !root.triggerClickToggles
+            ownerClickOverlay.visible = true
         }
 
         function closeDrawer() {
@@ -573,7 +573,10 @@ Item {
                     onTapped: {
                         if (launcherList.draggedItemIndex < 0) {
                             var cmd = model.command || ""
-                            if (cmd) ProcessLauncher.launch(cmd)
+                            if (cmd) {
+                                ProcessLauncher.launch(cmd)
+                                drawerPopup.closeDrawer()
+                            }
                         }
                     }
                 }

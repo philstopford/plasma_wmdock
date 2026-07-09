@@ -1053,6 +1053,13 @@ Item {
             id: calendarContent
             anchors.fill: parent
 
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.LeftButton
+                z: 10
+                onClicked: calendarPopup.closeDrawer()
+            }
+
             Rectangle {
                 anchors.fill: parent
                 color: "#1c1c1c"

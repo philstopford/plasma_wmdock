@@ -373,6 +373,13 @@ Item {
             id: loadContent
             anchors.fill: parent
 
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.LeftButton
+                z: 10
+                onClicked: loadPopup.closeDrawer()
+            }
+
             Rectangle {
                 anchors.fill: parent
                 color: "#1c1c1c"
