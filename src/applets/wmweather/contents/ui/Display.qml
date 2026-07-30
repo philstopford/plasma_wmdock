@@ -2,6 +2,7 @@
 import QtQuick
 import QtQuick.Controls as QQC2
 import org.kde.plasma.plasmoid
+import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.private.wmdock 1.0
 import org.kde.kirigami as Kirigami
 
@@ -55,9 +56,6 @@ Item {
         text:    "ERR"
         color:   "#ff3300"
         font { pixelSize: parent.height * 0.18; family: "monospace"; bold: true }
-        QQC2.ToolTip.visible: hoverHandlerErr.hovered
-        QQC2.ToolTip.text:   wp.error
-        HoverHandler { id: hoverHandlerErr }
     }
 
     // -----------------------------------------------------------------------
@@ -142,27 +140,16 @@ Item {
         onDoubleTapped: wp.refresh()
     }
 
-    // Compute tooltip text imperatively to avoid QML binding-loop detection.
-    QQC2.ToolTip {
-        id: mainTip
-        visible: hoverH.hovered
-        delay:   700
-
-        function updateText() {
-            const loc = "\nLat: " + wp.latitude.toFixed(2) +
-                        " Lon: " + wp.longitude.toFixed(2) +
-                        "\nDouble-click to refresh"
-            text = wp.error.length > 0 ? wp.error + loc : wp.description + loc
-        }
-
-        Component.onCompleted: updateText()
-
-        Connections {
-            target: wp
-            function onWeatherUpdated() { mainTip.updateText() }
-            function onErrorChanged()   { mainTip.updateText() }
-            function onLocationChanged(){ mainTip.updateText() }
-        }
+    // Plasma's tooltip is shown in its own surface, so it is not clipped by
+    // the panel window when this applet is embedded in a narrow dock.
+    PlasmaCore.ToolTipArea {
+        anchors.fill: parent
+        mainText: wp.error.length > 0 ? wp.error : wp.description
+        subText: "Lat: " + wp.latitude.toFixed(2) +
+                 "  Lon: " + wp.longitude.toFixed(2) +
+                 "<br>Double-click to refresh"
+        textFormat: Text.RichText
+        location: Plasmoid.location
+        active: !wp.loading
     }
-    HoverHandler { id: hoverH }
 }

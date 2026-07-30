@@ -2,6 +2,7 @@
 import QtQuick
 import QtQuick.Controls as QQC2
 import org.kde.plasma.plasmoid
+import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.private.wmdock 1.0
 
@@ -116,10 +117,9 @@ Item {
     }
 
     // Tooltip showing command
-    QQC2.ToolTip {
-        visible: hoverHandler.hovered
-        text:    root.launchCommand
-        delay:   700
+    PlasmaCore.ToolTipArea {
+        anchors.fill: parent
+        mainText: root.launchCommand
+        location: Plasmoid.location
     }
-    HoverHandler { id: hoverHandler }
 }

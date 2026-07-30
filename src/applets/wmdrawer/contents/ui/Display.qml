@@ -4,6 +4,7 @@ import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 import QtQuick.Window
 import org.kde.plasma.plasmoid
+import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.private.wmdock 1.0
 
@@ -241,12 +242,12 @@ Item {
         }
     }
 
-    QQC2.ToolTip {
-        visible: hoverHandler.hovered && !drawerPopup.visible
-        text:    root.drawerLabel
-        delay:   700
+    PlasmaCore.ToolTipArea {
+        anchors.fill: parent
+        mainText: root.drawerLabel
+        location: Plasmoid.location
+        active: !drawerPopup.visible
     }
-    HoverHandler { id: hoverHandler }
 
     // -----------------------------------------------------------------------
     // Drop-area on the drawer button: hover-to-open + drop-to-add launcher.
@@ -581,12 +582,12 @@ Item {
                     }
                 }
 
-                QQC2.ToolTip {
-                    visible: itemHover.hovered && launcherList.draggedItemIndex < 0
-                    text:    model.command || ""
-                    delay:   700
+                PlasmaCore.ToolTipArea {
+                    anchors.fill: parent
+                    mainText: model.command || ""
+                    location: Plasmoid.location
+                    active: launcherList.draggedItemIndex < 0
                 }
-                HoverHandler { id: itemHover }
             }
         }
 
