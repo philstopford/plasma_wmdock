@@ -3,8 +3,10 @@
 #pragma once
 
 #include <QObject>
+#include <QFileInfo>
 #include <QString>
 #include <QProcess>
+#include <QUrl>
 
 /**
  * @brief Simple QML-accessible process launcher.
@@ -31,6 +33,19 @@ public:
         if (command.trimmed().isEmpty()) return false;
         const QStringList parts = QProcess::splitCommand(command);
         if (parts.isEmpty()) return false;
+
+        // Migrate launchers created by older drawer versions, which stored a
+        // dropped executable as `xdg-open file:///...`. KIO intentionally
+        // refuses that operation; execute a local executable directly instead.
+        if (parts.size() == 2 && parts.constFirst() == QLatin1String("xdg-open")) {
+            const QUrl url(parts.at(1));
+            if (url.isLocalFile()) {
+                const QString path = url.toLocalFile();
+                const QFileInfo info(path);
+                if (info.isFile() && info.isExecutable())
+                    return QProcess::startDetached(path, {});
+            }
+        }
         return QProcess::startDetached(parts.value(0), parts.mid(1));
     }
 };

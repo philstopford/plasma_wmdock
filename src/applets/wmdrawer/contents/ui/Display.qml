@@ -45,6 +45,11 @@ Item {
     // Emitted after a drag-reorder so the dock can persist the new order.
     signal launchersReordered(var newLaunchers)
 
+    // A torn-off drawer is a persistent tool palette.  It is deliberately a
+    // runtime state: closing it attaches it back to the dock ready for the
+    // next open.
+    property bool drawerDetached: false
+
     // -----------------------------------------------------------------------
     // Resolved configuration
     // -----------------------------------------------------------------------
@@ -57,13 +62,12 @@ Item {
     }
 
     // True when the parent dock sits on a horizontal edge (top/bottom).
-    // Falls back to Plasmoid.location when running standalone.
-    //   Plasma 6: 5 = LeftEdge, 6 = RightEdge → vertical dock
-    //   3 = TopEdge, 4 = BottomEdge, 0 = Floating → horizontal dock
+    // Falls back to the actual Plasma form factor when running standalone;
+    // floating widgets cannot infer their layout direction from location.
     readonly property bool isHorizontalDock: {
         if (externalOrientation === "vertical")   return false
         if (externalOrientation === "horizontal") return true
-        return Plasmoid.location !== 5 && Plasmoid.location !== 6
+        return Plasmoid.formFactor !== PlasmaCore.Types.Vertical
     }
 
     readonly property string openEffect: Plasmoid.configuration.openEffect || "slide"
@@ -129,6 +133,60 @@ Item {
                 Plasmoid.configuration.launchersJson = JSON.stringify(arr)
             }
         }
+    }
+
+    function droppedValues(drop) {
+        var values = []
+        if (drop.hasUrls) {
+            for (var i = 0; i < drop.urls.length; ++i)
+                values.push(drop.urls[i].toString())
+        } else if (drop.hasText) {
+            var lines = drop.text.trim().split(/\r?\n/)
+            for (var j = 0; j < lines.length; ++j)
+                if (lines[j].trim()) values.push(lines[j].trim())
+        }
+        return values
+    }
+
+    function addLauncherFromDrop(drop, insertIndex) {
+        var values = droppedValues(drop)
+        var entries = []
+        for (var i = 0; i < values.length; ++i) {
+            var value = values[i]
+            var entry = DesktopFileReader.launcherForUrl(value)
+            if (entry && entry.command) entries.push(entry)
+        }
+        if (entries.length === 0) return
+
+        if (drawerPopup.drawerOpen) {
+            var at = insertIndex < 0 ? launcherModel.count
+                                     : Math.min(insertIndex, launcherModel.count)
+            for (var j = 0; j < entries.length; ++j)
+                launcherModel.insert(at + j, entries[j])
+            saveLaunchersFromModel()
+        } else {
+            var arr = root.launchers ? root.launchers.slice() : []
+            var pos = insertIndex < 0 ? arr.length : Math.min(insertIndex, arr.length)
+            for (var k = 0; k < entries.length; ++k)
+                arr.splice(pos + k, 0, entries[k])
+            if (root.externalLaunchers !== null) root.launchersReordered(arr)
+            else Plasmoid.configuration.launchersJson = JSON.stringify(arr)
+        }
+        drop.accept(Qt.CopyAction)
+    }
+
+    function launchDroppedFiles(command, drop) {
+        var values = droppedValues(drop)
+        if (!command || values.length === 0) return
+        var args = []
+        for (var i = 0; i < values.length; ++i) {
+            var value = values[i]
+            if (value.startsWith("file://"))
+                value = decodeURIComponent(value.slice(7))
+            args.push(JSON.stringify(value))
+        }
+        ProcessLauncher.launch(command + " " + args.join(" "))
+        drop.accept(Qt.CopyAction)
     }
 
     // -----------------------------------------------------------------------
@@ -233,9 +291,10 @@ Item {
         acceptedButtons: Qt.LeftButton
         onPressedChanged: root.pressed = tapHandler.pressed
         onTapped: {
-            // If the drawer is open or still animating closed, close it on a tap.
+            // The activation gadget always toggles drawer visibility.  Drawer
+            // lifetime is explicit; focus changes never hide it.
             if (drawerPopup.drawerOpen || drawerPopup.visible) {
-                if (root.triggerClickToggles) drawerPopup.closeDrawer()
+                drawerPopup.closeDrawer()
                 return
             }
             drawerPopup.openDrawer()
@@ -265,8 +324,7 @@ Item {
         onExited:  hoverOpenTimer.stop()
         onDropped: function(drop) {
             hoverOpenTimer.stop()
-            drop.acceptProposedAction()
-            root.addLauncherFromUrls(drop.urls, -1)
+            root.addLauncherFromDrop(drop, -1)
         }
     }
 
@@ -277,36 +335,46 @@ Item {
     ListModel { id: launcherModel }
 
     // -----------------------------------------------------------------------
-    // Drawer popup – uses a top-level Qt.Popup window so Plasma/Wayland can
-    // place it adjacent to the owning dock slot instead of treating it as a
-    // separately managed tool window.
+    // PlasmaCore.Dialog remains a Plasma-managed popup for its entire life.
+    // Tear-off only disables auto-hide and permits manual positioning; it
+    // never changes the native Wayland surface role.
     // -----------------------------------------------------------------------
-    Window {
+    PlasmaCore.Dialog {
         id: drawerPopup
-
-        flags: Qt.Popup | Qt.FramelessWindowHint
-        color: "transparent"
+        visualParent: buttonBody
+        // Let Plasma create the xdg-positioner anchor from the actual button.
+        // Direct Window.x/y assignments are not authoritative for Wayland
+        // popups and were being constrained to the panel's first row.
+        location: root.isHorizontalDock
+                    ? (Plasmoid.location === PlasmaCore.Types.TopEdge
+                       ? PlasmaCore.Types.TopEdge : PlasmaCore.Types.BottomEdge)
+                    : (Plasmoid.location === PlasmaCore.Types.RightEdge
+                       ? PlasmaCore.Types.RightEdge : PlasmaCore.Types.LeftEdge)
+        flags: Qt.WindowDoesNotAcceptFocus
+        hideOnWindowDeactivate: false
         visible: false
 
         // Open/closed state set by openDrawer()/closeDrawer() and synchronized
         // if the window is hidden externally.
         property bool drawerOpen: false
 
-        onVisibleChanged: {
-            if (!visible) {
-                ownerClickOverlay.visible = false
-                autoCloseStateResetTimer.restart()
-            }
+        function detachDrawer(globalX, globalY) {
+            if (root.drawerDetached) return
+            fadeInAnim.stop()
+            slideInAnim.stop()
+            root.drawerDetached = true
+            drawerOpen = true
         }
 
-        Timer {
-            id: autoCloseStateResetTimer
-            interval: 250
-            repeat: false
-            onTriggered: {
-                if (!drawerPopup.visible) {
-                    drawerPopup.drawerOpen = false
-                }
+        function attachAndHide() {
+            visible = false
+            drawerOpen = false
+            root.drawerDetached = false
+        }
+
+        onVisibleChanged: {
+            if (!visible) {
+                if (!root.drawerDetached) autoCloseStateResetTimer.restart()
             }
         }
 
@@ -315,33 +383,6 @@ Item {
         property real _targetPos: 0   // y (horiz dock) or x (vert dock)
         property real _fixedX:    0   // fixed x when sliding vertically
         property real _fixedY:    0   // fixed y when sliding horizontally
-
-        // --- Animations ---------------------------------------------------
-        NumberAnimation {
-            id: fadeInAnim
-            target: drawerPopup; property: "opacity"
-            from: 0; to: 1; duration: 200; easing.type: Easing.InQuad
-        }
-        SequentialAnimation {
-            id: fadeOutAnim
-            NumberAnimation {
-                target: drawerPopup; property: "opacity"
-                to: 0; duration: 200; easing.type: Easing.OutQuad
-            }
-            ScriptAction { script: drawerPopup.visible = false }
-        }
-        PropertyAnimation {
-            id: slideInAnim
-            target: drawerPopup; duration: 200; easing.type: Easing.OutQuad
-        }
-        SequentialAnimation {
-            id: slideOutAnim
-            PropertyAnimation {
-                id: slideOutPropAnim
-                target: drawerPopup; duration: 200; easing.type: Easing.InQuad
-            }
-            ScriptAction { script: drawerPopup.visible = false }
-        }
 
         // --- Open / close -------------------------------------------------
         function openDrawer() {
@@ -363,77 +404,29 @@ Item {
             var n    = Math.max(1, ls.length)
             var cellW = root.width
             var cellH = root.height
-            var popW  = root.isHorizontalDock ? cellW      : cellW * n
-            var popH  = root.isHorizontalDock ? cellH * n  : cellH
-            width  = popW
-            height = popH
-
-            var btnPos = root.mapToGlobal(0, 0)
-            var scr    = root.Screen
-            var gap    = 4
-            var targetX, targetY
-
-            if (root.isHorizontalDock) {
-                targetX = btnPos.x
-                if (btnPos.y - popH - gap >= scr.virtualY) {
-                    targetY    = btnPos.y - popH - gap
-                    _hiddenPos = btnPos.y - gap  // popup bottom at button's top
-                } else {
-                    targetY    = btnPos.y + root.height + gap
-                    _hiddenPos = targetY - popH  // popup top at button's bottom
-                }
-                _targetPos = targetY
-                _fixedX    = targetX
-            } else {
-                targetY = btnPos.y
-                if (Plasmoid.location === 6) {  // 6=RightEdge: popup to the left
-                    targetX    = btnPos.x - popW - gap
-                    _hiddenPos = btnPos.x - gap   // popup right edge at button's left
-                } else {                         // LeftEdge: popup to the right
-                    targetX    = btnPos.x + root.width + gap
-                    _hiddenPos = targetX - popW  // popup left edge at button's right
-                }
-                _targetPos = targetX
-                _fixedY    = targetY
-            }
-
-            // Clamp to current screen
-            targetX = Math.max(scr.virtualX, Math.min(targetX, scr.virtualX + scr.width  - popW))
-            targetY = Math.max(scr.virtualY, Math.min(targetY, scr.virtualY + scr.height - popH))
+            var titleSize = 18
+            var popW  = root.isHorizontalDock ? cellW : cellW * n + titleSize
+            var popH  = root.isHorizontalDock ? cellH * n + titleSize : cellH
+            drawerContent.implicitWidth  = popW
+            drawerContent.implicitHeight = popH
 
             var effect = root.openEffect
             if (effect === "fade") {
-                x = targetX; y = targetY
                 opacity = 0
                 visible = true
                 fadeInAnim.start()
-            } else if (effect === "slide") {
-                if (root.isHorizontalDock) {
-                    x = targetX; y = _hiddenPos
-                } else {
-                    x = _hiddenPos; y = targetY
-                }
-                opacity = 1
-                visible = true
-                slideInAnim.property = root.isHorizontalDock ? "y" : "x"
-                slideInAnim.from     = _hiddenPos
-                slideInAnim.to       = root.isHorizontalDock ? targetY : targetX
-                slideInAnim.start()
             } else {
-                x = targetX; y = targetY
                 opacity = 1
                 visible = true
             }
-            ownerClickOverlay.x = btnPos.x
-            ownerClickOverlay.y = btnPos.y
-            ownerClickOverlay.width = root.width
-            ownerClickOverlay.height = root.height
-            ownerClickOverlay.visible = true
         }
 
         function closeDrawer() {
             autoCloseStateResetTimer.stop()
-            ownerClickOverlay.visible = false
+            if (root.drawerDetached) {
+                attachAndHide()
+                return
+            }
             if (!visible) {
                 drawerOpen = false
                 return
@@ -444,18 +437,51 @@ Item {
             var effect = root.openEffect
             if (effect === "fade") {
                 fadeOutAnim.start()
-            } else if (effect === "slide") {
-                slideOutPropAnim.property = root.isHorizontalDock ? "y" : "x"
-                slideOutPropAnim.to       = _hiddenPos
-                slideOutAnim.start()
             } else {
                 visible = false
             }
         }
 
-        Item {
+        mainItem: Item {
             id: drawerContent
-            anchors.fill: parent
+            implicitWidth: root.width
+            implicitHeight: root.height + 18
+
+            Timer {
+                id: autoCloseStateResetTimer
+                interval: 250
+                repeat: false
+                onTriggered: {
+                    if (!drawerPopup.visible && !root.drawerDetached)
+                        drawerPopup.drawerOpen = false
+                }
+            }
+
+            NumberAnimation {
+                id: fadeInAnim
+                target: drawerPopup; property: "opacity"
+                from: 0; to: 1; duration: 200; easing.type: Easing.InQuad
+            }
+            SequentialAnimation {
+                id: fadeOutAnim
+                NumberAnimation {
+                    target: drawerPopup; property: "opacity"
+                    to: 0; duration: 200; easing.type: Easing.OutQuad
+                }
+                ScriptAction { script: drawerPopup.visible = false }
+            }
+            PropertyAnimation {
+                id: slideInAnim
+                target: drawerPopup; duration: 200; easing.type: Easing.OutQuad
+            }
+            SequentialAnimation {
+                id: slideOutAnim
+                PropertyAnimation {
+                    id: slideOutPropAnim
+                    target: drawerPopup; duration: 200; easing.type: Easing.InQuad
+                }
+                ScriptAction { script: drawerPopup.visible = false }
+            }
 
             // --- Background ---------------------------------------------------
             Rectangle {
@@ -466,10 +492,75 @@ Item {
                 radius: 4
             }
 
+            // --- Tear-off grip ------------------------------------------------
+            Rectangle {
+                id: tearOffGrip
+                z: 2
+                anchors {
+                    left: parent.left
+                    top: parent.top
+                    right: root.isHorizontalDock ? parent.right : undefined
+                    bottom: root.isHorizontalDock ? undefined : parent.bottom
+                }
+                width: root.isHorizontalDock ? parent.width : 18
+                height: root.isHorizontalDock ? 18 : parent.height
+                color: "#252525"
+                border.color: "#555"
+                border.width: 1
+
+                Text {
+                    anchors.centerIn: parent
+                    text: root.isHorizontalDock ? "≡" : "⋮"
+                    color: "#888"
+                    font.pixelSize: 12
+                }
+
+                Text {
+                    z: 3
+                    anchors { right: parent.right; top: parent.top; margins: 2 }
+                    text: "×"
+                    color: "#aaaaaa"
+                    font.pixelSize: 12
+
+                    MouseArea {
+                        anchors.fill: parent
+                        anchors.margins: -3
+                        cursorShape: Qt.ArrowCursor
+                        onClicked: drawerPopup.attachAndHide()
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.LeftButton
+                    cursorShape: Qt.SizeAllCursor
+                    property point pressGlobal
+                    property point pressWindow
+                    onPressed: function(mouse) {
+                        pressGlobal = tearOffGrip.mapToGlobal(mouse.x, mouse.y)
+                        pressWindow = Qt.point(drawerPopup.x, drawerPopup.y)
+                    }
+                    onPositionChanged: function(mouse) {
+                        if (!(mouse.buttons & Qt.LeftButton)) return
+                        var p = tearOffGrip.mapToGlobal(mouse.x, mouse.y)
+                        if (!root.drawerDetached) drawerPopup.detachDrawer(p.x, p.y)
+                        drawerPopup.x = pressWindow.x + p.x - pressGlobal.x
+                        drawerPopup.y = pressWindow.y + p.y - pressGlobal.y
+                    }
+                    onDoubleClicked: drawerPopup.attachAndHide()
+                }
+            }
+
             // --- Launcher strip -----------------------------------------------
             ListView {
                 id: launcherList
-                anchors.fill: parent
+                z: 2
+                anchors {
+                    left: root.isHorizontalDock ? parent.left : tearOffGrip.right
+                    right: parent.right
+                    top: root.isHorizontalDock ? tearOffGrip.bottom : parent.top
+                    bottom: parent.bottom
+                }
                 model:       launcherModel
                 orientation: root.isHorizontalDock ? ListView.Vertical : ListView.Horizontal
                 spacing:     0
@@ -576,7 +667,6 @@ Item {
                             var cmd = model.command || ""
                             if (cmd) {
                                 ProcessLauncher.launch(cmd)
-                                drawerPopup.closeDrawer()
                             }
                         }
                     }
@@ -587,6 +677,14 @@ Item {
                     mainText: model.command || ""
                     location: Plasmoid.location
                     active: launcherList.draggedItemIndex < 0
+                }
+
+                DropArea {
+                    anchors.fill: parent
+                    onEntered: function(drag) { drag.accept(Qt.CopyAction) }
+                    onDropped: function(drop) {
+                        root.launchDroppedFiles(model.command || "", drop)
+                    }
                 }
             }
         }
@@ -614,31 +712,17 @@ Item {
         // -------------------------------------------------------------------
         DropArea {
             anchors.fill: parent
-            keys: ["text/uri-list"]
+            z: 1
             onDropped: function(drop) {
-                drop.acceptProposedAction()
                 var cellSize = root.isHorizontalDock ? root.height : root.width
-                var coord    = root.isHorizontalDock ? drop.y : drop.x
+                var coord    = root.isHorizontalDock ? drop.y - 18 : drop.x - 18
                 var idx      = Math.max(0, Math.min(
                                    Math.floor(coord / cellSize),
                                    launcherModel.count))
-                root.addLauncherFromUrls(drop.urls, idx)
+                root.addLauncherFromDrop(drop, idx)
             }
         }
     }
 
-    }
-
-    Window {
-        id: ownerClickOverlay
-        flags: Qt.Popup | Qt.FramelessWindowHint
-        color: "transparent"
-        visible: false
-
-        MouseArea {
-            anchors.fill: parent
-            acceptedButtons: Qt.LeftButton
-            onClicked: drawerPopup.closeDrawer()
-        }
     }
 }

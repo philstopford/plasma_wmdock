@@ -27,4 +27,11 @@ public:
      *         if the file cannot be read or contains no @c Exec= entry.
      */
     Q_INVOKABLE QVariantMap read(const QString &fileUrl) const;
+
+    /**
+     * Build a launcher entry for a dropped URL. Desktop files are parsed,
+     * local executable files are launched directly, and other URLs use
+     * xdg-open.
+     */
+    Q_INVOKABLE QVariantMap launcherForUrl(const QString &fileUrl) const;
 };

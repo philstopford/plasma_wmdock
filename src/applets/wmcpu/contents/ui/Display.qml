@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 import QtQuick
-import QtQuick.Window
 import org.kde.plasma.plasmoid
+import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.private.wmdock 1.0
 
 /**
@@ -30,7 +30,7 @@ Item {
     readonly property bool isHorizontalDock: {
         if (externalOrientation === "vertical") return false
         if (externalOrientation === "horizontal") return true
-        return Plasmoid.location !== 5 && Plasmoid.location !== 6
+        return Plasmoid.formFactor !== PlasmaCore.Types.Vertical
     }
 
     readonly property url loadDisplaySource:
@@ -242,143 +242,44 @@ Item {
         enabled: root.loadAction === "clickDrawer" || root.loadAction === "clickToggleDrawer"
         onTapped: {
             if (loadPopup.drawerOpen || loadPopup.visible) {
-                if (root.loadClickToggles) loadPopup.closeDrawer()
+                loadPopup.closeDrawer()
                 return
             }
             loadPopup.openDrawer()
         }
     }
 
-    Window {
+    PlasmaCore.Dialog {
         id: loadPopup
-
-        flags: Qt.Popup | Qt.FramelessWindowHint
-        color: "transparent"
+        visualParent: root
+        location: root.isHorizontalDock
+                    ? (Plasmoid.location === PlasmaCore.Types.TopEdge
+                       ? PlasmaCore.Types.TopEdge : PlasmaCore.Types.BottomEdge)
+                    : (Plasmoid.location === PlasmaCore.Types.RightEdge
+                       ? PlasmaCore.Types.RightEdge : PlasmaCore.Types.LeftEdge)
+        flags: Qt.WindowDoesNotAcceptFocus
+        hideOnWindowDeactivate: false
         visible: false
 
         property bool drawerOpen: false
-        property real _hiddenPos: 0
-        onVisibleChanged: {
-            if (!visible) {
-                ownerClickOverlay.visible = false
-                autoCloseStateResetTimer.restart()
-            }
-        }
-
-        Timer {
-            id: autoCloseStateResetTimer
-            interval: 250
-            repeat: false
-            onTriggered: {
-                if (!loadPopup.visible) {
-                    loadPopup.drawerOpen = false
-                }
-            }
-        }
-
-        NumberAnimation {
-            id: loadSlideInAnim
-            target: loadPopup
-            duration: 160
-            easing.type: Easing.OutQuad
-        }
-
-        SequentialAnimation {
-            id: loadSlideOutAnim
-            PropertyAnimation {
-                id: loadSlideOutPropAnim
-                target: loadPopup
-                duration: 140
-                easing.type: Easing.InQuad
-            }
-            ScriptAction { script: loadPopup.visible = false }
-        }
+        property bool drawerDetached: false
 
         function openDrawer() {
-            autoCloseStateResetTimer.stop()
-            loadSlideOutAnim.stop()
             drawerOpen = true
-
-            var popW = root.width
-            var popH = root.height
-            width = popW
-            height = popH
-
-            var btnPos = root.mapToGlobal(0, 0)
-            var scr = root.Screen
-            var gap = 4
-            var targetX, targetY
-
-            if (root.isHorizontalDock) {
-                targetX = btnPos.x
-                if (btnPos.y - popH - gap >= scr.virtualY) {
-                    targetY = btnPos.y - popH - gap
-                    _hiddenPos = btnPos.y - gap
-                } else {
-                    targetY = btnPos.y + root.height + gap
-                    _hiddenPos = targetY - popH
-                }
-            } else {
-                targetY = btnPos.y
-                if (Plasmoid.location === 6) {
-                    targetX = btnPos.x - popW - gap
-                    _hiddenPos = btnPos.x - gap
-                } else {
-                    targetX = btnPos.x + root.width + gap
-                    _hiddenPos = targetX - popW
-                }
-            }
-
-            targetX = Math.max(scr.virtualX, Math.min(targetX, scr.virtualX + scr.width - popW))
-            targetY = Math.max(scr.virtualY, Math.min(targetY, scr.virtualY + scr.height - popH))
-
             opacity = 1
-            if (root.isHorizontalDock) {
-                x = targetX
-                y = _hiddenPos
-                loadSlideInAnim.property = "y"
-                loadSlideInAnim.from = _hiddenPos
-                loadSlideInAnim.to = targetY
-            } else {
-                x = _hiddenPos
-                y = targetY
-                loadSlideInAnim.property = "x"
-                loadSlideInAnim.from = _hiddenPos
-                loadSlideInAnim.to = targetX
-            }
-            ownerClickOverlay.x = btnPos.x
-            ownerClickOverlay.y = btnPos.y
-            ownerClickOverlay.width = root.width
-            ownerClickOverlay.height = root.height
             visible = true
-            ownerClickOverlay.visible = !root.loadClickToggles
-            loadSlideInAnim.start()
         }
 
         function closeDrawer() {
-            autoCloseStateResetTimer.stop()
-            ownerClickOverlay.visible = false
-            if (!visible) {
-                drawerOpen = false
-                return
-            }
-            loadSlideInAnim.stop()
             drawerOpen = false
-            loadSlideOutPropAnim.property = root.isHorizontalDock ? "y" : "x"
-            loadSlideOutPropAnim.to = _hiddenPos
-            loadSlideOutAnim.start()
+            drawerDetached = false
+            visible = false
         }
 
-        Item {
+        mainItem: Item {
             id: loadContent
-            anchors.fill: parent
-
-            MouseArea {
-                anchors.fill: parent
-                acceptedButtons: Qt.LeftButton
-                z: 10
-                onClicked: loadPopup.closeDrawer()
-            }
+            implicitWidth: root.width + (root.isHorizontalDock ? 0 : 18)
+            implicitHeight: root.height + (root.isHorizontalDock ? 18 : 0)
 
             Rectangle {
                 anchors.fill: parent
@@ -388,24 +289,59 @@ Item {
                 radius: 4
             }
 
+            Rectangle {
+                id: loadGrip
+                z: 2
+                width: root.isHorizontalDock ? parent.width : 18
+                height: root.isHorizontalDock ? 18 : parent.height
+                color: "#252525"
+                border.color: "#555"
+                border.width: 1
+
+                Text {
+                    anchors.centerIn: parent
+                    text: root.isHorizontalDock ? "≡" : "⋮"
+                    color: "#888"
+                    font.pixelSize: 12
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.SizeAllCursor
+                    property point pressGlobal
+                    property point pressWindow
+                    onPressed: function(mouse) {
+                        pressGlobal = loadGrip.mapToGlobal(mouse.x, mouse.y)
+                        pressWindow = Qt.point(loadPopup.x, loadPopup.y)
+                    }
+                    onPositionChanged: function(mouse) {
+                        if (!(mouse.buttons & Qt.LeftButton)) return
+                        loadPopup.drawerDetached = true
+                        var p = loadGrip.mapToGlobal(mouse.x, mouse.y)
+                        loadPopup.x = pressWindow.x + p.x - pressGlobal.x
+                        loadPopup.y = pressWindow.y + p.y - pressGlobal.y
+                    }
+                }
+                Text {
+                    z: 3
+                    anchors { right: parent.right; top: parent.top; margins: 2 }
+                    text: "×"
+                    color: "#aaa"
+                    font.pixelSize: 12
+                    MouseArea { anchors.fill: parent; anchors.margins: -3; onClicked: loadPopup.closeDrawer() }
+                }
+            }
+
             Loader {
-                anchors { fill: parent; margins: 1 }
+                anchors {
+                    left: root.isHorizontalDock ? parent.left : loadGrip.right
+                    right: parent.right
+                    top: root.isHorizontalDock ? loadGrip.bottom : parent.top
+                    bottom: parent.bottom
+                    margins: 1
+                }
                 active: loadPopup.visible
                 source: root.loadDisplaySource
             }
-        }
-    }
-
-    Window {
-        id: ownerClickOverlay
-        flags: Qt.Popup | Qt.FramelessWindowHint
-        color: "transparent"
-        visible: false
-
-        MouseArea {
-            anchors.fill: parent
-            acceptedButtons: Qt.LeftButton
-            onClicked: loadPopup.closeDrawer()
         }
     }
 }

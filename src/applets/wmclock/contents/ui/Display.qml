@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 import QtQuick
 import QtQuick.Controls as QQC2
-import QtQuick.Window
 import org.kde.plasma.plasmoid
+import org.kde.plasma.core as PlasmaCore
 
 /**
  * WMClock – Analog / Nixie-Tube clock applet styled after the classic wmclock dockapp.
@@ -34,7 +34,7 @@ Item {
     readonly property bool isHorizontalDock: {
         if (externalOrientation === "vertical") return false
         if (externalOrientation === "horizontal") return true
-        return Plasmoid.location !== 5 && Plasmoid.location !== 6
+        return Plasmoid.formFactor !== PlasmaCore.Types.Vertical
     }
 
     readonly property url calendarDisplaySource:
@@ -922,143 +922,44 @@ Item {
         enabled: root.calendarAction === "clickDrawer" || root.calendarAction === "clickToggleDrawer"
         onTapped: {
             if (calendarPopup.drawerOpen || calendarPopup.visible) {
-                if (root.calendarClickToggles) calendarPopup.closeDrawer()
+                calendarPopup.closeDrawer()
                 return
             }
             calendarPopup.openDrawer()
         }
     }
 
-    Window {
+    PlasmaCore.Dialog {
         id: calendarPopup
-
-        flags: Qt.Popup | Qt.FramelessWindowHint
-        color: "transparent"
+        visualParent: root
+        location: root.isHorizontalDock
+                    ? (Plasmoid.location === PlasmaCore.Types.TopEdge
+                       ? PlasmaCore.Types.TopEdge : PlasmaCore.Types.BottomEdge)
+                    : (Plasmoid.location === PlasmaCore.Types.RightEdge
+                       ? PlasmaCore.Types.RightEdge : PlasmaCore.Types.LeftEdge)
+        flags: Qt.WindowDoesNotAcceptFocus
+        hideOnWindowDeactivate: false
         visible: false
 
         property bool drawerOpen: false
-        property real _hiddenPos: 0
-        onVisibleChanged: {
-            if (!visible) {
-                ownerClickOverlay.visible = false
-                autoCloseStateResetTimer.restart()
-            }
-        }
-
-        Timer {
-            id: autoCloseStateResetTimer
-            interval: 250
-            repeat: false
-            onTriggered: {
-                if (!calendarPopup.visible) {
-                    calendarPopup.drawerOpen = false
-                }
-            }
-        }
-
-        NumberAnimation {
-            id: calendarSlideInAnim
-            target: calendarPopup
-            duration: 160
-            easing.type: Easing.OutQuad
-        }
-
-        SequentialAnimation {
-            id: calendarSlideOutAnim
-            PropertyAnimation {
-                id: calendarSlideOutPropAnim
-                target: calendarPopup
-                duration: 140
-                easing.type: Easing.InQuad
-            }
-            ScriptAction { script: calendarPopup.visible = false }
-        }
+        property bool drawerDetached: false
 
         function openDrawer() {
-            autoCloseStateResetTimer.stop()
-            calendarSlideOutAnim.stop()
             drawerOpen = true
-
-            var popW = root.width
-            var popH = root.height
-            width = popW
-            height = popH
-
-            var btnPos = root.mapToGlobal(0, 0)
-            var scr = root.Screen
-            var gap = 4
-            var targetX, targetY
-
-            if (root.isHorizontalDock) {
-                targetX = btnPos.x
-                if (btnPos.y - popH - gap >= scr.virtualY) {
-                    targetY = btnPos.y - popH - gap
-                    _hiddenPos = btnPos.y - gap
-                } else {
-                    targetY = btnPos.y + root.height + gap
-                    _hiddenPos = targetY - popH
-                }
-            } else {
-                targetY = btnPos.y
-                if (Plasmoid.location === 6) {
-                    targetX = btnPos.x - popW - gap
-                    _hiddenPos = btnPos.x - gap
-                } else {
-                    targetX = btnPos.x + root.width + gap
-                    _hiddenPos = targetX - popW
-                }
-            }
-
-            targetX = Math.max(scr.virtualX, Math.min(targetX, scr.virtualX + scr.width - popW))
-            targetY = Math.max(scr.virtualY, Math.min(targetY, scr.virtualY + scr.height - popH))
-
             opacity = 1
-            if (root.isHorizontalDock) {
-                x = targetX
-                y = _hiddenPos
-                calendarSlideInAnim.property = "y"
-                calendarSlideInAnim.from = _hiddenPos
-                calendarSlideInAnim.to = targetY
-            } else {
-                x = _hiddenPos
-                y = targetY
-                calendarSlideInAnim.property = "x"
-                calendarSlideInAnim.from = _hiddenPos
-                calendarSlideInAnim.to = targetX
-            }
-            ownerClickOverlay.x = btnPos.x
-            ownerClickOverlay.y = btnPos.y
-            ownerClickOverlay.width = root.width
-            ownerClickOverlay.height = root.height
             visible = true
-            ownerClickOverlay.visible = !root.calendarClickToggles
-            calendarSlideInAnim.start()
         }
 
         function closeDrawer() {
-            autoCloseStateResetTimer.stop()
-            ownerClickOverlay.visible = false
-            if (!visible) {
-                drawerOpen = false
-                return
-            }
-            calendarSlideInAnim.stop()
             drawerOpen = false
-            calendarSlideOutPropAnim.property = root.isHorizontalDock ? "y" : "x"
-            calendarSlideOutPropAnim.to = _hiddenPos
-            calendarSlideOutAnim.start()
+            drawerDetached = false
+            visible = false
         }
 
-        Item {
+        mainItem: Item {
             id: calendarContent
-            anchors.fill: parent
-
-            MouseArea {
-                anchors.fill: parent
-                acceptedButtons: Qt.LeftButton
-                z: 10
-                onClicked: calendarPopup.closeDrawer()
-            }
+            implicitWidth: root.width + (root.isHorizontalDock ? 0 : 18)
+            implicitHeight: root.height + (root.isHorizontalDock ? 18 : 0)
 
             Rectangle {
                 anchors.fill: parent
@@ -1068,24 +969,59 @@ Item {
                 radius: 4
             }
 
+            Rectangle {
+                id: calendarGrip
+                z: 2
+                width: root.isHorizontalDock ? parent.width : 18
+                height: root.isHorizontalDock ? 18 : parent.height
+                color: "#252525"
+                border.color: "#555"
+                border.width: 1
+
+                Text {
+                    anchors.centerIn: parent
+                    text: root.isHorizontalDock ? "≡" : "⋮"
+                    color: "#888"
+                    font.pixelSize: 12
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.SizeAllCursor
+                    property point pressGlobal
+                    property point pressWindow
+                    onPressed: function(mouse) {
+                        pressGlobal = calendarGrip.mapToGlobal(mouse.x, mouse.y)
+                        pressWindow = Qt.point(calendarPopup.x, calendarPopup.y)
+                    }
+                    onPositionChanged: function(mouse) {
+                        if (!(mouse.buttons & Qt.LeftButton)) return
+                        calendarPopup.drawerDetached = true
+                        var p = calendarGrip.mapToGlobal(mouse.x, mouse.y)
+                        calendarPopup.x = pressWindow.x + p.x - pressGlobal.x
+                        calendarPopup.y = pressWindow.y + p.y - pressGlobal.y
+                    }
+                }
+                Text {
+                    z: 3
+                    anchors { right: parent.right; top: parent.top; margins: 2 }
+                    text: "×"
+                    color: "#aaa"
+                    font.pixelSize: 12
+                    MouseArea { anchors.fill: parent; anchors.margins: -3; onClicked: calendarPopup.closeDrawer() }
+                }
+            }
+
             Loader {
-                anchors { fill: parent; margins: 1 }
+                anchors {
+                    left: root.isHorizontalDock ? parent.left : calendarGrip.right
+                    right: parent.right
+                    top: root.isHorizontalDock ? calendarGrip.bottom : parent.top
+                    bottom: parent.bottom
+                    margins: 1
+                }
                 active: calendarPopup.visible
                 source: root.calendarDisplaySource
             }
-        }
-    }
-
-    Window {
-        id: ownerClickOverlay
-        flags: Qt.Popup | Qt.FramelessWindowHint
-        color: "transparent"
-        visible: false
-
-        MouseArea {
-            anchors.fill: parent
-            acceptedButtons: Qt.LeftButton
-            onClicked: calendarPopup.closeDrawer()
         }
     }
 }

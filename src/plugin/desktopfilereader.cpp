@@ -4,6 +4,7 @@
 #include "desktopfilereader.h"
 
 #include <QFile>
+#include <QFileInfo>
 #include <QRegularExpression>
 #include <QTextStream>
 #include <QUrl>
@@ -72,5 +73,44 @@ QVariantMap DesktopFileReader::read(const QString &fileUrl) const
         {QStringLiteral("icon"),
          icon.isEmpty() ? QStringLiteral("application-x-executable") : icon},
         {QStringLiteral("label"), name.isEmpty() ? exec : name}
+    };
+}
+
+QVariantMap DesktopFileReader::launcherForUrl(const QString &fileUrl) const
+{
+    const QUrl url(fileUrl);
+    const QString path = url.isLocalFile() ? url.toLocalFile() : QString();
+
+    if (fileUrl.endsWith(QLatin1String(".desktop"), Qt::CaseInsensitive))
+        return read(fileUrl);
+
+    if (!path.isEmpty()) {
+        const QFileInfo info(path);
+        if (info.isFile() && info.isExecutable()) {
+            // QProcess::splitCommand understands a JSON-style double-quoted
+            // argument. Escape the two characters that are significant in it.
+            QString quotedPath = path;
+            quotedPath.replace(QLatin1Char('\\'), QStringLiteral("\\\\"));
+            quotedPath.replace(QLatin1Char('"'), QStringLiteral("\\\""));
+            const QString command = QString(QLatin1Char('"') + quotedPath + QLatin1Char('"'));
+            return {
+                {QStringLiteral("command"), command},
+                {QStringLiteral("icon"), QStringLiteral("application-x-executable")},
+                {QStringLiteral("label"), info.completeBaseName().isEmpty()
+                                              ? info.fileName() : info.completeBaseName()}
+            };
+        }
+    }
+
+    const QString label = !path.isEmpty() ? QFileInfo(path).fileName()
+                                          : url.fileName();
+    QString quotedUrl = fileUrl;
+    quotedUrl.replace(QLatin1Char('\\'), QStringLiteral("\\\\"));
+    quotedUrl.replace(QLatin1Char('"'), QStringLiteral("\\\""));
+    const QString command = QString(QStringLiteral("xdg-open \"") + quotedUrl + QLatin1Char('"'));
+    return {
+        {QStringLiteral("command"), command},
+        {QStringLiteral("icon"), QStringLiteral("application-x-executable")},
+        {QStringLiteral("label"), label.isEmpty() ? fileUrl : label}
     };
 }

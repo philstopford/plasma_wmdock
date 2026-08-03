@@ -21,6 +21,8 @@ Item {
     property int    slotIndex:  0
     property int    totalCount: 1
     property string slotConfig: ""   // JSON config for this slot
+    // Supplied by WMDock from the same property that controls its Flow.
+    property string dockOrientation: "horizontal"
 
     signal removeRequested()
     signal moveLeft()
@@ -79,14 +81,28 @@ Item {
         }
     }
 
+    // Keep the embedded drawer synchronized when Plasma finalizes or changes
+    // the dock form factor after the Loader has completed.
+    Binding {
+        target: appletLoader.item
+        property: "externalOrientation"
+        value: slot.dockOrientation
+        when: appletLoader.status === Loader.Ready &&
+              (slot.appletId === "org.kde.plasma.wmdrawer" ||
+               slot.appletId === "org.kde.plasma.wmcpu" ||
+               slot.appletId === "org.kde.plasma.wmclock")
+        restoreMode: Binding.RestoreBindingOrValue
+    }
+
     // Apply slotConfig to the loaded item whenever config or item changes
     function applySlotConfig() {
         if (!appletLoader.item) return
-        // Always propagate orientation so the drawer opens in the correct direction
-        // regardless of whether slotConfig has been populated yet.
-        // Plasma 6 location: 5 = LeftEdge, 6 = RightEdge → vertical dock; all others → horizontal dock.
+        // Match the same form-factor decision used by WMDock's Flow.  Location
+        // is not sufficient for a floating/desktop dock: it can have a vertical
+        // form factor while location is Floating, which previously made a
+        // second-row drawer anchor against the dock's first row.
         appletLoader.item.externalOrientation =
-            (Plasmoid.location === 5 || Plasmoid.location === 6) ? "vertical" : "horizontal"
+            slot.dockOrientation
         if (!slotConfig) return
         try {
             var cfg = JSON.parse(slotConfig)

@@ -97,6 +97,7 @@ PlasmoidItem {
                     slotIndex:  index
                     totalCount: appletList.length
                     slotConfig: index < slotConfigs.length ? slotConfigs[index] : ""
+                    dockOrientation: root.isVertical ? "vertical" : "horizontal"
 
                     onRemoveRequested: {
                         const lst = [...appletList]
