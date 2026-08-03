@@ -18,6 +18,8 @@ Item {
     readonly property bool weekStartsMonday: Plasmoid.configuration.weekStartsMonday ?? false
 
     property var _now: new Date()
+    property int viewYear: _now.getFullYear()
+    property int viewMonth: _now.getMonth()
 
     Timer {
         interval: 60000   // update every minute
@@ -45,10 +47,16 @@ Item {
     // When weekStartsMonday is true, Sunday (getDay()=0) maps to column 6.
     readonly property var  cells: buildCells()
 
+    function changeMonth(delta) {
+        const date = new Date(viewYear, viewMonth + delta, 1)
+        viewYear = date.getFullYear()
+        viewMonth = date.getMonth()
+    }
+
     function buildCells() {
-        let firstDay = new Date(todayYear, todayMonth, 1).getDay()  // 0=Sun
+        let firstDay = new Date(viewYear, viewMonth, 1).getDay()  // 0=Sun
         if (weekStartsMonday) firstDay = (firstDay + 6) % 7         // 0=Mon
-        const daysInMonth = new Date(todayYear, todayMonth + 1, 0).getDate()
+        const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate()
         let arr = []
         for (let i = 0; i < firstDay; i++)    arr.push(-1)
         for (let d = 1; d <= daysInMonth; d++) arr.push(d)
@@ -69,12 +77,51 @@ Item {
     // -----------------------------------------------------------------------
     // Month / year header
     // -----------------------------------------------------------------------
-    Text {
+    Row {
         id: monthHeader
-        anchors { top: parent.top; horizontalCenter: parent.horizontalCenter; topMargin: 1 }
-        text: monthNames[todayMonth] + " " + todayYear
-        color: "#0088ff"
-        font { pixelSize: parent.height * 0.11; family: "monospace"; bold: true }
+        anchors { top: parent.top; left: parent.left; right: parent.right; topMargin: 1 }
+        height: Math.max(previousMonth.implicitHeight, monthLabel.implicitHeight)
+
+        Text {
+            id: previousMonth
+            width: root.width * 0.2
+            text: "◀"
+            color: previousMouse.containsMouse ? "#ffffff" : "#0088ff"
+            font { pixelSize: root.height * 0.11; family: "monospace"; bold: true }
+            horizontalAlignment: Text.AlignHCenter
+            MouseArea {
+                id: previousMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.changeMonth(-1)
+            }
+        }
+
+        Text {
+            id: monthLabel
+            width: root.width * 0.6
+            text: monthNames[viewMonth] + " " + viewYear
+            color: "#0088ff"
+            font { pixelSize: root.height * 0.11; family: "monospace"; bold: true }
+            horizontalAlignment: Text.AlignHCenter
+        }
+
+        Text {
+            id: nextMonth
+            width: root.width * 0.2
+            text: "▶"
+            color: nextMouse.containsMouse ? "#ffffff" : "#0088ff"
+            font { pixelSize: root.height * 0.11; family: "monospace"; bold: true }
+            horizontalAlignment: Text.AlignHCenter
+            MouseArea {
+                id: nextMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.changeMonth(1)
+            }
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -121,7 +168,9 @@ Item {
                 width:  root.width / 7
                 height: calGrid.height / calGrid.rows
 
-                readonly property bool isToday: modelData === todayDay
+                readonly property bool isToday: modelData === todayDay &&
+                                                viewMonth === todayMonth &&
+                                                viewYear === todayYear
 
                 Rectangle {
                     anchors.centerIn: parent
