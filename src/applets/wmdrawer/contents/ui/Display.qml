@@ -49,6 +49,10 @@ Item {
     // runtime state: closing it attaches it back to the dock ready for the
     // next open.
     property bool drawerDetached: false
+    // Reserved insertion cell shown for the duration of an external drag.
+    // It deliberately survives transitions between delegates so the target
+    // does not move away from an imprecise pointer.
+    property bool dropSlotVisible: false
 
     // -----------------------------------------------------------------------
     // Resolved configuration
@@ -187,6 +191,27 @@ Item {
         }
         ProcessLauncher.launch(command + " " + args.join(" "))
         drop.accept(Qt.CopyAction)
+        dropSlotVisible = false
+    }
+
+    function beginExternalDrag() {
+        dropSlotHideTimer.stop()
+        dropSlotVisible = true
+    }
+
+    function endExternalDragSoon() {
+        dropSlotHideTimer.restart()
+    }
+
+    onDropSlotVisibleChanged: {
+        if (drawerPopup.visible) drawerPopup.updateDrawerSize()
+    }
+
+    Timer {
+        id: dropSlotHideTimer
+        interval: 700
+        repeat: false
+        onTriggered: root.dropSlotVisible = false
     }
 
     // -----------------------------------------------------------------------
@@ -320,11 +345,18 @@ Item {
         id: buttonDropArea
         anchors.fill: parent
         keys: ["text/uri-list"]
-        onEntered: hoverOpenTimer.start()
-        onExited:  hoverOpenTimer.stop()
+        onEntered: {
+            root.beginExternalDrag()
+            hoverOpenTimer.start()
+        }
+        onExited: {
+            hoverOpenTimer.stop()
+            root.endExternalDragSoon()
+        }
         onDropped: function(drop) {
             hoverOpenTimer.stop()
             root.addLauncherFromDrop(drop, -1)
+            root.dropSlotVisible = false
         }
     }
 
@@ -357,6 +389,18 @@ Item {
         // Open/closed state set by openDrawer()/closeDrawer() and synchronized
         // if the window is hidden externally.
         property bool drawerOpen: false
+
+        function updateDrawerSize() {
+            var cells = launcherModel.count + (root.dropSlotVisible ? 1 : 0)
+            cells = Math.max(1, cells)
+            var titleSize = 18
+            drawerContent.implicitWidth = root.isHorizontalDock
+                                          ? root.width
+                                          : root.width * cells + titleSize
+            drawerContent.implicitHeight = root.isHorizontalDock
+                                           ? root.height * cells + titleSize
+                                           : root.height
+        }
 
         function detachDrawer(globalX, globalY) {
             if (root.drawerDetached) return
@@ -401,14 +445,7 @@ Item {
                 })
             }
 
-            var n    = Math.max(1, ls.length)
-            var cellW = root.width
-            var cellH = root.height
-            var titleSize = 18
-            var popW  = root.isHorizontalDock ? cellW : cellW * n + titleSize
-            var popH  = root.isHorizontalDock ? cellH * n + titleSize : cellH
-            drawerContent.implicitWidth  = popW
-            drawerContent.implicitHeight = popH
+            updateDrawerSize()
 
             var effect = root.openEffect
             if (effect === "fade") {
@@ -423,6 +460,8 @@ Item {
 
         function closeDrawer() {
             autoCloseStateResetTimer.stop()
+            dropSlotHideTimer.stop()
+            root.dropSlotVisible = false
             if (root.drawerDetached) {
                 attachAndHide()
                 return
@@ -679,20 +718,40 @@ Item {
                     active: launcherList.draggedItemIndex < 0
                 }
 
-                DropArea {
-                    anchors.fill: parent
-                    onEntered: function(drag) { drag.accept(Qt.CopyAction) }
-                    onDropped: function(drop) {
-                        root.launchDroppedFiles(model.command || "", drop)
-                    }
+            }
+            }
+
+            // Stable insertion cell appended after the existing launchers.
+            // Moving from this cell onto a launcher keeps it allocated until
+            // the drag completes or leaves the drawer for a short grace period.
+            Item {
+                id: insertionSlot
+                z: 3
+                visible: root.dropSlotVisible
+                width: root.width
+                height: root.height
+                x: root.isHorizontalDock ? 0 : 18 + launcherModel.count * root.width
+                y: root.isHorizontalDock ? 18 + launcherModel.count * root.height : 0
+
+                Rectangle {
+                    anchors { fill: parent; margins: 2 }
+                    color: drawerDragArea.containsDrag ? "#183858" : "#151515"
+                    border.color: drawerDragArea.containsDrag ? "#5599ff" : "#555"
+                    border.width: 1
+                    radius: 3
+                }
+                Text {
+                    anchors.centerIn: parent
+                    text: "+"
+                    color: drawerDragArea.containsDrag ? "#ffffff" : "#777"
+                    font.pixelSize: Math.max(14, Math.min(parent.width, parent.height) * 0.35)
                 }
             }
-        }
 
         // Empty-state message
         Text {
             anchors.centerIn: parent
-            visible: launcherModel.count === 0
+            visible: launcherModel.count === 0 && !root.dropSlotVisible
             text:    i18n("No launchers configured.\nRight-click the drawer to configure.")
             color:   "#888888"
             font.pixelSize: 11
@@ -711,15 +770,37 @@ Item {
         // A drop past the last slot appends at the end.
         // -------------------------------------------------------------------
         DropArea {
+            id: drawerDragArea
             anchors.fill: parent
-            z: 1
+            // One top-level drag target avoids delegate/border hit-testing
+            // races. Mouse/touch events are unaffected by DropArea.
+            z: 20
+            onEntered: function(drag) {
+                root.beginExternalDrag()
+                drag.accept(Qt.CopyAction)
+            }
+            onPositionChanged: function(drag) {
+                root.beginExternalDrag()
+                drag.accept(Qt.CopyAction)
+            }
+            onExited: root.endExternalDragSoon()
             onDropped: function(drop) {
                 var cellSize = root.isHorizontalDock ? root.height : root.width
                 var coord    = root.isHorizontalDock ? drop.y - 18 : drop.x - 18
-                var idx      = Math.max(0, Math.min(
-                                   Math.floor(coord / cellSize),
-                                   launcherModel.count))
-                root.addLauncherFromDrop(drop, idx)
+                var existingExtent = launcherModel.count * cellSize
+
+                // Existing cell: use the dropped values as arguments for that
+                // launcher. Header, border, or appended cell: create entries.
+                if (coord >= 0 && coord < existingExtent) {
+                    var idx = Math.max(0, Math.min(
+                                           Math.floor(coord / cellSize),
+                                           launcherModel.count - 1))
+                    root.launchDroppedFiles(launcherModel.get(idx).command || "", drop)
+                } else {
+                    dropSlotHideTimer.stop()
+                    root.addLauncherFromDrop(drop, launcherModel.count)
+                }
+                root.dropSlotVisible = false
             }
         }
     }
