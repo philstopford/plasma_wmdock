@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 import QtQuick
 import QtQuick.Controls as QQC2
+import QtQuick.Dialogs
 import QtQuick.Layouts
+import org.kde.iconthemes as KIconThemes
 import org.kde.plasma.plasmoid
 import org.kde.plasma.components 3.0 as PlasmaComponents
 import org.kde.kirigami as Kirigami
@@ -373,7 +375,9 @@ Item {
                             launcherListModel.append({
                                 cmd:   item.command || "",
                                 ico:   item.icon    || "",
-                                lbl:   item.label   || ""
+                                lbl:   item.label   || "",
+                                desc:  item.description || "",
+                                gpu:   item.gpuPreference || "default"
                             })
                         }
                     }
@@ -439,11 +443,11 @@ Item {
     // Sub-dialog: edit a single launcher entry in the drawer
     QQC2.Dialog {
         id: launcherEditDialog
-        title: i18n("Edit Launcher")
+        title: editIndex >= 0 ? i18n("Edit Launcher") : i18n("Add Launcher")
         modal: true
         parent: QQC2.Overlay.overlay
         anchors.centerIn: parent
-        width: 320
+        width: 480
 
         property int editIndex: -1
 
@@ -454,22 +458,43 @@ Item {
                 editCmdField.text   = item.command || ""
                 editIconField.text  = item.icon    || ""
                 editLabelField.text = item.label   || ""
+                editDescriptionField.text = item.description || ""
+                var gpu = item.gpuPreference || "default"
+                for (var i = 0; i < editGpuField.model.length; ++i) {
+                    if (editGpuField.model[i].value === gpu) {
+                        editGpuField.currentIndex = i
+                        break
+                    }
+                }
             } else {
                 editCmdField.text   = ""
                 editIconField.text  = ""
                 editLabelField.text = ""
+                editDescriptionField.text = ""
+                editGpuField.currentIndex = 0
             }
             open()
         }
 
         contentItem: Kirigami.FormLayout {
-            QQC2.TextField {
-                id: editCmdField
+            RowLayout {
                 Kirigami.FormData.label: i18n("Command:")
-                placeholderText: "konsole"
+                QQC2.TextField {
+                    id: editCmdField
+                    Layout.fillWidth: true
+                    placeholderText: "konsole"
+                }
+                QQC2.ToolButton {
+                    icon.name: "document-open"
+                    text: i18n("Browse…")
+                    display: QQC2.AbstractButton.IconOnly
+                    QQC2.ToolTip.text: text
+                    QQC2.ToolTip.visible: hovered
+                    onClicked: editCommandFileDialog.open()
+                }
             }
             RowLayout {
-                Kirigami.FormData.label: i18n("Icon name:")
+                Kirigami.FormData.label: i18n("Icon:")
                 spacing: Kirigami.Units.smallSpacing
                 QQC2.TextField {
                     id: editIconField
@@ -478,15 +503,37 @@ Item {
                 }
                 Kirigami.Icon {
                     source: editIconField.text || "application-x-executable"
-                    width:  Kirigami.Units.iconSizes.medium
-                    height: Kirigami.Units.iconSizes.medium
+                    Layout.preferredWidth: Kirigami.Units.iconSizes.large
+                    Layout.preferredHeight: Kirigami.Units.iconSizes.large
                     isMask: false
+                }
+                QQC2.ToolButton {
+                    icon.name: "preferences-desktop-icons"
+                    text: i18n("Select Icon…")
+                    display: QQC2.AbstractButton.IconOnly
+                    QQC2.ToolTip.text: text
+                    QQC2.ToolTip.visible: hovered
+                    onClicked: editIconDialog.open()
                 }
             }
             QQC2.TextField {
                 id: editLabelField
                 Kirigami.FormData.label: i18n("Label:")
                 placeholderText: "Terminal"
+            }
+            QQC2.TextField {
+                id: editDescriptionField
+                Kirigami.FormData.label: i18n("Description:")
+            }
+            QQC2.ComboBox {
+                id: editGpuField
+                Kirigami.FormData.label: i18n("Graphics processor:")
+                textRole: "text"
+                model: [
+                    { text: i18n("System default"), value: "default" },
+                    { text: i18n("Integrated GPU"), value: "integrated" },
+                    { text: i18n("Discrete GPU (PRIME)"), value: "discrete" }
+                ]
             }
         }
 
@@ -505,7 +552,9 @@ Item {
             var entry = {
                 command: editCmdField.text  || "konsole",
                 icon:    editIconField.text || "application-x-executable",
-                label:   editLabelField.text || editCmdField.text || "Launch"
+                label:   editLabelField.text || editCmdField.text || "Launch",
+                description: editDescriptionField.text,
+                gpuPreference: editGpuField.model[editGpuField.currentIndex].value
             }
             if (editIndex >= 0 && editIndex < drawerConfigDialog.editingLaunchers.length) {
                 drawerConfigDialog.editingLaunchers[editIndex] = entry
@@ -513,6 +562,36 @@ Item {
                 drawerConfigDialog.editingLaunchers.push(entry)
             }
             launcherListView.reload()
+        }
+
+        FileDialog {
+            id: editCommandFileDialog
+            title: i18n("Select Command")
+            fileMode: FileDialog.OpenFile
+            nameFilters: [i18n("All files (*)")]
+            onAccepted: {
+                var value = selectedFile.toString()
+                var path = value.startsWith("file://")
+                           ? decodeURIComponent(value.slice(7)) : value
+                editCmdField.text = /\s/.test(path) ? JSON.stringify(path) : path
+            }
+        }
+
+        KIconThemes.IconDialog {
+            id: editIconDialog
+            property string pendingIcon: ""
+            title: i18n("Select Icon")
+            modality: Qt.ApplicationModal
+            onVisibleChanged: {
+                if (visible) pendingIcon = editIconField.text
+            }
+            onIconNameChanged: {
+                if (visible) pendingIcon = iconName
+            }
+            onAccepted: {
+                if (pendingIcon.length > 0) editIconField.text = pendingIcon
+            }
+            onRejected: pendingIcon = editIconField.text
         }
     }
 

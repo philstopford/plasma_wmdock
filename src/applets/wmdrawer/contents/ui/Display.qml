@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 import QtQuick
 import QtQuick.Controls as QQC2
+import QtQuick.Dialogs
 import QtQuick.Layouts
 import QtQuick.Window
+import org.kde.iconthemes as KIconThemes
 import org.kde.plasma.plasmoid
 import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
@@ -53,6 +55,8 @@ Item {
     // It deliberately survives transitions between delegates so the target
     // does not move away from an imprecise pointer.
     property bool dropSlotVisible: false
+    property int dropInsertIndex: -1
+    property int editingLauncherIndex: -1
 
     // -----------------------------------------------------------------------
     // Resolved configuration
@@ -88,13 +92,40 @@ Item {
         var arr = []
         for (var i = 0; i < launcherModel.count; i++) {
             var item = launcherModel.get(i)
-            arr.push({ command: item.command, icon: item.icon, label: item.label })
+            arr.push({ command: item.command, icon: item.icon, label: item.label,
+                       description: item.description || "",
+                       gpuPreference: item.gpuPreference || "default" })
         }
         if (root.externalLaunchers !== null) {
             root.launchersReordered(arr)
         } else {
             Plasmoid.configuration.launchersJson = JSON.stringify(arr)
         }
+    }
+
+    function editLauncher(index) {
+        editingLauncherIndex = index
+        var item = (index >= 0 && index < launcherModel.count)
+                   ? launcherModel.get(index) : null
+        launcherCommand.text = item ? (item.command || "") : ""
+        launcherIcon.text = item ? (item.icon || "") : ""
+        launcherName.text = item ? (item.label || "") : ""
+        launcherDescription.text = item ? (item.description || "") : ""
+        var preference = item ? (item.gpuPreference || "default") : "default"
+        for (var i = 0; i < launcherGpu.model.length; ++i) {
+            if (launcherGpu.model[i].value === preference) {
+                launcherGpu.currentIndex = i
+                break
+            }
+        }
+        launcherEditor.showEditor()
+    }
+
+    function removeLauncher(index) {
+        if (index < 0 || index >= launcherModel.count) return
+        launcherModel.remove(index)
+        saveLaunchersFromModel()
+        drawerPopup.updateDrawerSize()
     }
 
     // -----------------------------------------------------------------------
@@ -179,7 +210,7 @@ Item {
         drop.accept(Qt.CopyAction)
     }
 
-    function launchDroppedFiles(command, drop) {
+    function launchDroppedFiles(command, gpuPreference, drop) {
         var values = droppedValues(drop)
         if (!command || values.length === 0) return
         var args = []
@@ -189,13 +220,14 @@ Item {
                 value = decodeURIComponent(value.slice(7))
             args.push(JSON.stringify(value))
         }
-        ProcessLauncher.launch(command + " " + args.join(" "))
+        ProcessLauncher.launch(command + " " + args.join(" "), gpuPreference || "default")
         drop.accept(Qt.CopyAction)
         dropSlotVisible = false
     }
 
     function beginExternalDrag() {
         dropSlotHideTimer.stop()
+        if (dropInsertIndex < 0) dropInsertIndex = launcherModel.count
         dropSlotVisible = true
     }
 
@@ -391,7 +423,9 @@ Item {
         property bool drawerOpen: false
 
         function updateDrawerSize() {
-            var cells = launcherModel.count + (root.dropSlotVisible ? 1 : 0)
+            // The final cell is a permanent add gadget. During a drag it is
+            // repositioned to the currently hovered insertion boundary.
+            var cells = launcherModel.count + 1
             cells = Math.max(1, cells)
             var titleSize = 18
             drawerContent.implicitWidth = root.isHorizontalDock
@@ -400,6 +434,16 @@ Item {
             drawerContent.implicitHeight = root.isHorizontalDock
                                            ? root.height * cells + titleSize
                                            : root.height
+            // PlasmaCore.Dialog takes the initial implicit size when opened,
+            // but does not reliably adopt later mainItem growth on Wayland.
+            // Resize the live surface as well so an appended delegate occupies
+            // the old '+' cell and the '+' cell receives a new slot after it.
+            // Dialog width/height are the outer surface dimensions, so include
+            // Plasma's theme margins rather than shrinking the main item.
+            if (visible) {
+                width = drawerContent.implicitWidth + margins.left + margins.right
+                height = drawerContent.implicitHeight + margins.top + margins.bottom
+            }
         }
 
         function detachDrawer(globalX, globalY) {
@@ -441,7 +485,9 @@ Item {
                 launcherModel.append({
                     command: ls[i].command || "",
                     icon:    ls[i].icon    || "application-x-executable",
-                    label:   ls[i].label   || ls[i].command || "Launch"
+                    label:   ls[i].label   || ls[i].command || "Launch",
+                    description: ls[i].description || "",
+                    gpuPreference: ls[i].gpuPreference || "default"
                 })
             }
 
@@ -624,6 +670,15 @@ Item {
 
                     property bool itemPressed: false
 
+                    // Make room for the insertion gadget at the hovered
+                    // boundary without changing the launcher model.
+                    transform: Translate {
+                        x: !root.isHorizontalDock && root.dropSlotVisible
+                           && index >= root.dropInsertIndex ? root.width : 0
+                        y: root.isHorizontalDock && root.dropSlotVisible
+                           && index >= root.dropInsertIndex ? root.height : 0
+                    }
+
                 // Button background
                 Rectangle {
                     anchors { fill: parent; margins: delItem.itemPressed ? 2 : 1 }
@@ -705,15 +760,29 @@ Item {
                         if (launcherList.draggedItemIndex < 0) {
                             var cmd = model.command || ""
                             if (cmd) {
-                                ProcessLauncher.launch(cmd)
+                                ProcessLauncher.launch(cmd, model.gpuPreference || "default")
                             }
                         }
                     }
                 }
 
+                TapHandler {
+                    id: launcherRightTap
+                    acceptedButtons: Qt.RightButton
+                    onTapped: {
+                        launcherContextMenu.launcherIndex = index
+                        var clickPos = delItem.mapToItem(
+                            drawerContent, point.position.x, point.position.y)
+                        launcherContextMenu.x = clickPos.x
+                        launcherContextMenu.y = clickPos.y
+                        launcherContextMenu.open()
+                    }
+                }
+
                 PlasmaCore.ToolTipArea {
                     anchors.fill: parent
-                    mainText: model.command || ""
+                    mainText: model.label || model.command || ""
+                    subText: model.description || model.command || ""
                     location: Plasmoid.location
                     active: launcherList.draggedItemIndex < 0
                 }
@@ -721,38 +790,53 @@ Item {
             }
             }
 
-            // Stable insertion cell appended after the existing launchers.
-            // Moving from this cell onto a launcher keeps it allocated until
-            // the drag completes or leaves the drawer for a short grace period.
+            // Permanent add gadget. During an external drag it moves to the
+            // nearest boundary, producing a stable blank drop target.
             Item {
                 id: insertionSlot
                 z: 3
-                visible: root.dropSlotVisible
+                visible: true
                 width: root.width
                 height: root.height
-                x: root.isHorizontalDock ? 0 : 18 + launcherModel.count * root.width
-                y: root.isHorizontalDock ? 18 + launcherModel.count * root.height : 0
+                x: root.isHorizontalDock ? 0
+                   : 18 + (root.dropSlotVisible ? root.dropInsertIndex
+                                                : launcherModel.count) * root.width
+                y: root.isHorizontalDock
+                   ? 18 + (root.dropSlotVisible ? root.dropInsertIndex
+                                                : launcherModel.count) * root.height
+                   : 0
 
                 Rectangle {
                     anchors { fill: parent; margins: 2 }
-                    color: drawerDragArea.containsDrag ? "#183858" : "#151515"
-                    border.color: drawerDragArea.containsDrag ? "#5599ff" : "#555"
+                    color: root.dropSlotVisible ? "#183858" : "#151515"
+                    border.color: root.dropSlotVisible ? "#5599ff" : "#555"
                     border.width: 1
                     radius: 3
                 }
                 Text {
                     anchors.centerIn: parent
                     text: "+"
-                    color: drawerDragArea.containsDrag ? "#ffffff" : "#777"
+                    color: root.dropSlotVisible ? "#ffffff" : "#aaaaaa"
                     font.pixelSize: Math.max(14, Math.min(parent.width, parent.height) * 0.35)
+                }
+                TapHandler {
+                    acceptedButtons: Qt.LeftButton
+                    enabled: !root.dropSlotVisible
+                    onTapped: root.editLauncher(-1)
+                }
+                PlasmaCore.ToolTipArea {
+                    anchors.fill: parent
+                    mainText: i18n("Add launcher")
+                    active: !root.dropSlotVisible
+                    location: Plasmoid.location
                 }
             }
 
         // Empty-state message
         Text {
             anchors.centerIn: parent
-            visible: launcherModel.count === 0 && !root.dropSlotVisible
-            text:    i18n("No launchers configured.\nRight-click the drawer to configure.")
+            visible: false
+            text:    ""
             color:   "#888888"
             font.pixelSize: 11
             wrapMode: Text.WordWrap
@@ -777,10 +861,12 @@ Item {
             z: 20
             onEntered: function(drag) {
                 root.beginExternalDrag()
+                updateInsertionPosition(drag)
                 drag.accept(Qt.CopyAction)
             }
             onPositionChanged: function(drag) {
                 root.beginExternalDrag()
+                updateInsertionPosition(drag)
                 drag.accept(Qt.CopyAction)
             }
             onExited: root.endExternalDragSoon()
@@ -788,22 +874,200 @@ Item {
                 var cellSize = root.isHorizontalDock ? root.height : root.width
                 var coord    = root.isHorizontalDock ? drop.y - 18 : drop.x - 18
                 var existingExtent = launcherModel.count * cellSize
-
-                // Existing cell: use the dropped values as arguments for that
-                // launcher. Header, border, or appended cell: create entries.
-                if (coord >= 0 && coord < existingExtent) {
-                    var idx = Math.max(0, Math.min(
-                                           Math.floor(coord / cellSize),
-                                           launcherModel.count - 1))
-                    root.launchDroppedFiles(launcherModel.get(idx).command || "", drop)
+                dropSlotHideTimer.stop()
+                if (root.dropSlotVisible || coord < 0 || coord >= existingExtent) {
+                    root.addLauncherFromDrop(drop, Math.max(0, root.dropInsertIndex))
                 } else {
-                    dropSlotHideTimer.stop()
-                    root.addLauncherFromDrop(drop, launcherModel.count)
+                    var idx = Math.max(0, Math.min(Math.floor(coord / cellSize),
+                                                   launcherModel.count - 1))
+                    var target = launcherModel.get(idx)
+                    root.launchDroppedFiles(target.command || "",
+                                            target.gpuPreference || "default", drop)
                 }
                 root.dropSlotVisible = false
+            }
+
+            function updateInsertionPosition(drag) {
+                var cellSize = root.isHorizontalDock ? root.height : root.width
+                var coord = root.isHorizontalDock ? drag.y - 18 : drag.x - 18
+                var extent = launcherModel.count * cellSize
+                if (coord < 0 || coord >= extent) {
+                    root.dropInsertIndex = coord < 0 ? 0 : launcherModel.count
+                    root.dropSlotVisible = true
+                    return
+                }
+                var withinCell = coord % cellSize
+                var edge = Math.max(5, cellSize * 0.18)
+                // Entry centres remain file-drop targets for the launcher;
+                // either border reveals a full insertion cell.
+                if (withinCell <= edge || withinCell >= cellSize - edge) {
+                    root.dropInsertIndex = Math.max(0, Math.min(
+                        Math.round(coord / cellSize), launcherModel.count))
+                    root.dropSlotVisible = true
+                } else {
+                    root.dropSlotVisible = false
+                    root.dropInsertIndex = -1
+                }
+            }
+        }
+
+        // Keep this menu in the drawer window's scene, not the activation
+        // gadget's panel scene. Its explicit width prevents the narrow drawer
+        // cell from collapsing or clipping the menu contents.
+        QQC2.Menu {
+            id: launcherContextMenu
+            z: 100
+            width: Math.max(220, root.width)
+            property int launcherIndex: -1
+            QQC2.MenuItem {
+                width: launcherContextMenu.availableWidth
+                text: i18n("Edit Launcher…")
+                icon.name: "document-edit"
+                onTriggered: root.editLauncher(launcherContextMenu.launcherIndex)
+            }
+            QQC2.MenuItem {
+                width: launcherContextMenu.availableWidth
+                text: i18n("Remove Launcher")
+                icon.name: "edit-delete"
+                onTriggered: root.removeLauncher(launcherContextMenu.launcherIndex)
             }
         }
     }
 
+    }
+
+    // A real transient window is required here. QQC2.Dialog is a popup and,
+    // on Wayland, is constrained to the drawer's narrow popup surface; it
+    // therefore cannot extend inward from a right-edge panel.
+    Window {
+        id: launcherEditor
+        title: root.editingLauncherIndex >= 0 ? i18n("Edit Launcher")
+                                               : i18n("Add Launcher")
+        visible: false
+        modality: Qt.ApplicationModal
+        flags: Qt.Dialog
+        transientParent: drawerPopup
+        width: 480
+        height: 410
+        minimumWidth: 440
+        minimumHeight: 390
+        color: Kirigami.Theme.backgroundColor
+
+        function showEditor() {
+            visible = true
+            requestActivate()
+        }
+
+        ColumnLayout {
+            id: launcherEditorLayout
+            anchors { fill: parent; margins: Kirigami.Units.largeSpacing }
+            spacing: Kirigami.Units.largeSpacing
+
+            Kirigami.FormLayout {
+                Layout.fillWidth: true
+                RowLayout {
+                    Kirigami.FormData.label: i18n("Command:")
+                    QQC2.TextField {
+                        id: launcherCommand
+                        Layout.fillWidth: true
+                    }
+                    QQC2.ToolButton {
+                        icon.name: "document-open"
+                        text: i18n("Browse…")
+                        display: QQC2.AbstractButton.IconOnly
+                        QQC2.ToolTip.text: text
+                        QQC2.ToolTip.visible: hovered
+                        onClicked: commandFileDialog.open()
+                    }
+                }
+                RowLayout {
+                    Kirigami.FormData.label: i18n("Icon:")
+                    QQC2.TextField {
+                        id: launcherIcon
+                        Layout.fillWidth: true
+                    }
+                    Kirigami.Icon {
+                        source: launcherIcon.text || "application-x-executable"
+                        Layout.preferredWidth: Kirigami.Units.iconSizes.large
+                        Layout.preferredHeight: Kirigami.Units.iconSizes.large
+                    }
+                    QQC2.ToolButton {
+                        icon.name: "preferences-desktop-icons"
+                        text: i18n("Select Icon…")
+                        display: QQC2.AbstractButton.IconOnly
+                        QQC2.ToolTip.text: text
+                        QQC2.ToolTip.visible: hovered
+                        onClicked: iconDialog.open()
+                    }
+                }
+                QQC2.TextField { id: launcherName; Kirigami.FormData.label: i18n("Name:") }
+                QQC2.TextField { id: launcherDescription; Kirigami.FormData.label: i18n("Description:") }
+                QQC2.ComboBox {
+                    id: launcherGpu
+                    Kirigami.FormData.label: i18n("Graphics processor:")
+                    Layout.fillWidth: true
+                    textRole: "text"
+                    model: [
+                        { text: i18n("System default"), value: "default" },
+                        { text: i18n("Integrated GPU"), value: "integrated" },
+                        { text: i18n("Discrete GPU (PRIME)"), value: "discrete" }
+                    ]
+                }
+            }
+
+            Item { Layout.fillHeight: true }
+
+            QQC2.DialogButtonBox {
+                Layout.fillWidth: true
+                standardButtons: QQC2.DialogButtonBox.Ok | QQC2.DialogButtonBox.Cancel
+                onRejected: launcherEditor.close()
+                onAccepted: {
+                    var entry = {
+                        command: launcherCommand.text,
+                        icon: launcherIcon.text || "application-x-executable",
+                        label: launcherName.text || launcherCommand.text || i18n("Launch"),
+                        description: launcherDescription.text,
+                        gpuPreference: launcherGpu.model[launcherGpu.currentIndex].value
+                    }
+                    if (root.editingLauncherIndex >= 0)
+                        launcherModel.set(root.editingLauncherIndex, entry)
+                    else
+                        launcherModel.append(entry)
+                    root.saveLaunchersFromModel()
+                    drawerPopup.updateDrawerSize()
+                    launcherEditor.close()
+                }
+            }
+        }
+
+        FileDialog {
+            id: commandFileDialog
+            title: i18n("Select Command")
+            fileMode: FileDialog.OpenFile
+            nameFilters: [i18n("All files (*)")]
+            onAccepted: {
+                var value = selectedFile.toString()
+                var path = value.startsWith("file://")
+                           ? decodeURIComponent(value.slice(7)) : value
+                launcherCommand.text = /\s/.test(path) ? JSON.stringify(path) : path
+            }
+        }
+
+        KIconThemes.IconDialog {
+            id: iconDialog
+            property string pendingIcon: ""
+            title: i18n("Select Icon")
+            modality: Qt.ApplicationModal
+            onVisibleChanged: {
+                if (visible) pendingIcon = launcherIcon.text
+            }
+            onIconNameChanged: {
+                if (visible) pendingIcon = iconName
+            }
+            onAccepted: {
+                if (pendingIcon.length > 0) launcherIcon.text = pendingIcon
+            }
+            onRejected: pendingIcon = launcherIcon.text
+        }
     }
 }

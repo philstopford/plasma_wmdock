@@ -22,7 +22,7 @@ QVariantMap DesktopFileReader::read(const QString &fileUrl) const
 
     QTextStream in(&file);
     bool   inEntry = false;
-    QString name, exec, icon;
+    QString name, exec, icon, description;
 
     while (!in.atEnd()) {
         const QString line = in.readLine().trimmed();
@@ -52,6 +52,8 @@ QVariantMap DesktopFileReader::read(const QString &fileUrl) const
             exec = val;
         else if (key == QLatin1String("Icon") && icon.isEmpty())
             icon = val;
+        else if (key == QLatin1String("Comment") && description.isEmpty())
+            description = val;
     }
 
     // Strip .desktop field codes from the Exec value.
@@ -72,7 +74,8 @@ QVariantMap DesktopFileReader::read(const QString &fileUrl) const
         {QStringLiteral("command"), exec},
         {QStringLiteral("icon"),
          icon.isEmpty() ? QStringLiteral("application-x-executable") : icon},
-        {QStringLiteral("label"), name.isEmpty() ? exec : name}
+        {QStringLiteral("label"), name.isEmpty() ? exec : name},
+        {QStringLiteral("description"), description}
     };
 }
 

@@ -44,9 +44,10 @@ Item {
     Component.onCompleted: parseLaunchers()
     onCfg_launchersJsonChanged: parseLaunchers()
 
-    function commitLauncher(idx, cmd, ico, lbl) {
+    function commitLauncher(idx, cmd, ico, lbl, desc, gpu) {
         var arr = parsedLaunchers.slice()
-        var entry = { command: cmd, icon: ico, label: lbl }
+        var entry = { command: cmd, icon: ico, label: lbl, description: desc,
+                      gpuPreference: gpu }
         if (idx >= 0 && idx < arr.length) arr[idx] = entry
         else arr.push(entry)
         cfg_launchersJson = JSON.stringify(arr)
@@ -64,6 +65,14 @@ Item {
         editCmdInput.text   = src ? (src.command || "") : ""
         editIconInput.text  = src ? (src.icon    || "") : ""
         editLabelInput.text = src ? (src.label   || "") : ""
+        editDescriptionInput.text = src ? (src.description || "") : ""
+        var gpu = src ? (src.gpuPreference || "default") : "default"
+        for (var i = 0; i < editGpuInput.model.length; ++i) {
+            if (editGpuInput.model[i].value === gpu) {
+                editGpuInput.currentIndex = i
+                break
+            }
+        }
     }
 
     Kirigami.FormLayout {
@@ -302,6 +311,37 @@ Item {
             }
         }
 
+        Rectangle {
+            Kirigami.FormData.label: i18n("Description:")
+            implicitWidth: 200
+            implicitHeight: Kirigami.Units.gridUnit * 2
+            color: Kirigami.Theme.backgroundColor
+            border.color: editDescriptionInput.activeFocus ? Kirigami.Theme.highlightColor
+                                                           : Kirigami.Theme.disabledTextColor
+            border.width: 1
+            radius: 3
+            TextInput {
+                id: editDescriptionInput
+                anchors { fill: parent; margins: 4 }
+                color: Kirigami.Theme.textColor
+                selectedTextColor: Kirigami.Theme.highlightedTextColor
+                selectionColor: Kirigami.Theme.highlightColor
+                selectByMouse: true
+                verticalAlignment: TextInput.AlignVCenter
+            }
+        }
+
+        QQC2.ComboBox {
+            id: editGpuInput
+            Kirigami.FormData.label: i18n("Graphics processor:")
+            textRole: "text"
+            model: [
+                { text: i18n("System default"), value: "default" },
+                { text: i18n("Integrated GPU"), value: "integrated" },
+                { text: i18n("Discrete GPU (PRIME)"), value: "discrete" }
+            ]
+        }
+
         Row {
             Kirigami.FormData.label: ""
             spacing: Kirigami.Units.smallSpacing
@@ -313,11 +353,14 @@ Item {
                     var cmd = editCmdInput.text   || "konsole"
                     var ico = editIconInput.text  || "application-x-executable"
                     var lbl = editLabelInput.text || editCmdInput.text || "Launch"
-                    configPage.commitLauncher(configPage.editIndex, cmd, ico, lbl)
+                    configPage.commitLauncher(configPage.editIndex, cmd, ico, lbl,
+                                              editDescriptionInput.text,
+                                              editGpuInput.model[editGpuInput.currentIndex].value)
                     configPage.editIndex = -1
                     editCmdInput.text   = ""
                     editIconInput.text  = ""
                     editLabelInput.text = ""
+                    editDescriptionInput.text = ""
                 }
             }
 
@@ -330,6 +373,7 @@ Item {
                     editCmdInput.text   = ""
                     editIconInput.text  = ""
                     editLabelInput.text = ""
+                    editDescriptionInput.text = ""
                 }
             }
         }

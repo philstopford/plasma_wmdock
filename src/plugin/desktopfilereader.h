@@ -23,7 +23,8 @@ public:
      * @brief Read a .desktop file and return a QVariantMap with launcher fields.
      *
      * @param fileUrl  Either a @c file:// URL or a bare filesystem path.
-     * @return A map with keys @c command, @c icon, @c label, or an empty map
+     * @return A map with keys @c command, @c icon, @c label, and
+     *         @c description, or an empty map
      *         if the file cannot be read or contains no @c Exec= entry.
      */
     Q_INVOKABLE QVariantMap read(const QString &fileUrl) const;

@@ -14,7 +14,7 @@
       <default>Apps</default>
     </entry>
     <entry name="launchersJson" type="String">
-      <label>JSON array of launcher entries (command, icon, label)</label>
+      <label>JSON launcher entries (command, icon, label, description, GPU preference)</label>
       <default>[]</default>
     </entry>
     <entry name="openEffect" type="String">
