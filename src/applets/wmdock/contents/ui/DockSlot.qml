@@ -317,6 +317,37 @@ Item {
         height: 480
 
         property var editingLaunchers: []
+        property int pendingRemoveIndex: -1
+
+        function portableDrawer() {
+            return {
+                format: "plasma-wmdock-drawer",
+                version: 1,
+                drawer: {
+                    icon: drawerIconField.text || "folder",
+                    label: drawerLabelField.text || "Apps",
+                    clickMode: drawerClickToggleBox.checked ? "toggle" : "open",
+                    launchers: editingLaunchers
+                }
+            }
+        }
+
+        function importJson(contents) {
+            try {
+                var parsed = JSON.parse(contents)
+                if (parsed.format !== "plasma-wmdock-drawer" || parsed.version !== 1
+                    || !parsed.drawer || !Array.isArray(parsed.drawer.launchers))
+                    throw new Error(i18n("This is not a supported WMDrawer export."))
+                drawerIconField.text = parsed.drawer.icon || "folder"
+                drawerLabelField.text = parsed.drawer.label || "Apps"
+                drawerClickToggleBox.checked = parsed.drawer.clickMode === "toggle"
+                editingLaunchers = JSON.parse(JSON.stringify(parsed.drawer.launchers))
+                launcherListView.reload()
+            } catch (e) {
+                drawerIoError.text = i18n("Could not import drawer: %1", e.toString())
+                drawerIoError.open()
+            }
+        }
 
         function openForSlot() {
             try {
@@ -403,18 +434,31 @@ Item {
                         QQC2.ToolButton {
                             icon.name: "list-remove"
                             onClicked: {
-                                drawerConfigDialog.editingLaunchers.splice(index, 1)
-                                launcherListView.reload()
+                                drawerConfigDialog.pendingRemoveIndex = index
+                                configureRemoveConfirmation.open()
                             }
                         }
                     }
                 }
             }
 
-            QQC2.Button {
-                text: i18n("Add Launcher…")
-                Layout.alignment: Qt.AlignLeft
-                onClicked: launcherEditDialog.openFor(-1)
+            RowLayout {
+                Layout.fillWidth: true
+                QQC2.Button {
+                    text: i18n("Add Launcher…")
+                    onClicked: launcherEditDialog.openFor(-1)
+                }
+                Item { Layout.fillWidth: true }
+                QQC2.Button {
+                    text: i18n("Import…")
+                    icon.name: "document-import"
+                    onClicked: drawerImportDialog.open()
+                }
+                QQC2.Button {
+                    text: i18n("Export…")
+                    icon.name: "document-export"
+                    onClicked: drawerExportDialog.open()
+                }
             }
         }
 
@@ -437,6 +481,71 @@ Item {
                 launchers:    editingLaunchers
             }
             slot.slotConfigSaved(slotIndex, JSON.stringify(cfg))
+        }
+
+        FileDialog {
+            id: drawerImportDialog
+            title: i18n("Import Drawer")
+            fileMode: FileDialog.OpenFile
+            nameFilters: [i18n("WMDrawer files (*.json)"), i18n("All files (*)")]
+            onAccepted: {
+                var contents = DrawerFileIO.read(selectedFile)
+                if (DrawerFileIO.lastError.length > 0) {
+                    drawerIoError.text = i18n("Could not read drawer: %1", DrawerFileIO.lastError)
+                    drawerIoError.open()
+                } else {
+                    drawerConfigDialog.importJson(contents)
+                }
+            }
+        }
+
+        FileDialog {
+            id: drawerExportDialog
+            title: i18n("Export Drawer")
+            fileMode: FileDialog.SaveFile
+            defaultSuffix: "json"
+            nameFilters: [i18n("WMDrawer files (*.json)")]
+            onAccepted: {
+                var json = JSON.stringify(drawerConfigDialog.portableDrawer(), null, 2)
+                if (!DrawerFileIO.write(selectedFile, json)) {
+                    drawerIoError.text = i18n("Could not export drawer: %1", DrawerFileIO.lastError)
+                    drawerIoError.open()
+                }
+            }
+        }
+
+        QQC2.Dialog {
+            id: configureRemoveConfirmation
+            title: i18n("Remove Launcher")
+            modal: true
+            parent: QQC2.Overlay.overlay
+            anchors.centerIn: parent
+            standardButtons: QQC2.Dialog.Ok | QQC2.Dialog.Cancel
+            contentItem: QQC2.Label {
+                text: i18n("Remove this launcher from the drawer?")
+                padding: Kirigami.Units.largeSpacing
+            }
+            onAccepted: {
+                drawerConfigDialog.editingLaunchers.splice(
+                    drawerConfigDialog.pendingRemoveIndex, 1)
+                drawerConfigDialog.pendingRemoveIndex = -1
+                launcherListView.reload()
+            }
+        }
+
+        QQC2.Dialog {
+            id: drawerIoError
+            property alias text: drawerIoErrorLabel.text
+            title: i18n("Drawer Import/Export")
+            modal: true
+            parent: QQC2.Overlay.overlay
+            anchors.centerIn: parent
+            standardButtons: QQC2.Dialog.Ok
+            contentItem: QQC2.Label {
+                id: drawerIoErrorLabel
+                padding: Kirigami.Units.largeSpacing
+                wrapMode: Text.WordWrap
+            }
         }
     }
 

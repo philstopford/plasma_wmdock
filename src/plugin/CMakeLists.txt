@@ -2,6 +2,7 @@ set(PLUGIN_SOURCES
     wmdockplugin.cpp
     processlauncher.cpp
     desktopfilereader.cpp
+    drawerfileio.cpp
     systemmonitor.cpp
     networkmonitor.cpp
     batterymonitor.cpp

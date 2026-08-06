@@ -73,6 +73,21 @@ Or drag it to the desktop as a free-floating widget.
 Right-click the dock → **Configure WM Dock…** → **Applets** tab.
 Select which applets fill each slot and their order.
 
+### Drawer backup and synchronization
+
+Open a drawer's **Configure Drawer** dialog and use **Export…** to create a
+portable, human-readable JSON file. **Import…** restores the drawer appearance,
+launchers, descriptions, and GPU preferences. Imported changes are staged until
+the configuration dialog is accepted.
+
+Plasma does not store each drawer in a separate file. Standalone drawer settings
+and embedded WM Dock slot settings are normally held with the rest of the Plasma
+layout in `~/.config/plasma-org.kde.plasma.desktop-appletsrc`. Synchronizing that
+entire file with Dropbox or a similar service is not recommended while Plasma is
+running: it contains unrelated widget and screen-layout state, and concurrent
+edits can overwrite one another. Synchronizing exported drawer JSON files is the
+safer approach; import the desired file on each machine after it changes.
+
 ### Legacy Dockapp Support (X11 only)
 
 On an X11 Plasma session, additional slots of type *External Dockapp* can be

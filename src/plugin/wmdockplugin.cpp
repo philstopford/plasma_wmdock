@@ -9,6 +9,7 @@
 #include "audiospectrummonitor.h"
 #include "weatherprovider.h"
 #include "desktopfilereader.h"
+#include "drawerfileio.h"
 #include "processlauncher.h"
 #include "thermalmonitor.h"
 #include "storagemonitor.h"
@@ -61,6 +62,11 @@ void WMDockPlugin::registerTypes(const char *uri)
     qmlRegisterSingletonType<DesktopFileReader>(uri, 1, 0, "DesktopFileReader",
         [](QQmlEngine *, QJSEngine *) -> QObject * {
             return new DesktopFileReader();
+        });
+
+    qmlRegisterSingletonType<DrawerFileIO>(uri, 1, 0, "DrawerFileIO",
+        [](QQmlEngine *, QJSEngine *) -> QObject * {
+            return new DrawerFileIO();
         });
 
     qmlRegisterSingletonType<ThermalMonitor>(uri, 1, 0, "ThermalMonitor",

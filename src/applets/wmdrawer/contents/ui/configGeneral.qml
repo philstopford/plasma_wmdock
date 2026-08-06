@@ -26,6 +26,7 @@ Item {
     property string title:                   ""
 
     property int editIndex: -1
+    property int pendingRemoveIndex: -1
 
     // Simple property — updated imperatively to avoid computed-binding with
     // return statements which can confuse the QML parser in some Qt 6 builds.
@@ -57,6 +58,7 @@ Item {
         var arr = parsedLaunchers.slice()
         arr.splice(idx, 1)
         cfg_launchersJson = JSON.stringify(arr)
+        pendingRemoveIndex = -1
     }
 
     function startEdit(idx) {
@@ -215,9 +217,27 @@ Item {
                     }
                     QQC2.ToolButton {
                         icon.name: "list-remove"
-                        onClicked: configPage.removeLauncher(index)
+                        onClicked: configPage.pendingRemoveIndex = index
                     }
                 }
+            }
+        }
+
+        RowLayout {
+            Kirigami.FormData.label: ""
+            visible: configPage.pendingRemoveIndex >= 0
+            QQC2.Label {
+                text: i18n("Remove this launcher?")
+                Layout.fillWidth: true
+            }
+            QQC2.Button {
+                text: i18n("Cancel")
+                onClicked: configPage.pendingRemoveIndex = -1
+            }
+            QQC2.Button {
+                text: i18n("Remove")
+                icon.name: "edit-delete"
+                onClicked: configPage.removeLauncher(configPage.pendingRemoveIndex)
             }
         }
 

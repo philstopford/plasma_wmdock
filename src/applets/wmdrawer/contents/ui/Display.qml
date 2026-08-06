@@ -57,6 +57,7 @@ Item {
     property bool dropSlotVisible: false
     property int dropInsertIndex: -1
     property int editingLauncherIndex: -1
+    property int pendingRemoveIndex: -1
 
     // -----------------------------------------------------------------------
     // Resolved configuration
@@ -125,7 +126,13 @@ Item {
         if (index < 0 || index >= launcherModel.count) return
         launcherModel.remove(index)
         saveLaunchersFromModel()
-        drawerPopup.updateDrawerSize()
+        scheduleDrawerLayout()
+    }
+
+    function confirmRemoveLauncher(index) {
+        if (index < 0 || index >= launcherModel.count) return
+        pendingRemoveIndex = index
+        removeConfirmation.showConfirmation()
     }
 
     // -----------------------------------------------------------------------
@@ -235,9 +242,7 @@ Item {
         dropSlotHideTimer.restart()
     }
 
-    onDropSlotVisibleChanged: {
-        if (drawerPopup.visible) drawerPopup.updateDrawerSize()
-    }
+    onDropSlotVisibleChanged: scheduleDrawerLayout()
 
     Timer {
         id: dropSlotHideTimer
@@ -397,6 +402,27 @@ Item {
     // reflected without requiring a re-parse of the config.
     // -----------------------------------------------------------------------
     ListModel { id: launcherModel }
+
+    function scheduleDrawerLayout() {
+        drawerLayoutTimer.restart()
+    }
+
+    Timer {
+        id: drawerLayoutTimer
+        interval: 0
+        repeat: false
+        onTriggered: {
+            // Wait until ListView has consumed the model notification, then
+            // position its footer and resize the native popup as one update.
+            launcherList.forceLayout()
+            drawerPopup.updateDrawerSize()
+        }
+    }
+
+    Connections {
+        target: launcherModel
+        function onCountChanged() { root.scheduleDrawerLayout() }
+    }
 
     // -----------------------------------------------------------------------
     // PlasmaCore.Dialog remains a Plasma-managed popup for its entire life.
@@ -659,6 +685,36 @@ Item {
                     NumberAnimation { properties: "x,y"; duration: 80 }
                 }
 
+                footer: Item {
+                    id: addLauncherSlot
+                    width: root.width
+                    height: root.height
+                    visible: !root.dropSlotVisible
+
+                    Rectangle {
+                        anchors { fill: parent; margins: 2 }
+                        color: "#151515"
+                        border.color: "#555"
+                        border.width: 1
+                        radius: 3
+                    }
+                    Text {
+                        anchors.centerIn: parent
+                        text: "+"
+                        color: "#aaaaaa"
+                        font.pixelSize: Math.max(14, Math.min(parent.width, parent.height) * 0.35)
+                    }
+                    TapHandler {
+                        acceptedButtons: Qt.LeftButton
+                        onTapped: root.editLauncher(-1)
+                    }
+                    PlasmaCore.ToolTipArea {
+                        anchors.fill: parent
+                        mainText: i18n("Add launcher")
+                        location: Plasmoid.location
+                    }
+                }
+
                 delegate: Item {
                     id: delItem
 
@@ -771,11 +827,13 @@ Item {
                     acceptedButtons: Qt.RightButton
                     onTapped: {
                         launcherContextMenu.launcherIndex = index
+                        // Delegates carry a ListView content offset. Passing a
+                        // delegate directly as the native popup parent can make
+                        // Qt apply that offset twice. Map exactly once into the
+                        // drawer window's stable top-level content coordinates.
                         var clickPos = delItem.mapToItem(
                             drawerContent, point.position.x, point.position.y)
-                        launcherContextMenu.x = clickPos.x
-                        launcherContextMenu.y = clickPos.y
-                        launcherContextMenu.open()
+                        launcherContextMenu.popup(drawerContent, clickPos)
                     }
                 }
 
@@ -790,45 +848,30 @@ Item {
             }
             }
 
-            // Permanent add gadget. During an external drag it moves to the
-            // nearest boundary, producing a stable blank drop target.
+            // During an external drag the ListView footer is hidden and this
+            // cell occupies the hovered boundary. In normal use the footer is
+            // authoritative, so model changes can never overlap the '+' cell.
             Item {
-                id: insertionSlot
+                id: dragInsertionSlot
                 z: 3
-                visible: true
+                visible: root.dropSlotVisible
                 width: root.width
                 height: root.height
-                x: root.isHorizontalDock ? 0
-                   : 18 + (root.dropSlotVisible ? root.dropInsertIndex
-                                                : launcherModel.count) * root.width
-                y: root.isHorizontalDock
-                   ? 18 + (root.dropSlotVisible ? root.dropInsertIndex
-                                                : launcherModel.count) * root.height
-                   : 0
+                x: root.isHorizontalDock ? 0 : 18 + root.dropInsertIndex * root.width
+                y: root.isHorizontalDock ? 18 + root.dropInsertIndex * root.height : 0
 
                 Rectangle {
                     anchors { fill: parent; margins: 2 }
-                    color: root.dropSlotVisible ? "#183858" : "#151515"
-                    border.color: root.dropSlotVisible ? "#5599ff" : "#555"
+                    color: "#183858"
+                    border.color: "#5599ff"
                     border.width: 1
                     radius: 3
                 }
                 Text {
                     anchors.centerIn: parent
                     text: "+"
-                    color: root.dropSlotVisible ? "#ffffff" : "#aaaaaa"
+                    color: "#ffffff"
                     font.pixelSize: Math.max(14, Math.min(parent.width, parent.height) * 0.35)
-                }
-                TapHandler {
-                    acceptedButtons: Qt.LeftButton
-                    enabled: !root.dropSlotVisible
-                    onTapped: root.editLauncher(-1)
-                }
-                PlasmaCore.ToolTipArea {
-                    anchors.fill: parent
-                    mainText: i18n("Add launcher")
-                    active: !root.dropSlotVisible
-                    location: Plasmoid.location
                 }
             }
 
@@ -929,7 +972,7 @@ Item {
                 width: launcherContextMenu.availableWidth
                 text: i18n("Remove Launcher")
                 icon.name: "edit-delete"
-                onTriggered: root.removeLauncher(launcherContextMenu.launcherIndex)
+                onTriggered: root.confirmRemoveLauncher(launcherContextMenu.launcherIndex)
             }
         }
     }
@@ -1034,7 +1077,7 @@ Item {
                     else
                         launcherModel.append(entry)
                     root.saveLaunchersFromModel()
-                    drawerPopup.updateDrawerSize()
+                    root.scheduleDrawerLayout()
                     launcherEditor.close()
                 }
             }
@@ -1068,6 +1111,45 @@ Item {
                 if (pendingIcon.length > 0) launcherIcon.text = pendingIcon
             }
             onRejected: pendingIcon = launcherIcon.text
+        }
+    }
+
+    Window {
+        id: removeConfirmation
+        visible: false
+        modality: Qt.ApplicationModal
+        flags: Qt.Dialog
+        transientParent: drawerPopup
+        title: i18n("Remove Launcher")
+        width: 380
+        height: 150
+        color: Kirigami.Theme.backgroundColor
+
+        function showConfirmation() {
+            visible = true
+            requestActivate()
+        }
+
+        ColumnLayout {
+            anchors { fill: parent; margins: Kirigami.Units.largeSpacing }
+            QQC2.Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: i18n("Remove “%1” from this drawer?",
+                           root.pendingRemoveIndex >= 0
+                           ? launcherModel.get(root.pendingRemoveIndex).label : "")
+            }
+            Item { Layout.fillHeight: true }
+            QQC2.DialogButtonBox {
+                Layout.fillWidth: true
+                standardButtons: QQC2.DialogButtonBox.Ok | QQC2.DialogButtonBox.Cancel
+                onRejected: removeConfirmation.close()
+                onAccepted: {
+                    root.removeLauncher(root.pendingRemoveIndex)
+                    root.pendingRemoveIndex = -1
+                    removeConfirmation.close()
+                }
+            }
         }
     }
 }
