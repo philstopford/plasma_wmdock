@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 import QtQuick
 import QtQuick.Controls as QQC2
+import QtQuick.Dialogs
 import QtQuick.Layouts
+import org.kde.iconthemes as KIconThemes
 import org.kde.kirigami as Kirigami
 
 // Root must be plain Item so Plasma can embed it in its own config dialog.
-// All content lives inside a single Kirigami.FormLayout anchored left/right
-// directly to the root Item — this is the only proven-to-work pattern in
-// Plasma 6 (matching wmlauncher/wmnet). Additional sections use
-// Kirigami.FormData.isSection separators rather than extra children outside
-// the FormLayout.
+// Keep the visual content in one FormLayout, but let it scroll because Plasma's
+// configuration host does not guarantee enough height for every font/DPI.
 Item {
     id: configPage
 
@@ -77,9 +76,16 @@ Item {
         }
     }
 
-    Kirigami.FormLayout {
-        anchors.left:  parent.left
-        anchors.right: parent.right
+    QQC2.ScrollView {
+        id: configScrollView
+        anchors.fill: parent
+        clip: true
+        contentWidth: availableWidth
+        QQC2.ScrollBar.horizontal.policy: QQC2.ScrollBar.AlwaysOff
+
+        Kirigami.FormLayout {
+            id: settingsForm
+            width: configScrollView.availableWidth
 
         // ── Drawer appearance ───────────────────────────────────────────────
 
@@ -250,57 +256,87 @@ Item {
                                          : i18n("Add Launcher")
         }
 
-        Rectangle {
+        RowLayout {
             Kirigami.FormData.label: i18n("Command:")
-            implicitWidth:  200
-            implicitHeight: Kirigami.Units.gridUnit * 2
-            color:        Kirigami.Theme.backgroundColor
-            border.color: editCmdInput.activeFocus ? Kirigami.Theme.highlightColor
-                                                   : Kirigami.Theme.disabledTextColor
-            border.width: 1
-            radius: 3
-            Text {
-                anchors { fill: parent; margins: 4 }
-                text:  "konsole"
-                color: Kirigami.Theme.disabledTextColor
-                visible: editCmdInput.text.length === 0
-                verticalAlignment: Text.AlignVCenter
+            implicitWidth: Kirigami.Units.gridUnit * 20
+
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: Kirigami.Units.gridUnit * 2
+                color: Kirigami.Theme.backgroundColor
+                border.color: editCmdInput.activeFocus ? Kirigami.Theme.highlightColor
+                                                       : Kirigami.Theme.disabledTextColor
+                border.width: 1
+                radius: 3
+                Text {
+                    anchors { fill: parent; margins: 4 }
+                    text: "konsole"
+                    color: Kirigami.Theme.disabledTextColor
+                    visible: editCmdInput.text.length === 0
+                    verticalAlignment: Text.AlignVCenter
+                }
+                TextInput {
+                    id: editCmdInput
+                    anchors { fill: parent; margins: 4 }
+                    color: Kirigami.Theme.textColor
+                    selectedTextColor: Kirigami.Theme.highlightedTextColor
+                    selectionColor: Kirigami.Theme.highlightColor
+                    selectByMouse: true
+                    verticalAlignment: TextInput.AlignVCenter
+                }
             }
-            TextInput {
-                id: editCmdInput
-                anchors { fill: parent; margins: 4 }
-                color:             Kirigami.Theme.textColor
-                selectedTextColor: Kirigami.Theme.highlightedTextColor
-                selectionColor:    Kirigami.Theme.highlightColor
-                selectByMouse:     true
-                verticalAlignment: TextInput.AlignVCenter
+            QQC2.ToolButton {
+                icon.name: "document-open"
+                text: i18n("Browse…")
+                display: QQC2.AbstractButton.IconOnly
+                QQC2.ToolTip.text: text
+                QQC2.ToolTip.visible: hovered
+                onClicked: editCommandFileDialog.open()
             }
         }
 
-        Rectangle {
-            Kirigami.FormData.label: i18n("Icon name:")
-            implicitWidth:  200
-            implicitHeight: Kirigami.Units.gridUnit * 2
-            color:        Kirigami.Theme.backgroundColor
-            border.color: editIconInput.activeFocus ? Kirigami.Theme.highlightColor
-                                                    : Kirigami.Theme.disabledTextColor
-            border.width: 1
-            radius: 3
-            Text {
-                anchors { fill: parent; margins: 4 }
-                text:  "utilities-terminal"
-                color: Kirigami.Theme.disabledTextColor
-                visible: editIconInput.text.length === 0
-                verticalAlignment: Text.AlignVCenter
+        RowLayout {
+            Kirigami.FormData.label: i18n("Icon:")
+            implicitWidth: Kirigami.Units.gridUnit * 20
+            spacing: Kirigami.Units.smallSpacing
+
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: Kirigami.Units.gridUnit * 2
+                color: Kirigami.Theme.backgroundColor
+                border.color: editIconInput.activeFocus ? Kirigami.Theme.highlightColor
+                                                        : Kirigami.Theme.disabledTextColor
+                border.width: 1
+                radius: 3
+                Text {
+                    anchors { fill: parent; margins: 4 }
+                    text: "utilities-terminal"
+                    color: Kirigami.Theme.disabledTextColor
+                    visible: editIconInput.text.length === 0
+                    verticalAlignment: Text.AlignVCenter
+                }
+                TextInput {
+                    id: editIconInput
+                    anchors { fill: parent; margins: 4 }
+                    color: Kirigami.Theme.textColor
+                    selectedTextColor: Kirigami.Theme.highlightedTextColor
+                    selectionColor: Kirigami.Theme.highlightColor
+                    selectByMouse: true
+                    verticalAlignment: TextInput.AlignVCenter
+                }
             }
-            TextInput {
-                id: editIconInput
-                anchors { fill: parent; margins: 4 }
-                color:             Kirigami.Theme.textColor
-                selectedTextColor: Kirigami.Theme.highlightedTextColor
-                selectionColor:    Kirigami.Theme.highlightColor
-                selectByMouse:     true
-                verticalAlignment: TextInput.AlignVCenter
+            Kirigami.Icon {
+                source: editIconInput.text || "application-x-executable"
+                Layout.preferredWidth: Kirigami.Units.iconSizes.large
+                Layout.preferredHeight: Kirigami.Units.iconSizes.large
+            }
+            QQC2.ToolButton {
+                icon.name: "preferences-desktop-icons"
+                text: i18n("Select Icon…")
+                display: QQC2.AbstractButton.IconOnly
+                QQC2.ToolTip.text: text
+                QQC2.ToolTip.visible: hovered
+                onClicked: editIconDialog.open()
             }
         }
 
@@ -362,40 +398,71 @@ Item {
             ]
         }
 
-        Row {
-            Kirigami.FormData.label: ""
-            spacing: Kirigami.Units.smallSpacing
+            Row {
+                Kirigami.FormData.label: ""
+                spacing: Kirigami.Units.smallSpacing
 
-            QQC2.Button {
-                text: configPage.editIndex >= 0 ? i18n("Update") : i18n("Add")
-                icon.name: configPage.editIndex >= 0 ? "document-save" : "list-add"
-                onClicked: {
-                    var cmd = editCmdInput.text   || "konsole"
-                    var ico = editIconInput.text  || "application-x-executable"
-                    var lbl = editLabelInput.text || editCmdInput.text || "Launch"
-                    configPage.commitLauncher(configPage.editIndex, cmd, ico, lbl,
-                                              editDescriptionInput.text,
-                                              editGpuInput.model[editGpuInput.currentIndex].value)
-                    configPage.editIndex = -1
-                    editCmdInput.text   = ""
-                    editIconInput.text  = ""
-                    editLabelInput.text = ""
-                    editDescriptionInput.text = ""
+                QQC2.Button {
+                    text: configPage.editIndex >= 0 ? i18n("Update") : i18n("Add")
+                    icon.name: configPage.editIndex >= 0 ? "document-save" : "list-add"
+                    onClicked: {
+                        var cmd = editCmdInput.text   || "konsole"
+                        var ico = editIconInput.text  || "application-x-executable"
+                        var lbl = editLabelInput.text || editCmdInput.text || "Launch"
+                        configPage.commitLauncher(configPage.editIndex, cmd, ico, lbl,
+                                                  editDescriptionInput.text,
+                                                  editGpuInput.model[editGpuInput.currentIndex].value)
+                        configPage.editIndex = -1
+                        editCmdInput.text   = ""
+                        editIconInput.text  = ""
+                        editLabelInput.text = ""
+                        editDescriptionInput.text = ""
+                    }
                 }
-            }
 
-            QQC2.Button {
-                text: i18n("Cancel")
-                icon.name: "dialog-cancel"
-                visible: configPage.editIndex >= 0
-                onClicked: {
-                    configPage.editIndex = -1
-                    editCmdInput.text   = ""
-                    editIconInput.text  = ""
-                    editLabelInput.text = ""
-                    editDescriptionInput.text = ""
+                QQC2.Button {
+                    text: i18n("Cancel")
+                    icon.name: "dialog-cancel"
+                    visible: configPage.editIndex >= 0
+                    onClicked: {
+                        configPage.editIndex = -1
+                        editCmdInput.text   = ""
+                        editIconInput.text  = ""
+                        editLabelInput.text = ""
+                        editDescriptionInput.text = ""
+                    }
                 }
             }
         }
+    }
+
+    FileDialog {
+        id: editCommandFileDialog
+        title: i18n("Select Command")
+        fileMode: FileDialog.OpenFile
+        nameFilters: [i18n("All files (*)")]
+        onAccepted: {
+            var value = selectedFile.toString()
+            var path = value.startsWith("file://")
+                       ? decodeURIComponent(value.slice(7)) : value
+            editCmdInput.text = /\s/.test(path) ? JSON.stringify(path) : path
+        }
+    }
+
+    KIconThemes.IconDialog {
+        id: editIconDialog
+        property string pendingIcon: ""
+        title: i18n("Select Icon")
+        modality: Qt.ApplicationModal
+        onVisibleChanged: {
+            if (visible) pendingIcon = editIconInput.text
+        }
+        onIconNameChanged: {
+            if (visible) pendingIcon = iconName
+        }
+        onAccepted: {
+            if (pendingIcon.length > 0) editIconInput.text = pendingIcon
+        }
+        onRejected: pendingIcon = editIconInput.text
     }
 }
