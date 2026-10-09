@@ -363,6 +363,111 @@ Item {
         }
     }
 
+    TapHandler {
+        acceptedButtons: Qt.RightButton
+        onTapped: {
+            var clickPos = root.mapToItem(root, point.position.x, point.position.y)
+            drawerContextMenu.popup(root, clickPos)
+        }
+    }
+
+    function portableDrawer() {
+        return {
+            format: "plasma-wmdock-drawer",
+            version: 1,
+            drawer: {
+                icon: root.drawerIcon || "folder",
+                label: root.drawerLabel || "Apps",
+                clickMode: root.drawerClickMode || "open",
+                launchers: root.launchers || []
+            }
+        }
+    }
+
+    function importDrawer(contents) {
+        try {
+            var parsed = JSON.parse(contents)
+            if (parsed.format !== "plasma-wmdock-drawer" || parsed.version !== 1
+                    || !parsed.drawer || !Array.isArray(parsed.drawer.launchers))
+                throw new Error(i18n("This is not a supported WMDrawer export."))
+            if (root.externalLaunchers !== null)
+                throw new Error(i18n("Embedded drawers must be imported through the dock menu."))
+
+            Plasmoid.configuration.drawerIcon = parsed.drawer.icon || "folder"
+            Plasmoid.configuration.drawerLabel = parsed.drawer.label || "Apps"
+            Plasmoid.configuration.drawerClickMode =
+                    parsed.drawer.clickMode === "toggle" ? "toggle" : "open"
+            Plasmoid.configuration.launchersJson = JSON.stringify(parsed.drawer.launchers)
+        } catch (e) {
+            drawerIoError.text = i18n("Could not import drawer: %1", e.toString())
+            drawerIoError.open()
+        }
+    }
+
+    QQC2.Menu {
+        id: drawerContextMenu
+        z: 100
+        width: Math.max(220, root.width)
+        QQC2.MenuItem {
+            width: drawerContextMenu.availableWidth
+            text: i18n("Import Drawer…")
+            icon.name: "document-import"
+            onTriggered: drawerImportDialog.open()
+        }
+        QQC2.MenuItem {
+            width: drawerContextMenu.availableWidth
+            text: i18n("Export Drawer…")
+            icon.name: "document-export"
+            onTriggered: drawerExportDialog.open()
+        }
+    }
+
+    FileDialog {
+        id: drawerImportDialog
+        title: i18n("Import Drawer")
+        fileMode: FileDialog.OpenFile
+        nameFilters: [i18n("WMDrawer files (*.json)"), i18n("All files (*)")]
+        onAccepted: {
+            var contents = DrawerFileIO.read(selectedFile)
+            if (DrawerFileIO.lastError.length > 0) {
+                drawerIoError.text = i18n("Could not read drawer: %1", DrawerFileIO.lastError)
+                drawerIoError.open()
+            } else {
+                root.importDrawer(contents)
+            }
+        }
+    }
+
+    FileDialog {
+        id: drawerExportDialog
+        title: i18n("Export Drawer")
+        fileMode: FileDialog.SaveFile
+        defaultSuffix: "json"
+        nameFilters: [i18n("WMDrawer files (*.json)")]
+        onAccepted: {
+            var json = JSON.stringify(root.portableDrawer(), null, 2)
+            if (!DrawerFileIO.write(selectedFile, json)) {
+                drawerIoError.text = i18n("Could not export drawer: %1", DrawerFileIO.lastError)
+                drawerIoError.open()
+            }
+        }
+    }
+
+    QQC2.Dialog {
+        id: drawerIoError
+        property alias text: drawerIoErrorLabel.text
+        title: i18n("Drawer Import/Export")
+        modal: true
+        parent: QQC2.Overlay.overlay
+        anchors.centerIn: parent
+        standardButtons: QQC2.Dialog.Ok
+        contentItem: QQC2.Label {
+            id: drawerIoErrorLabel
+            padding: Kirigami.Units.largeSpacing
+            wrapMode: Text.WordWrap
+        }
+    }
+
     PlasmaCore.ToolTipArea {
         anchors.fill: parent
         mainText: root.drawerLabel
@@ -973,6 +1078,19 @@ Item {
                 text: i18n("Remove Launcher")
                 icon.name: "edit-delete"
                 onTriggered: root.confirmRemoveLauncher(launcherContextMenu.launcherIndex)
+            }
+            QQC2.MenuSeparator {}
+            QQC2.MenuItem {
+                width: launcherContextMenu.availableWidth
+                text: i18n("Import Drawer…")
+                icon.name: "document-import"
+                onTriggered: drawerImportDialog.open()
+            }
+            QQC2.MenuItem {
+                width: launcherContextMenu.availableWidth
+                text: i18n("Export Drawer…")
+                icon.name: "document-export"
+                onTriggered: drawerExportDialog.open()
             }
         }
     }

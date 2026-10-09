@@ -5,6 +5,7 @@ import QtQuick.Dialogs
 import QtQuick.Layouts
 import org.kde.iconthemes as KIconThemes
 import org.kde.kirigami as Kirigami
+import org.kde.plasma.private.wmdock 1.0
 
 // Root must be plain Item so Plasma can embed it in its own config dialog.
 // Keep the visual content in one FormLayout, but let it scroll because Plasma's
@@ -58,6 +59,45 @@ Item {
         arr.splice(idx, 1)
         cfg_launchersJson = JSON.stringify(arr)
         pendingRemoveIndex = -1
+    }
+
+    function portableDrawer() {
+        return {
+            format: "plasma-wmdock-drawer",
+            version: 1,
+            drawer: {
+                icon: cfg_drawerIcon || "folder",
+                label: cfg_drawerLabel || "Apps",
+                clickMode: cfg_drawerClickMode || "open",
+                launchers: parsedLaunchers
+            }
+        }
+    }
+
+    function importDrawer(contents) {
+        try {
+            var parsed = JSON.parse(contents)
+            if (parsed.format !== "plasma-wmdock-drawer" || parsed.version !== 1
+                    || !parsed.drawer || !Array.isArray(parsed.drawer.launchers))
+                throw new Error(i18n("This is not a supported WMDrawer export."))
+
+            cfg_drawerIcon = parsed.drawer.icon || "folder"
+            cfg_drawerLabel = parsed.drawer.label || "Apps"
+            cfg_drawerClickMode = parsed.drawer.clickMode === "toggle" ? "toggle" : "open"
+            cfg_launchersJson = JSON.stringify(parsed.drawer.launchers)
+            drawerIconInput.text = cfg_drawerIcon
+            drawerLabelInput.text = cfg_drawerLabel
+            for (var i = 0; i < drawerClickModeCombo.model.length; ++i) {
+                if (drawerClickModeCombo.model[i].value === cfg_drawerClickMode) {
+                    drawerClickModeCombo.currentIndex = i
+                    break
+                }
+            }
+            drawerIoError.close()
+        } catch (e) {
+            drawerIoError.text = i18n("Could not import drawer: %1", e.toString())
+            drawerIoError.open()
+        }
     }
 
     function startEdit(idx) {
@@ -191,6 +231,26 @@ Item {
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
             Kirigami.FormData.label: i18n("Launchers")
+        }
+
+        RowLayout {
+            Kirigami.FormData.label: ""
+            QQC2.Button {
+                text: i18n("Import…")
+                icon.name: "document-import"
+                onClicked: drawerImportDialog.open()
+            }
+            QQC2.Button {
+                text: i18n("Export…")
+                icon.name: "document-export"
+                onClicked: drawerExportDialog.open()
+            }
+            QQC2.Label {
+                text: i18n("Move this drawer between machines as a JSON file.")
+                opacity: 0.7
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+            }
         }
 
         // ListView lives as a regular FormLayout child; explicit implicitWidth/
@@ -446,6 +506,52 @@ Item {
             var path = value.startsWith("file://")
                        ? decodeURIComponent(value.slice(7)) : value
             editCmdInput.text = /\s/.test(path) ? JSON.stringify(path) : path
+        }
+    }
+
+    FileDialog {
+        id: drawerImportDialog
+        title: i18n("Import Drawer")
+        fileMode: FileDialog.OpenFile
+        nameFilters: [i18n("WMDrawer files (*.json)"), i18n("All files (*)")]
+        onAccepted: {
+            var contents = DrawerFileIO.read(selectedFile)
+            if (DrawerFileIO.lastError.length > 0) {
+                drawerIoError.text = i18n("Could not read drawer: %1", DrawerFileIO.lastError)
+                drawerIoError.open()
+            } else {
+                configPage.importDrawer(contents)
+            }
+        }
+    }
+
+    FileDialog {
+        id: drawerExportDialog
+        title: i18n("Export Drawer")
+        fileMode: FileDialog.SaveFile
+        defaultSuffix: "json"
+        nameFilters: [i18n("WMDrawer files (*.json)")]
+        onAccepted: {
+            var json = JSON.stringify(configPage.portableDrawer(), null, 2)
+            if (!DrawerFileIO.write(selectedFile, json)) {
+                drawerIoError.text = i18n("Could not export drawer: %1", DrawerFileIO.lastError)
+                drawerIoError.open()
+            }
+        }
+    }
+
+    QQC2.Dialog {
+        id: drawerIoError
+        property alias text: drawerIoErrorLabel.text
+        title: i18n("Drawer Import/Export")
+        modal: true
+        parent: QQC2.Overlay.overlay
+        anchors.centerIn: parent
+        standardButtons: QQC2.Dialog.Ok
+        contentItem: QQC2.Label {
+            id: drawerIoErrorLabel
+            padding: Kirigami.Units.largeSpacing
+            wrapMode: Text.WordWrap
         }
     }
 

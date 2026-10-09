@@ -208,6 +208,26 @@ Item {
                 }
             }
         }
+        QQC2.MenuItem {
+            text: i18n("Import Drawer…")
+            icon.name: "document-import"
+            visible: appletId === "org.kde.plasma.wmdrawer"
+            height: visible ? implicitHeight : 0
+            onTriggered: {
+                drawerConfigDialog.openForSlot()
+                drawerImportDialog.open()
+            }
+        }
+        QQC2.MenuItem {
+            text: i18n("Export Drawer…")
+            icon.name: "document-export"
+            visible: appletId === "org.kde.plasma.wmdrawer"
+            height: visible ? implicitHeight : 0
+            onTriggered: {
+                drawerConfigDialog.openForSlot()
+                drawerExportDialog.open()
+            }
+        }
         QQC2.MenuSeparator {
             visible: appletId === "org.kde.plasma.wmlauncher" ||
                      appletId === "org.kde.plasma.wmdrawer"   ||
