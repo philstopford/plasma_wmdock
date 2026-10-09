@@ -363,13 +363,15 @@ Item {
         }
     }
 
-    TapHandler {
-        acceptedButtons: Qt.RightButton
-        onTapped: {
-            var clickPos = root.mapToItem(root, point.position.x, point.position.y)
-            drawerContextMenu.popup(root, clickPos)
-        }
+    PlasmaCore.ToolTipArea {
+        anchors.fill: parent
+        mainText: root.drawerLabel
+        location: Plasmoid.location
+        active: !drawerPopup.visible
     }
+
+    function openImportDialog() { drawerImportDialog.open() }
+    function openExportDialog() { drawerExportDialog.open() }
 
     function portableDrawer() {
         return {
@@ -401,24 +403,6 @@ Item {
         } catch (e) {
             drawerIoError.text = i18n("Could not import drawer: %1", e.toString())
             drawerIoError.open()
-        }
-    }
-
-    QQC2.Menu {
-        id: drawerContextMenu
-        z: 100
-        width: Math.max(220, root.width)
-        QQC2.MenuItem {
-            width: drawerContextMenu.availableWidth
-            text: i18n("Import Drawer…")
-            icon.name: "document-import"
-            onTriggered: drawerImportDialog.open()
-        }
-        QQC2.MenuItem {
-            width: drawerContextMenu.availableWidth
-            text: i18n("Export Drawer…")
-            icon.name: "document-export"
-            onTriggered: drawerExportDialog.open()
         }
     }
 
@@ -466,13 +450,6 @@ Item {
             padding: Kirigami.Units.largeSpacing
             wrapMode: Text.WordWrap
         }
-    }
-
-    PlasmaCore.ToolTipArea {
-        anchors.fill: parent
-        mainText: root.drawerLabel
-        location: Plasmoid.location
-        active: !drawerPopup.visible
     }
 
     // -----------------------------------------------------------------------
@@ -1084,12 +1061,14 @@ Item {
                 width: launcherContextMenu.availableWidth
                 text: i18n("Import Drawer…")
                 icon.name: "document-import"
+                visible: root.externalLaunchers === null
                 onTriggered: drawerImportDialog.open()
             }
             QQC2.MenuItem {
                 width: launcherContextMenu.availableWidth
                 text: i18n("Export Drawer…")
                 icon.name: "document-export"
+                visible: root.externalLaunchers === null
                 onTriggered: drawerExportDialog.open()
             }
         }
