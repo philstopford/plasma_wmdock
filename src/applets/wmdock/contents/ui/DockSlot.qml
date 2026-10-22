@@ -30,6 +30,12 @@ Item {
     signal moveLeft()
     signal moveRight()
     signal slotConfigSaved(int index, string config)
+    // The dock owns the model, so this slot only reports pointer movement.
+    // Keeping reordering there lets the applet and its per-slot configuration
+    // move as one unit.
+    signal dragStarted(int sourceIndex)
+    signal dragMoved(real dockX, real dockY)
+    signal dragFinished(real dockX, real dockY)
 
     // -----------------------------------------------------------------------
     // Outer slot border  (classic raised/inset WM look)
@@ -155,6 +161,34 @@ Item {
         text: "?"
         color: "#ff4444"
         font.pixelSize: parent.height * 0.4
+    }
+
+    // Start a normal pointer drag anywhere on a slot.  A tap stays available
+    // to the embedded applet; this handler only takes the gesture once it has
+    // crossed Qt's drag threshold.
+    DragHandler {
+        id: slotDragHandler
+        target: null
+        acceptedButtons: Qt.LeftButton
+        grabPermissions: PointerHandler.CanTakeOverFromItems |
+                         PointerHandler.ApprovesTakeOverByAnything
+        onActiveChanged: {
+            if (active) {
+                slot.dragStarted(slot.slotIndex)
+            } else {
+                var point = slot.mapToItem(slot.parent,
+                                           centroid.position.x,
+                                           centroid.position.y)
+                slot.dragFinished(point.x, point.y)
+            }
+        }
+        onCentroidChanged: {
+            if (!active) return
+            var point = slot.mapToItem(slot.parent,
+                                       centroid.position.x,
+                                       centroid.position.y)
+            slot.dragMoved(point.x, point.y)
+        }
     }
 
     // -----------------------------------------------------------------------

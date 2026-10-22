@@ -39,6 +39,44 @@ PlasmoidItem {
     // -----------------------------------------------------------------------
     readonly property int count: appletList.length
     readonly property int totalSlots: Math.max(1, count)
+    property int draggedSlotIndex: -1
+
+    // Move an applet and its serialized settings together.  Slots can share
+    // an applet ID, so the active index is the only stable drag identity.
+    function moveSlot(source, target) {
+        if (source < 0 || source >= appletList.length || source === target)
+            return
+        target = Math.max(0, Math.min(target, appletList.length - 1))
+        var applets = [...appletList]
+        var configs = [...slotConfigs]
+        while (configs.length < applets.length) configs.push("")
+        var applet = applets.splice(source, 1)[0]
+        var config = configs.splice(source, 1)[0]
+        applets.splice(target, 0, applet)
+        configs.splice(target, 0, config)
+        Plasmoid.configuration.appletList = applets
+        Plasmoid.configuration.slotConfigs = configs
+        draggedSlotIndex = target
+    }
+
+    function removeSlot(index) {
+        if (index < 0 || index >= appletList.length) return
+        var applets = [...appletList]
+        var configs = [...slotConfigs]
+        applets.splice(index, 1)
+        if (index < configs.length) configs.splice(index, 1)
+        Plasmoid.configuration.appletList = applets
+        Plasmoid.configuration.slotConfigs = configs
+    }
+
+    function updateSlotDrag(dockX, dockY) {
+        if (draggedSlotIndex < 0 || appletList.length < 2) return
+        var axis = isVertical ? dockY : dockX
+        var firstCenter = slotSize / 2
+        var target = Math.floor((axis - firstCenter + (slotSize + slotSpacing) / 2)
+                                / (slotSize + slotSpacing))
+        moveSlot(draggedSlotIndex, target)
+    }
 
     readonly property int panelThickness : slotSize + 8
     readonly property int panelLength    : totalSlots * (slotSize + slotSpacing) + slotSpacing + 4
@@ -99,15 +137,7 @@ PlasmoidItem {
                     slotConfig: index < slotConfigs.length ? slotConfigs[index] : ""
                     dockOrientation: root.isVertical ? "vertical" : "horizontal"
 
-                    onRemoveRequested: {
-                        const lst = [...appletList]
-                        lst.splice(index, 1)
-                        Plasmoid.configuration.appletList = lst
-                        // Also remove corresponding slotConfig
-                        const cfgLst = [...slotConfigs]
-                        if (index < cfgLst.length) cfgLst.splice(index, 1)
-                        Plasmoid.configuration.slotConfigs = cfgLst
-                    }
+                    onRemoveRequested: root.removeSlot(index)
 
                     onMoveLeft: {
                         if (index === 0) return
@@ -139,6 +169,23 @@ PlasmoidItem {
                         cfgLst[index + 1] = cfgLst[index]
                         cfgLst[index]     = tmpCfg
                         Plasmoid.configuration.slotConfigs = cfgLst
+                    }
+
+                    onDragStarted: (sourceIndex) => {
+                        root.draggedSlotIndex = sourceIndex
+                    }
+                    onDragMoved: (dockX, dockY) => {
+                        root.updateSlotDrag(dockX, dockY)
+                    }
+                    onDragFinished: (dockX, dockY) => {
+                        var dragged = root.draggedSlotIndex
+                        // Releasing outside the dock tears the slot off.  A
+                        // release within the Flow keeps the reordered entry.
+                        if (dragged >= 0 && (dockX < 0 || dockY < 0
+                                || dockX > slotFlow.width || dockY > slotFlow.height)) {
+                            root.removeSlot(dragged)
+                        }
+                        root.draggedSlotIndex = -1
                     }
 
                     onSlotConfigSaved: (idx, cfg) => {
