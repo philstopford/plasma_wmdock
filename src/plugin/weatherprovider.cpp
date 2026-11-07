@@ -6,8 +6,13 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QNetworkRequest>
 #include <QUrlQuery>
 #include <QUrl>
+
+namespace {
+constexpr int RequestTimeoutMs = 15000;
+}
 
 WeatherProvider::WeatherProvider(QObject *parent)
     : QObject(parent)
@@ -26,6 +31,18 @@ WeatherProvider::WeatherProvider(QObject *parent)
     m_debounceTimer.setSingleShot(true);
     m_debounceTimer.setInterval(400);
     connect(&m_debounceTimer, &QTimer::timeout, this, &WeatherProvider::refresh);
+
+    // A disconnected network can otherwise leave requests pending for an
+    // implementation-defined amount of time.  Keep at most one bounded
+    // request per applet instance so it can never accumulate stalled replies.
+    m_requestTimeout.setSingleShot(true);
+    m_requestTimeout.setInterval(RequestTimeoutMs);
+    connect(&m_requestTimeout, &QTimer::timeout, this, [this] {
+        if (m_reply) {
+            m_requestTimedOut = true;
+            m_reply->abort();
+        }
+    });
 
     // Delay the first fetch so QML has time to apply all Plasmoid.configuration
     // bindings before the network request fires.  Without this delay the
@@ -77,8 +94,16 @@ void WeatherProvider::setTempUnit(const QString &u)
 
 void WeatherProvider::refresh()
 {
+    // Timers, configuration changes, and user clicks can all request a
+    // refresh.  Do not start another connection while one is still pending.
+    if (m_reply)
+        return;
+
     m_loading = true;
-    m_error.clear();
+    if (!m_error.isEmpty()) {
+        m_error.clear();
+        Q_EMIT errorChanged();
+    }
     Q_EMIT loadingChanged();
 
     QUrl url(QStringLiteral("https://api.open-meteo.com/v1/forecast"));
@@ -91,17 +116,45 @@ void WeatherProvider::refresh()
     query.addQueryItem(QStringLiteral("windspeed_unit"),     QStringLiteral("kmh"));
     url.setQuery(query);
 
-    m_nam.get(QNetworkRequest(url));
+    QNetworkRequest request(url);
+    request.setTransferTimeout(RequestTimeoutMs);
+    request.setHeader(QNetworkRequest::UserAgentHeader,
+                      QStringLiteral("Plasma-WMDock/1.0"));
+    m_requestTimedOut = false;
+    m_reply = m_nam.get(request);
+    m_requestTimeout.start();
 }
 
 void WeatherProvider::onReplyFinished(QNetworkReply *reply)
 {
+    // QNetworkAccessManager only creates replies for this provider, but guard
+    // against a stale reply defensively if its lifetime changes in the future.
+    if (reply != m_reply) {
+        reply->deleteLater();
+        return;
+    }
+
+    m_requestTimeout.stop();
+    m_reply = nullptr;
     reply->deleteLater();
     m_loading = false;
     Q_EMIT loadingChanged();
 
+    if (m_requestTimedOut) {
+        m_error = QStringLiteral("Weather request timed out");
+        Q_EMIT errorChanged();
+        return;
+    }
+
     if (reply->error() != QNetworkReply::NoError) {
-        m_error = reply->errorString();
+        m_error = QStringLiteral("Weather request failed: %1").arg(reply->errorString());
+        Q_EMIT errorChanged();
+        return;
+    }
+
+    const int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    if (httpStatus < 200 || httpStatus >= 300) {
+        m_error = QStringLiteral("Weather service returned HTTP %1").arg(httpStatus);
         Q_EMIT errorChanged();
         return;
     }
@@ -115,6 +168,14 @@ void WeatherProvider::onReplyFinished(QNetworkReply *reply)
 
     const QJsonObject root = doc.object();
     const QJsonObject cw   = root[QLatin1String("current_weather")].toObject();
+
+    if (cw.isEmpty() || !cw.contains(QLatin1String("temperature")) ||
+        !cw.contains(QLatin1String("windspeed")) ||
+        !cw.contains(QLatin1String("weathercode"))) {
+        m_error = QStringLiteral("Weather service returned incomplete data");
+        Q_EMIT errorChanged();
+        return;
+    }
 
     m_temperature = cw[QLatin1String("temperature")].toDouble();
     m_windSpeed   = cw[QLatin1String("windspeed")].toDouble();

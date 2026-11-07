@@ -21,6 +21,8 @@ Item {
     property var    _geoResults:   []
     property bool   _geoSearching: false
     property string _geoError:     ""
+    property var    _geoRequest:   null
+    property int    _geoRequestId: 0
 
     // 1 degree = 1000 SpinBox steps (three decimal places of precision)
     readonly property int _coordScale:     1000
@@ -28,6 +30,9 @@ Item {
 
     function _doGeocode(query) {
         if (query.length === 0) return
+        var requestId = ++_geoRequestId
+        if (_geoRequest)
+            _geoRequest.abort()
         _geoSearching = true
         _geoError     = ""
         _geoResults   = []
@@ -40,7 +45,9 @@ Item {
         xhr.open("GET", url)
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== XMLHttpRequest.DONE) return
+            if (requestId !== page._geoRequestId) return
             geocodeTimer.stop()
+            page._geoRequest = null
             _geoSearching = false
             if (xhr.status === 200) {
                 try {
@@ -57,6 +64,7 @@ Item {
                 _geoError = i18n("Search failed (HTTP %1).").arg(xhr.status)
             }
         }
+        _geoRequest = xhr
         xhr.send()
     }
 
@@ -67,6 +75,13 @@ Item {
         repeat:   false
         onTriggered: {
             if (page._geoSearching) {
+                // XMLHttpRequest has no per-request timeout in this QML API;
+                // abort it explicitly so a lost connection cannot leave an
+                // orphaned request in the Plasma process.
+                ++page._geoRequestId
+                if (page._geoRequest)
+                    page._geoRequest.abort()
+                page._geoRequest = null
                 page._geoSearching = false
                 page._geoError     = i18n("Search timed out.")
             }

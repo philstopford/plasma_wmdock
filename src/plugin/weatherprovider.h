@@ -5,6 +5,7 @@
 #include <QObject>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
+#include <QPointer>
 #include <QTimer>
 #include <QString>
 #include <QVariantMap>
@@ -79,6 +80,8 @@ private:
     QNetworkAccessManager m_nam;
     QTimer  m_timer;         // periodic auto-refresh
     QTimer  m_debounceTimer; // coalesces rapid property changes
+    QTimer  m_requestTimeout;
+    QPointer<QNetworkReply> m_reply;
     double  m_lat         = 51.5;   // default: London
     double  m_lon         = -0.12;
     QString m_locationName;
@@ -88,5 +91,6 @@ private:
     double  m_windSpeed   = 0.0;
     double  m_humidity    = 0.0;
     bool    m_loading     = false;
+    bool    m_requestTimedOut = false;
     QString m_error;
 };
